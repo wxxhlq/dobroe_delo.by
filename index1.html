@@ -1522,11 +1522,11 @@ function helpFormHTML(formId){
       </div>
       <div class="field">
         <label class="small"><input type="checkbox" name="consent" required /> Согласен(на) на обработку данных для связи.</label>
-        <div class="hint">Демо: данные сохраняются в localStorage браузера.</div>
+        <div class="hint"></div>
       </div>
       <div class="row">
         <button class="btn" type="submit">Отправить</button>
-        <button class="btn secondary" type="button" id="helpHow">Как это работает?</button>
+        
       </div>
     </form>
   `;
@@ -1844,217 +1844,263 @@ function openUserMenu(){
 
 /* ===== Pages ===== */
 function renderHome(){
-  const u=currentUser();
-  const published = state.projects.filter(p=>p.status==="PUBLISHED");
+  const u = currentUser();
+  const published = state.projects ? state.projects.filter(p => p.status === "PUBLISHED") : [];
   const kpiProjects = published.length;
-  const kpiVols = state.users.filter(x=>x.role==="VOLUNTEER").length;
-  const kpiStories = state.stories.length;
+  const kpiVols = state.users ? state.users.filter(x => x.role === "VOLUNTEER").length : 0;
+  const kpiStories = state.stories ? state.stories.length : 0;
 
-  const preview = published.slice(0,6);
-  const latestNews = state.news.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,3);
+  const preview = published.slice(0, 6);
+  const latestNews = state.news ? [...state.news].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 3) : [];
 
   const catDesc = {
-    elderly: "Сопровождение, доставка, бытовые задачи.",
-    animals: "Приюты, передержки, помощь животным.",
-    eco: "Субботники, сортировка, инициативы.",
-    children: "Обучение, мастер‑классы, поддержка.",
-    events: "Организация мероприятий и помощь на месте."
+    elderly: "Помощь пожилым: доставка продуктов, общение и бытовая поддержка.",
+    animals: "Помощь приютам: выгул, кормление и поиск нового дома.",
+    eco: "Экология: субботники, переработка и защита природы.",
+    children: "Детям: репетиторство, организация досуга и мастер-классы.",
+    events: "События: помощь в организации городских фестивалей."
   };
 
   $("#app").innerHTML = `
-    <section class="hero" style="--hero-img:url('${STOCK.hero}')">
-      <div class="container hero-inner">
-        <div class="hero-content">
-          <div class="hero-copy">
-            <h1>Добрые дела рядом — начните сегодня</h1>
-            <p>Выберите проект по городу и формату. Откликнитесь за минуту и присоединяйтесь к сообществу, которое реально помогает.</p>
+      <section class="modern-hero" style="min-height: 85vh; display: flex; align-items: center; background: linear-gradient(135deg, #f8f9fa 0%, #eef2ff 100%); overflow: hidden; position: relative; margin-bottom: 80px; ы">
 
-            <div class="hero-actions">
-              <button class="btn" id="homeWantHelp">Найти проект</button>
-              <button class="btn secondary" id="homeNeedHelp">Нужна помощь?</button>
-              ${u ? `<button class="btn secondary" id="homeCabinet">Личный кабинет</button>` : `<button class="btn secondary" id="homeRegister">Регистрация</button>`}
-            </div>
+    <div class="container" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 60px; align-items: center; padding-top: 40px; padding-bottom: 40px;">
+      
+      <div style="animation: slideInLeft 0.8s ease-out; z-index: 2;">
+        
+        <h1 style="font-size: clamp(48px, 5vw, 72px); font-weight: 850; line-height: 1.05; color: var(--text); margin-bottom: 24px; letter-spacing: -1.5px;">
+          Ваше пространство <br>
+          <span style="color: var(--blue);">добрых дел</span>
+        </h1>
+        <p style="font-size: 20px; color: var(--muted); line-height: 1.6; margin-bottom: 40px; max-width: 500px;">
+          Превращаем желание помочь в реальные действия. Присоединяйтесь к тысячам волонтеров, меняющих мир прямо сейчас.
+        </p>
+        
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <button class="btn" id="homeWantHelp" style="padding: 18px 40px; font-size: 17px; border-radius: 16px; box-shadow: 0 10px 30px rgba(37,99,235,0.3);">
+            Найти проект
+          </button>
+          <button class="btn secondary" id="homeNeedHelpPersonal" style="padding: 18px 40px; font-size: 17px; border-radius: 16px; background: #fff; border: 1px solid var(--border);">
+            Нужна помощь
+          </button>
+        </div>
 
-            <div class="hero-down">
-              <button id="scrollToContent">↓</button>
-              <span>Прокрутите вниз, чтобы увидеть проекты</span>
-            </div>
+        <div style="margin-top: 60px; display: flex; gap: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 30px;">
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiProjects}</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Активных проектов</div>
+          </div>
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiVols}+</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Волонтеров</div>
+          </div>
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiStories}</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Добрых историй</div>
           </div>
         </div>
       </div>
+
+      <div style="position: relative; animation: slideInRight 0.8s ease-out; ">
+        <div style="height: 600px; width: 100%; border-radius: 40px; overflow: hidden; box-shadow: 0 20px 80px rgba(0,0,0,0.1); position: relative; z-index: 1;">
+          <img src="${STOCK.hero}" style="width: 100%; height: 100%; object-fit: cover; object-position: 5% center;" alt="Volunteers">
+        </div>
+        
+        <div style="position: absolute; top: 40px; left: -30px; background: #fff; padding: 15px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); z-index: 2; display: flex; align-items: center; gap: 15px; animation: float 6s ease-in-out infinite;">
+          <div style="background: #dcfce7; color: #166534; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛡️</div>
+          <div>
+            <div style="font-weight: 800; font-size: 14px;">Верифицировано</div>
+            <div style="font-size: 12px; color: var(--muted);">Все заявки проверены</div>
+          </div>
+        </div>
+
+        <div style="position: absolute; bottom: 60px; right: -20px; background: #fff; padding: 20px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); z-index: 2; animation: float 7s ease-in-out infinite reverse;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 50%; overflow: hidden;">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" width="40">
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">Алексей М.</div>
+              <div style="font-size: 11px; color: var(--blue);">Только что помог</div>
+            </div>
+          </div>
+          <div style="font-size: 13px; color: var(--muted); line-height: 1.4;">
+            "Это заняло всего час, <br>но эмоций — на неделю!"
+          </div>
+        </div>
+        
+        <div style="position: absolute; top: -10%; right: -10%; width: 300px; height: 300px; background: var(--blue); opacity: 0.05; border-radius: 50%; z-index: 0; filter: blur(50px);"></div>
+      </div>
+
+    </div>
     </section>
 
-    <div class="container" id="homeContent" style="padding-top:16px">
-      <section class="card">
-        <div class="section-title"><h2>О проекте в цифрах</h2><small>демо</small></div>
-        <div class="card-inner">
-          <div class="kpis">
-            <div class="kpi"><div class="num">${kpiProjects}</div><div class="lab">Активных проектов</div></div>
-            <div class="kpi"><div class="num">${kpiVols}</div><div class="lab">Волонтёров</div></div>
-            <div class="kpi"><div class="num">${kpiStories}</div><div class="lab">Историй</div></div>
-          </div>
+    <style>
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes slideInRight { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+
+    /* Адаптив для Hero */
+    @media (max-width: 900px) {
+      .modern-hero .container { grid-template-columns: 1fr !important; text-align: center; }
+      .modern-hero h1 { font-size: 40px !important; }
+      .modern-hero p { margin: 0 auto 30px !important; }
+      /* Центрирование кнопок на мобильных */
+      .modern-hero .container > div:first-child > div[style*="display: flex; gap: 16px"] { justify-content: center; }
+      /* Центрирование статистики на мобильных */
+      .modern-hero .container > div:first-child > div[style*="margin-top: 60px"] { justify-content: center; }
+    }
+    </style>
+
+    <div class="container" style="padding: 0 var(--pad);">
+      
+
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; margin-bottom: 100px;">
+        <div style="padding: 40px; background: var(--blue); color: #fff; border-radius: 30px;">
+          <h3 style="color: #fff; font-size: 28px; margin-bottom: 20px;">Наша миссия</h3>
+          <p style="font-size: 18px; line-height: 1.6; opacity: 0.9;">
+            Сделать благотворительность естественной частью жизни. Мы создаем мост между искренним желанием помочь и теми, кто ждет поддержки.
+          </p>
+        </div>
+        <div style="padding: 40px; background: var(--surface2); border: 1px solid var(--border); border-radius: 30px;">
+          <h3 style="font-size: 28px; margin-bottom: 20px;">Цель проекта</h3>
+          <p class="muted" style="font-size: 18px; line-height: 1.6;">
+            Построить прозрачное сообщество, где каждый участник видит результат своего вклада, а помощь приходит вовремя и по адресу.
+          </p>
         </div>
       </section>
 
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>Категории помощи</h2><small>быстрый выбор</small></div>
-        <div class="cats" id="catsGrid">
-          ${CATEGORIES.map(c=>`
-            <div class="catcard" data-cat="${c.id}">
-              <div class="catbadge"><span class="dot"></span>${esc(c.name)}</div>
-              <div class="d">${esc(catDesc[c.id] || "Выберите проекты по теме.")}</div>
+      <section style="margin-bottom: 100px;">
+        <div class="section-title"><h2>Категории помощи</h2></div>
+        <div id="catsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-top: 30px;">
+          ${CATEGORIES.map(c => `
+            <div class="catcard" data-cat="${c.id}" style="background: #fff; padding: 30px; border-radius: 20px; border: 1px solid var(--border); transition: 0.3s; cursor: pointer;">
+              <div style="font-size: 36px; margin-bottom: 15px;">${c.id === 'elderly' ? '👵' : c.id === 'animals' ? '🐾' : c.id === 'eco' ? '🌱' : c.id === 'children' ? '👶' : '🎉'}</div>
+              <h4 style="margin-bottom: 10px; font-weight: 800;">${esc(c.name)}</h4>
+              <p style="font-size: 14px; color: var(--muted); line-height: 1.5;">${esc(catDesc[c.id] || "Поддержка в этой сфере.")}</p>
             </div>
           `).join("")}
         </div>
       </section>
 
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>Почему это удобно</h2><small>платформа</small></div>
-        <div class="features">
-          <div class="feature">
-            <div class="icon">⚡</div>
-            <div class="title">Быстрый отклик</div>
-            <div class="text">Один клик — и заявка отправлена. В демо подтверждение происходит автоматически.</div>
-          </div>
-          <div class="feature">
-            <div class="icon">🧭</div>
-            <div class="title">Удобный поиск</div>
-            <div class="text">Фильтры по региону, городу и формату, чтобы не тратить время на лишнее.</div>
-          </div>
-          <div class="feature">
-            <div class="icon">🏅</div>
-            <div class="title">Прогресс и баллы</div>
-            <div class="text">Баллы волонтёра и история участия — мотивация и прозрачность.</div>
-          </div>
+      <section style="margin-bottom: 100px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px;">
+          <h2 style="font-size: 32px; font-weight: 850;">Популярные проекты</h2>
+          <button class="btn secondary" id="homeAllProjects">Все проекты →</button>
+        </div>
+        <div class="project-grid" id="homeProjects" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px;">
+          ${preview.map(projectCard).join("")}
         </div>
       </section>
 
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>Популярно сейчас</h2><small>карточки с фото</small></div>
-        <div class="card-inner">
-          <div class="row" style="margin-bottom:10px">
-            ${CATEGORIES.slice(0,4).map(c=>`<button class="chip" data-homecat="${c.id}">${esc(c.name)}</button>`).join("")}
-            <span class="right"></span>
-            <button class="btn secondary" id="homeAllProjects">Смотреть все</button>
-          </div>
-          <div class="project-grid" id="homeProjects">${preview.map(projectCard).join("")}</div>
-        </div>
-      </section>
-
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>Как это работает</h2><small>4 шага</small></div>
-        <div class="steps">
-          <div class="step"><div class="n">1</div><div class="t k">Регистрация</div><div class="d">Создайте аккаунт и заполните профиль.</div></div>
-          <div class="step"><div class="n">2</div><div class="t k">Выбор проекта</div><div class="d">Фильтруйте по городу, формату и теме.</div></div>
-          <div class="step"><div class="n">3</div><div class="t k">Отклик</div><div class="d">Нажмите «Откликнуться» и следите за статусом.</div></div>
-          <div class="step"><div class="n">4</div><div class="t k">Участие</div><div class="d">Помогайте и получайте баллы в профиле.</div></div>
-        </div>
-      </section>
-
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>Отзывы</h2><small>что говорят люди</small></div>
-        <div class="quotes">
-          <div class="quote">
-            <div class="q">«Очень удобно: нашла проект рядом, быстро откликнулась и сразу получила подтверждение.»</div>
-            <div class="who">
-              <div class="avatar" style="background-image:url('${STOCK.avatar1}')"></div>
-              <div>
-                <div class="k">Мария</div>
-                <div class="muted small">Волонтёр</div>
+      <section style="margin-bottom: 100px;">
+        <h2 style="font-size: 32px; font-weight: 850; margin-bottom: 30px;">Новости и события</h2>
+        <div id="homeNews" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+          ${latestNews.map(n => `
+            <div class="news-item" data-news="${n.id}" style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: 0.3s;">
+              <div style="height: 180px; background: url('${n.image || STOCK.news}') center/cover;"></div>
+              <div style="padding: 20px;">
+                <h3 style="font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3;">${esc(n.title)}</h3>
+                <div style="margin-top: 12px; font-size: 12px; color: var(--blue); font-weight: 700; text-transform: uppercase;">${fmtDate(n.date)}</div>
               </div>
             </div>
-          </div>
-          <div class="quote">
-            <div class="q">«Карточки проектов выглядят понятно — видно дату, город и сколько мест осталось.»</div>
-            <div class="who">
-              <div class="avatar" style="background-image:url('${STOCK.avatar2}')"></div>
-              <div>
-                <div class="k">Иван</div>
-                <div class="muted small">Участник</div>
-              </div>
-            </div>
-          </div>
-          <div class="quote">
-            <div class="q">«Нравится, что есть новости и истории — создаётся ощущение живого сообщества.»</div>
-            <div class="who">
-              <div class="avatar" style="background-image:url('${STOCK.avatar3}')"></div>
-              <div>
-                <div class="k">Алина</div>
-                <div class="muted small">Волонтёр</div>
-              </div>
-            </div>
-          </div>
+          `).join("")}
         </div>
       </section>
 
-      <section class="card" style="margin-top:16px">
-        <div class="section-title"><h2>FAQ</h2><small>частые вопросы</small></div>
-        <div class="card-inner">
-          <details class="faq">
-            <summary>Как откликнуться на проект?<span class="muted">+</span></summary>
-            <div class="ans">Откройте проект и нажмите «Откликнуться». В демо подтверждение произойдёт автоматически.</div>
+      <section id="helpSection" style="background: var(--surface2); padding: 60px; border-radius: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-bottom: 100px;">
+        <div>
+          <h2 style="font-size: 36px; font-weight: 850; margin-bottom: 25px;">Нужна помощь?</h2>
+          <p style="color: var(--muted); font-size: 18px; line-height: 1.7; margin-bottom: 30px;">
+            Расскажите нам о своей ситуации. Мы верифицируем заявки и направляем волонтеров для адресной помощи людям, оказавшимся в непростых обстоятельствах.
+          </p>
+          <div style="display: flex; gap: 30px;">
+             <div style="text-align: center;"><div style="font-size: 32px;">🍎</div><div style="font-weight: 700; font-size: 12px;">Продукты</div></div>
+             <div style="text-align: center;"><div style="font-size: 32px;">📦</div><div style="font-weight: 700; font-size: 12px;">Доставка</div></div>
+             <div style="text-align: center;"><div style="font-size: 32px;">🤝</div><div style="font-weight: 700; font-size: 12px;">Поддержка</div></div>
+          </div>
+        </div>
+        <div id="homeHelpFormWrap" style="background: #fff; padding: 40px; border-radius: 30px; box-shadow: var(--shadow);">
+        </div>
+      </section>
+
+      <section style="max-width: 900px; margin: 0 auto 100px;">
+        <h2 style="text-align: center; font-size: 36px; font-weight: 850; margin-bottom: 50px;">Вопросы и ответы</h2>
+        <div style="display: grid; gap: 16px;">
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Кто может стать волонтером? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Любой желающий старше 14 лет. Мы подберем проект, соответствующий вашему времени и возможностям. Для подростков до 18 лет требуется согласие родителей.</p>
           </details>
-          <details class="faq">
-            <summary>Где хранятся данные?<span class="muted">+</span></summary>
-            <div class="ans">В демо — в localStorage вашего браузера. В реальном проекте будет сервер и база данных.</div>
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Как происходит проверка заявок на помощь? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Модераторы связываются с заявителем для уточнения деталей. Это необходимо для обеспечения безопасности наших волонтеров и адресности помощи.</p>
           </details>
-          <details class="faq">
-            <summary>Можно ли отменить отклик?<span class="muted">+</span></summary>
-            <div class="ans">Да, в личном кабинете можно отменить отклик (статус станет CANCELLED).</div>
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Зачем мне копить баллы? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Баллы — это ваша репутация. Они открывают доступ к специальным бонусам, мерчу и приоритету в участии в крупных городских событиях.</p>
           </details>
         </div>
       </section>
-
-      <div class="grid" style="margin-top:16px">
-        <section class="card">
-          <div class="section-title"><h2>Новости</h2><small class="link" data-go="#/news">Все новости</small></div>
-          <div class="list" id="homeNews">
-            ${latestNews.map(n=>`
-              <div class="news-item" data-news="${n.id}">
-                <div class="thumb" style="background-image:url('${STOCK.news}')"></div>
-                <div>
-                  <h3>${esc(n.title)}</h3>
-                  <div class="news-meta">${fmtDate(n.date)} · 👍 ${n.likes}</div>
-                  <p>${esc(n.excerpt)}</p>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        </section>
-
-        <aside class="card">
-          <div class="section-title"><h2>Нужна помощь?</h2><small>быстрая заявка</small></div>
-          <div class="card-inner" id="homeHelpFormWrap"></div>
-        </aside>
-      </div>
     </div>
+
+    <footer style="background: var(--text); color: #fff; padding: 80px 0 40px;">
+      <div class="container">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 60px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 60px;">
+          <div>
+            <div style="font-size: 26px; font-weight: 850; margin-bottom: 20px;">Доброе_дело.by</div>
+            <p style="opacity: 0.6; line-height: 1.6; max-width: 400px;">Единая платформа волонтерства и социальной взаимопомощи. Сделаем наш город добрее вместе.</p>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Навигация</h4>
+            <div style="display: grid; gap: 12px; opacity: 0.8; font-size: 15px;">
+              <span class="link" onclick="navigate('#/projects')">Проекты</span>
+              <span class="link" onclick="navigate('#/news')">Новости</span>
+              <span class="link" onclick="navigate('#/about')">О нас</span>
+            </div>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Контакты</h4>
+            <p style="opacity: 0.8; font-size: 15px;">info@ddby.by</p>
+            <p style="opacity: 0.8; font-size: 15px;">+375 (29) 000-00-00</p>
+          </div>
+        </div>
+        <div style="margin-top: 40px; text-align: center; opacity: 0.4; font-size: 13px;">© 2026 Доброе_дело.by. Все права защищены.</div>
+      </div>
+    </footer>
+
+    <style>
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .catcard:hover, .news-item:hover { border-color: var(--blue) !important; transform: translateY(-5px); box-shadow: var(--shadow); }
+      details summary { list-style: none; }
+      details summary::-webkit-details-marker { display: none; }
+    </style>
   `;
 
-  $("#homeNeedHelp").onclick=openHelpModal;
-  $("#homeWantHelp").onclick=()=>navigate("#/projects");
-  $("#homeAllProjects").onclick=()=>navigate("#/projects");
-  if(u) $("#homeCabinet").onclick=()=>navigate("#/cabinet");
-  else $("#homeRegister").onclick=openAuthModal;
+  // Логика кнопок
+  $("#homeWantHelp").onclick = () => navigate("#/projects");
+  $("#homeAllProjects").onclick = () => navigate("#/projects");
+  $("#homeNeedHelpPersonal").onclick = () => document.getElementById('helpSection').scrollIntoView({behavior:'smooth'});
 
-  $("#scrollToContent").onclick=()=>$("#homeContent").scrollIntoView({behavior:"smooth"});
+  const fw = $("#homeHelpFormWrap");
+  if(fw) {
+    fw.innerHTML = helpFormHTML("homeHelp");
+    $("#homeHelp").addEventListener("submit", onSubmitHelpForm);
+  }
 
-  $("#homeHelpFormWrap").innerHTML = helpFormHTML("homeHelp");
-  $("#homeHelp").addEventListener("submit", onSubmitHelpForm);
-  $("#helpHow").onclick=()=>openModal("Как это работает?", `<div class="muted">Заявка сохраняется локально (демо). В реальной версии — обработка модератором.</div>`);
+  $$("#homeNews .news-item").forEach(el => el.onclick = () => openNewsModal(el.dataset.news));
+  
+  $$("#catsGrid .catcard").forEach(el => el.onclick = () => {
+    navigate("#/projects");
+    setTimeout(() => { 
+        const sel = $("#fCategory"); 
+        if(sel) { sel.value = el.dataset.cat; $("#btnApplyFilters")?.click(); } 
+    }, 0);
+  });
 
-  $$("#homeNews .news-item").forEach(el=>el.addEventListener("click",()=>openNewsModal(el.dataset.news)));
-  $$(".link[data-go]").forEach(el=>el.addEventListener("click",()=>navigate(el.dataset.go)));
   bindProjectButtons($("#homeProjects"));
-
-  $$(".chip[data-homecat]").forEach(btn=>btn.addEventListener("click",()=>{
-    navigate("#/projects");
-    setTimeout(()=>{ const sel=$("#fCategory"); if(sel){ sel.value=btn.dataset.homecat; $("#btnApplyFilters")?.click(); } },0);
-  }));
-
-  $$("#catsGrid .catcard").forEach(card=>card.addEventListener("click",()=>{
-    navigate("#/projects");
-    setTimeout(()=>{ const sel=$("#fCategory"); if(sel){ sel.value=card.dataset.cat; $("#btnApplyFilters")?.click(); } },0);
-  }));
 }
 
 function renderProjects(){
@@ -3174,6 +3220,94 @@ window.saveAdminNews = function() {
     renderNews(); // Перерисовываем страницу новостей
     toast("ok", "Готово", "Ваша новость опубликована!");
 };
+
+function renderAbout() {
+    $("#app").innerHTML = `
+    <div class="container" style="padding-top: 80px; padding-bottom: 120px;">
+        
+        <header style="max-width: 900px; margin-bottom: 80px;">
+            <div style="display: inline-block; background: var(--blueSoft); color: var(--blue); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 24px; text-transform: uppercase;">
+                Социально-образовательная инициатива
+            </div>
+            <h1 style="font-size: clamp(34px, 5vw, 68px); line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 30px; font-weight: 800;">
+                Платформа для тех, кто <br><span style="color: var(--blue)">не привык оставаться в стороне.</span>
+            </h1>
+            <p style="font-size: 20px; color: var(--text); line-height: 1.6; max-width: 750px; opacity: 0.85;">
+                Доброе_дело.by — это наш ответ на вопрос о том, как сделать волонтерство частью жизни современного человека. Мы создаем пространство, где помощь становится простой, честной и доступной каждому.
+            </p>
+        </header>
+
+        <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; margin-bottom: 80px;">
+            
+            <div class="card" style="grid-column: span 8; padding: 50px; background: var(--blueSoft); border: none; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="font-size: 26px; margin-bottom: 20px; color: var(--blue);">Почему мы это делаем?</h3>
+                <p style="font-size: 17px; color: var(--text); line-height: 1.7;">
+                    Мы заметили, что многие хотят приносить пользу, но не знают, с чего начать. Проект объединяет запросы о помощи от приютов, активистов и социальных центров в единую систему. Теперь, чтобы сделать шаг навстречу важному делу, достаточно лишь намерения и доступа к платформе.
+                </p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 40px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 50px; margin-bottom: 15px;">📍</div>
+                <h3 style="margin-bottom: 10px; font-size: 20px;">Свои для своих</h3>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Мы создаем инструмент, который помогает локальным инициативам находить поддержку прямо здесь и сейчас. Это проект о людях, которые живут рядом.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Честность</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">На платформе размещаются только проверенные инициативы. Мы за то, чтобы каждый участник был уверен в прозрачности и значимости своего вклада.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Развитие</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Волонтерство — это не только помощь другим, но и прокачка собственных навыков, новые знакомства и накопление уникального опыта.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Технологии</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Мы используем цифровой потенциал, чтобы автоматизировать поиск проектов и сделать взаимодействие волонтера и организатора мгновенным.</p>
+            </div>
+        </div>
+
+        <div style="background: var(--surface2); border-radius: 30px; padding: 60px; border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1.2fr; gap: 60px; align-items: center;">
+            <div>
+                <h2 style="font-size: 32px; margin-bottom: 25px;">Задачи проекта</h2>
+                <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 18px;">
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">01</span> 
+                        <span style="font-size: 16px;">Сформировать удобную инфраструктуру для реализации социальных идей.</span>
+                    </li>
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">02</span> 
+                        <span style="font-size: 16px;">Дать возможность каждому стать частью масштабного движения взаимопомощи.</span>
+                    </li>
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">03</span> 
+                        <span style="font-size: 16px;">Показать потенциал студенческих инициатив в решении актуальных проблем общества.</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div style="text-align: right; padding-left: 40px; border-left: 1px solid var(--border);">
+                <div style="font-size: 80px; margin-bottom: 20px; opacity: 0.2;">✨</div>
+                <h3 style="margin-bottom: 15px; font-size: 26px;">Культура соучастия</h3>
+                <p class="muted" style="font-size: 16px; line-height: 1.7;">
+                    Мы строим не просто инструмент, а среду, основанную на взаимном уважении и искренности. Если ваша организация разделяет наши ценности или вам нужна поддержка в реализации доброй идеи — мы готовы стать вашей технической и информационной опорой в рамках развития этого проекта.
+                </p>
+            </div>
+        </div>
+
+        <div style="margin-top: 80px; text-align: center;">
+            <p style="color: var(--muted); margin-bottom: 20px;">Остались вопросы или есть предложения по сотрудничеству?</p>
+            <div style="display: flex; justify-content: center; gap: 15px;">
+                <button class="btn" onclick="location.href='mailto:info@ddby.by'">Связаться с командой</button>
+                <button class="btn secondary" onclick="location.hash='#/projects'">Перейти к проектам</button>
+            </div>
+        </div>
+
+    </div>
+    `;
+}
+
 
 </script>
 </body>
