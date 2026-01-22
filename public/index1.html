@@ -1196,6 +1196,164 @@
     font-size: 17px;
     color: var(--text);
 }
+    /* Современные карточки проектов */
+    .project-card {
+        background: #fff;
+        border-radius: 28px;
+        border: 1px solid rgba(0,0,0,0.05);
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .project-card:hover {
+        transform: translateY(-12px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        border-color: var(--blue-light);
+    }
+
+    .project-card .img-wrapper {
+        overflow: hidden;
+        height: 220px;
+        position: relative;
+    }
+
+    .project-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.6s ease;
+    }
+
+    .project-card:hover img {
+        transform: scale(1.08);
+    }
+
+    /* Прогресс-бар */
+    .progress-container {
+        background: #f0f2f5;
+        border-radius: 10px;
+        height: 8px;
+        width: 100%;
+        margin: 15px 0;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        background: linear-gradient(90deg, var(--blue), #60a5fa);
+        height: 100%;
+        border-radius: 10px;
+        transition: width 1s ease-in-out;
+    }
+
+    /* Улучшенное модальное окно */
+    /* Основной контейнер модалки — делаем его шире */
+    #modal-content {
+        max-width: 900px !important; /* Увеличиваем ширину */
+        width: 95% !important;
+        padding: 0 !important; /* Убираем стандартные паддинги, чтобы фото было во весь край */
+        border-radius: 32px !important;
+        overflow: hidden;
+        border: none !important;
+    }
+
+    /* Современная верстка внутри модалки */
+    .modal-modern {
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-header-img {
+        height: 400px;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+    }
+
+    .modal-body-content {
+        padding: 40px 50px; /* Большие отступы для "воздуха" */
+        margin-top: -40px; /* Наплыв на фото */
+        background: #fff;
+        border-radius: 40px 40px 0 0;
+        position: relative;
+        z-index: 2;
+    }
+
+    .close-modal-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        z-index: 10;
+    }
+
+    .tag {
+        padding: 6px 16px;
+        background: #f1f5f9;
+        border-radius: 100px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--blue);
+    }
+
+    .project-card .img-wrapper {
+        height: 220px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .project-card .img-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+    }
+
+    .project-card:hover img {
+        transform: scale(1.1);
+    }
+
+    /* Стили для кнопки избранного */
+    .fav-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(5px);
+        border: none;
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: 0.3s;
+    }
+
+    .fav-btn:hover { transform: scale(1.1); background: #fff; }
+    .fav-btn.active { background: #fff1f2; }
+
+    /* Прогресс бар */
+    .progress-bar-bg { background: #f1f5f9; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
+    .progress-bar-fill { background: var(--blue); height: 100%; border-radius: 10px; }
   </style>
 </head>
 
@@ -1324,68 +1482,52 @@ function seed(){
   const orgU  = { id: uid("u"), role:"ORGANIZER", email:"org@demo.by", pass:"org", name:"Организатор", city:"Минск", phone:"+375(44)222-33-44", points: 0, privacy:"public", createdAt: nowISO() };
   const org = { id: uid("org"), ownerUserId: orgU.id, name:"ОО «Добрые люди»", status:"VERIFIED", contacts:"org@demo.by", rating: 4.8, createdAt: nowISO() };
 
-  const projects = [
-    {
-      id: uid("p"), orgId: org.id, categoryId:"elderly",
-      title:"Сопровождение пожилых в поликлинику",
-      descriptionShort:"Нужны волонтёры для сопровождения (Минск), 2–3 часа.",
-      descriptionFull:"Помощь пожилым людям: встретить у дома, сопроводить в поликлинику и обратно. Важно: внимательность и доброжелательность.",
-      region:"Минск", city:"Минск", address:"ул. Примерная, 10",
-      startDate: new Date(Date.now()+86400000*3).toISOString(),
-      endDate: new Date(Date.now()+86400000*3).toISOString(),
-      format:"Разовое", skills:["Сопровождение","Коммуникация"],
-      flags:{urgent:true, few:false},
-      capacity: 8, approved: 3,
-      allowKids:false, minorsAllowed:true,
-      status:"PUBLISHED",
-      createdAt: nowISO()
-    },
-    {
-      id: uid("p"), orgId: org.id, categoryId:"animals",
-      title:"Приют: выгул собак и уборка территории",
-      descriptionShort:"Нужно 10 человек. Перчатки и инвентарь выдаём на месте.",
-      descriptionFull:"Помогаем приюту: выгул собак, уборка, сортировка кормов. С собой удобная одежда и закрытая обувь.",
-      region:"Минская", city:"Жодино", address:"Приют (условный адрес)",
-      startDate: new Date(Date.now()+86400000*5).toISOString(),
-      endDate: new Date(Date.now()+86400000*5).toISOString(),
-      format:"Разовое", skills:["Любовь к животным"],
-      flags:{urgent:false, few:true},
-      capacity: 10, approved: 8,
-      allowKids:true, minorsAllowed:true,
-      status:"PUBLISHED",
-      createdAt: nowISO()
-    },
-    {
-      id: uid("p"), orgId: org.id, categoryId:"eco",
-      title:"Эко-субботник у реки",
-      descriptionShort:"Сбор мусора, сортировка. После — чай и фотоотчёт.",
-      descriptionFull:"Выездная уборка берега реки. Выдадим пакеты и перчатки. Важна безопасность и соблюдение инструктажа.",
-      region:"Гродненская", city:"Гродно", address:"Набережная (точка сбора в чате проекта)",
-      startDate: new Date(Date.now()+86400000*10).toISOString(),
-      endDate: new Date(Date.now()+86400000*10).toISOString(),
-      format:"Разовое", skills:["Командная работа"],
-      flags:{urgent:false, few:false},
-      capacity: 25, approved: 9,
-      allowKids:true, minorsAllowed:true,
-      status:"PUBLISHED",
-      createdAt: nowISO()
-    },
-    {
-      id: uid("p"), orgId: org.id, categoryId:"children",
-      title:"Мастер‑класс по программированию для подростков",
-      descriptionShort:"Нужны наставники: базовый JS/логика. Формат: 2 встречи.",
-      descriptionFull:"Проводим мастер‑класс для подростков. Требуется умение объяснять простыми словами и поддерживать дружелюбную атмосферу.",
-      region:"Минск", city:"Минск", address:"Коворкинг (условный адрес)",
-      startDate: new Date(Date.now()+86400000*7).toISOString(),
-      endDate: new Date(Date.now()+86400000*14).toISOString(),
-      format:"Регулярное", skills:["Работа с детьми","Публичные выступления"],
-      flags:{urgent:true, few:true},
-      capacity: 6, approved: 5,
-      allowKids:false, minorsAllowed:false,
-      status:"PUBLISHED",
-      createdAt: nowISO()
-    }
-  ];
+    const projects = [
+        {
+            id: "p_1", categoryId: "elderly",
+            image: "images/img2.png",
+            title: "Сопровождение пожилых в поликлинику",
+            descriptionShort: "Помощь в передвижении и моральная поддержка.",
+            descriptionFull: "Нужны волонтеры для помощи пожилым людям. Нужно зайти за человеком домой, проводить до кабинета врача и помочь вернуться обратно.",
+            city: "Минск",
+            startDate: new Date().toISOString(),
+            capacity: 8, approved: 3, // используем эти имена полей
+            status: "PUBLISHED"
+        },
+        {
+            id: "p_2", orgId: "org1", categoryId: "animals",
+            image: "img/animals.jpg",
+            title: "Выгул собак в приюте «Лапа»",
+            descriptionShort: "Активная прогулка с нашими подопечными.",
+            descriptionFull: "Приюту не хватает рук для выгула активных собак. Мы выдадим поводки и проведем инструктаж. С собой — удобная обувь.",
+            region: "Минская обл.", city: "Жодино", address: "ул. Зеленая, 1",
+            startDate: new Date().toISOString(),
+            volunteersNeeded: 15, volunteersFound: 12,
+            status: "PUBLISHED"
+        },
+        {
+            id: "p_3", orgId: "org1", categoryId: "eco",
+            image: "img/eco.jpg",
+            title: "Эко-патруль: Чистый берег",
+            descriptionShort: "Уборка мусора и установка табличек у реки.",
+            descriptionFull: "Масштабная акция по очистке береговой линии. Весь инвентарь (перчатки, пакеты) предоставляем. После работы — пикник.",
+            region: "Гродно", city: "Гродно", address: "наб. Немана",
+            startDate: new Date().toISOString(),
+            volunteersNeeded: 30, volunteersFound: 10,
+            status: "PUBLISHED"
+        },
+        {
+            id: "p_4", orgId: "org1", categoryId: "children",
+            image: "img/coding.jpg",
+            title: "Программирование для подростков",
+            descriptionShort: "Основы JS и логики для ребят из детских домов.",
+            descriptionFull: "Если вы знаете основы программирования, помогите нам передать эти знания детям. Формат мастер-класса.",
+            region: "Минск", city: "Минск", address: "ул. Октябрьская, 16",
+            startDate: new Date().toISOString(),
+            volunteersNeeded: 5, volunteersFound: 2,
+            status: "PUBLISHED"
+        }
+    ];
 
   const news = [
     { id: uid("n"), title:"Доброе_дело.by — старт!", date: nowISO(), excerpt:"Запустили демо‑платформу: проекты, заявки, новости, кабинет.", body:"Это автономная версия на HTML/CSS/JS. Данные сохраняются в localStorage вашего браузера.", comments:[], likes:0 },
@@ -1445,43 +1587,80 @@ function setActiveNav(){
 }
 
 /* components */
-function projectCard(p){
-  const cat = CATEGORIES.find(c=>c.id===p.categoryId)?.name || "Категория";
-  const fill = p.capacity ? Math.round((p.approved/p.capacity)*100) : 0;
-  const flags = [
-    p.flags?.urgent ? `<span class="flag urgent">Срочно</span>` : "",
-    (p.flags?.few || (p.capacity - p.approved <= 2)) ? `<span class="flag few">Мало мест</span>` : ""
-  ].join("");
 
-  const img = projectPhoto(p.categoryId);
+function projectCard(p) {
+    if (!p) return "";
 
-  return `
-    <article class="project">
-      <div class="pimg" style="background-image:url('${img}')">
-        <div class="flags">${flags}</div>
+    // 1. ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ/КАБИНЕТЕ)
+    const cat = (state.categories || []).find(c => c.id === p.categoryId);
+
+    // Формируем путь: если есть http — берем как есть, если нет — добавляем img/,
+    // если пусто — вызываем заглушку projectPhoto
+    const imgUrl = p.image
+        ? (p.image.startsWith('http') ? p.image : 'img/' + p.image)
+        : (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+
+    // 2. ЛОГИКА ИЗБРАННОГО
+    const favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
+    const isFav = favorites.includes(p.id);
+
+    // 3. РАСЧЕТ ПРОГРЕССА
+    const total = p.capacity || 1;
+    const current = p.approved || 0;
+    const progress = Math.min(Math.round((current / total) * 100), 100);
+
+    return `
+    <div class="project-card" style="position: relative;">
+      <button class="fav-btn ${isFav ? 'active' : ''}"
+              onclick="event.stopPropagation(); toggleFavorite('${p.id}')">
+        ${isFav ? '❤️' : '🤍'}
+      </button>
+
+      <div class="img-wrapper" onclick="openProjectModal('${p.id}')">
+        <img src="${imgUrl}"
+             alt="${esc(p.title)}"
+             onerror="this.onerror=null; this.src='img/social.jpg';">
+
+        <div class="card-tag">${esc(cat?.name || "Проект")}</div>
       </div>
-      <div class="pbody">
-        <div class="tagrow">
-          <span class="tag">${esc(cat)}</span>
-          <span class="tag">${esc(p.format||"—")}</span>
-          <span class="tag">${esc(p.city)}</span>
+
+      <div style="padding: 24px; cursor: pointer;" onclick="openProjectModal('${p.id}')">
+        <div style="font-size: 12px; color: var(--blue); font-weight: 700; margin-bottom: 8px;">
+           📍 ${esc(p.city || 'Город')}
         </div>
-        <h3 class="ptitle">${esc(p.title)}</h3>
-        <p class="pdesc">${esc(p.descriptionShort||"")}</p>
-        <div class="meta">
-          <span>📅 ${fmtDate(p.startDate)}</span>
-          <span>👥 ${p.approved}/${p.capacity}</span>
+        <h3 style="font-weight: 850; font-size: 20px; color: var(--text);">${esc(p.title)}</h3>
+        <p style="color: var(--muted); font-size: 14px; margin: 12px 0 20px;">${esc(p.descriptionShort || '')}</p>
+
+        <div class="progress-bar-bg" style="background: #f1f5f9; height: 8px; border-radius: 10px; overflow: hidden; margin-bottom: 10px;">
+          <div class="progress-bar-fill" style="width: ${progress}%; background: var(--blue); height: 100%;"></div>
         </div>
-        <div class="bar"><div style="width:${clamp(fill,0,100)}%"></div></div>
-        <div class="actions">
-          <button class="btn secondary" data-action="details" data-id="${p.id}">Подробнее</button>
-          <button class="btn secondary" data-action="fav" data-id="${p.id}">В избранное</button>
-          <button class="btn" data-action="apply" data-id="${p.id}">Откликнуться</button>
+
+        <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700;">
+          <span style="color: var(--text);">👥 ${current} / ${total}</span>
+          <span style="color: var(--blue);">${progress}%</span>
         </div>
       </div>
-    </article>
-  `;
+    </div>`;
 }
+
+
+function toggleFavorite(id) {
+    let favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
+    if (favorites.includes(id)) {
+        favorites = favorites.filter(favId => favId !== id);
+    } else {
+        favorites.push(id);
+    }
+    localStorage.setItem('favProjects', JSON.stringify(favorites));
+
+    // Если есть функция роутинга или отрисовки, вызываем её
+    if (window.location.hash.includes('profile')) {
+        renderPersonalCabinet(); // Если мы в личном кабинете
+    } else {
+        renderHome(); // Если мы на главной
+    }
+}
+
 function bindProjectButtons(root){
   $$("[data-action]", root).forEach(btn=>{
     btn.addEventListener("click",(e)=>{
@@ -1587,53 +1766,51 @@ function applyToProject(projectId){
 }
 
 /* Modals */
-function openProjectModal(projectId){
-  const p=state.projects.find(x=>x.id===projectId);
-  if(!p) return;
-  const org=state.organizations.find(o=>o.id===p.orgId);
-  const cat=CATEGORIES.find(c=>c.id===p.categoryId)?.name||"—";
-  const fill=p.capacity?Math.round((p.approved/p.capacity)*100):0;
-  const u=currentUser();
-  const isFav = u && (state.favorites[u.id]||[]).includes(p.id);
-  const myApp = u ? state.applications.find(a=>a.projectId===p.id && a.userId===u.id && a.status!=="CANCELLED") : null;
 
-  openModal("Проект", `
-    <div class="pimg" style="height:200px;border-radius:16px;border:1px solid var(--border);background-image:url('${projectPhoto(p.categoryId)}')"></div>
-    <div class="hr"></div>
+function openProjectModal(id) {
+    // Ищем проект в стейте или глобальном массиве
+    const p = (state.projects || []).find(x => x.id === id) || projects.find(x => x.id === id);
+    if (!p) return;
 
-    <div class="tagrow">
-      <span class="tag">${esc(cat)}</span>
-      <span class="tag">📍 ${esc(p.city)}</span>
-      <span class="tag">🕒 ${esc(p.format)}</span>
-    </div>
+    // --- ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ) ---
+    const imgUrl = p.image
+        ? (p.image.startsWith('http') ? p.image : 'img/' + p.image)
+        : (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
 
-    <h2 style="margin:12px 0 6px">${esc(p.title)}</h2>
-    <div class="muted">📅 ${fmtDate(p.startDate)} · 👥 ${p.approved}/${p.capacity}</div>
+    const html = `
+    <div class="modal-modern">
+      <div class="modal-header-img-container" style="position: relative; width: 100%; height: 380px; overflow: hidden; background: #eee;">
+        <img src="${imgUrl}"
+             alt="${esc(p.title)}"
+             style="width: 100%; height: 100%; object-fit: cover; display: block;"
+             onerror="this.src='img/social.jpg'">
 
-    <div class="hr"></div>
-    <div class="k">Описание</div>
-    <div class="muted" style="line-height:1.7; margin-top:6px">${esc(p.descriptionFull)}</div>
+        <button onclick="closeModal()" class="close-modal-btn">✕</button>
+      </div>
 
-    <div class="hr"></div>
-    <div class="k">Набор</div>
-    <div class="muted" style="margin-top:6px">Заполнение: ${fill}%</div>
-    <div class="bar" style="margin-top:8px"><div style="width:${clamp(fill,0,100)}%"></div></div>
+      <div class="modal-body-content" style="padding: 40px; background: #fff;">
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+           <span class="tag">#${p.categoryId || 'Общее'}</span>
+           <span class="tag" style="background: #fef3c7; color: #92400e;">📍 ${p.city || 'Минск'}</span>
+        </div>
 
-    <div class="hr"></div>
-    <div class="k">Организатор</div>
-    <div class="muted" style="margin-top:6px">${esc(org?.name||"—")} · статус: ${esc(org?.status||"—")} · рейтинг: ${org?.rating ?? "—"}</div>
+        <h2 style="font-size: 32px; font-weight: 900; margin-bottom: 20px; color: var(--text);">${esc(p.title)}</h2>
 
-    <div class="hr"></div>
-    <div class="row">
-      <button class="btn secondary" id="pmFav">${isFav ? "Убрать из избранного":"В избранное"}</button>
-      <button class="btn" id="pmApply">Откликнуться</button>
-      <span class="right"></span>
-      <span class="catbadge"><span class="dot"></span>${u ? ("Статус: "+(myApp?myApp.status:"нет")) : "Нужен вход"}</span>
-    </div>
-  `);
+        <p style="font-size: 17px; line-height: 1.7; color: #4b5563; margin-bottom: 30px;">
+            ${p.descriptionFull || p.descriptionShort || 'Описание отсутствует.'}
+        </p>
 
-  $("#pmFav").onclick = ()=>{ toggleFavorite(p.id); closeModal(); openProjectModal(p.id); };
-  $("#pmApply").onclick = ()=>{ applyToProject(p.id); closeModal(); };
+        <div style="background: #f8fafc; padding: 25px; border-radius: 24px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #eef2f6;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Волонтеры</div>
+            <div style="font-size: 24px; font-weight: 900; color: var(--blue);">${p.approved || 0} из ${p.capacity || 0}</div>
+          </div>
+          <button class="btn" style="padding: 16px 32px; border-radius: 16px;" onclick="directApply('${p.id}')">Откликнуться</button>
+        </div>
+      </div>
+    </div>`;
+
+    showModal(html);
 }
 
 function openNewsModal(id){
@@ -1724,7 +1901,7 @@ function openHelpModal(){
 
 function openAuthModal(){
   openModal("Вход / регистрация", `
-    <div class="muted">Демо‑режим: данные хранятся в вашем браузере.</div>
+
     <div class="hr"></div>
 
     <div class="two">
@@ -1732,10 +1909,10 @@ function openAuthModal(){
         <div class="card-inner">
           <div class="k">Вход</div>
           <form id="loginForm" style="margin-top:10px">
-            <div class="field"><label>Email</label><input name="email" type="email" required placeholder="vol@demo.by"></div>
-            <div class="field"><label>Пароль</label><input name="pass" type="password" required placeholder="vol"></div>
+            <div class="field"><label>Email</label><input name="email" type="email"></div>
+            <div class="field"><label>Пароль</label><input name="pass" type="password"></div>
             <button class="btn" type="submit">Войти</button>
-            <div class="hint" style="margin-top:10px">Тесты: admin@demo.by/admin · vol@demo.by/vol · org@demo.by/org</div>
+
           </form>
         </div>
       </div>
