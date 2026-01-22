@@ -1,0 +1,3636 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Доброе_дело.by — Blue UI</title>
+<!-- марк лох объелся блох -->
+  <style>
+    :root{
+      --bg: #f6f8fc;
+      --surface: #ffffff;
+      --surface2: #f9fbff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e6eaf2;
+
+      --blue: #1d4ed8;
+      --blue2:#2563eb;
+      --blueSoft:#eff6ff;
+
+      --shadow: 0 10px 28px rgba(15,23,42,.08);
+      --shadow2: 0 16px 44px rgba(15,23,42,.14);
+
+      --radius: 18px;
+      --radius2: 14px;
+
+      --max: 1700px;
+      --pad: 44px; /* ~50px, можно 32px если хочешь еще плотнее */
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", sans-serif;
+    }
+    @media (max-width: 900px){
+      :root{ --pad: 16px; }
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--font);
+      color:var(--text);
+      background: var(--bg);
+    }
+
+    a{color:inherit; text-decoration:none}
+    button,input,select,textarea{font:inherit}
+    .container{max-width:var(--max); margin:0 auto; padding:0 var(--pad)}
+    .muted{color:var(--muted)}
+    .k{font-weight:1000}
+    .small{font-size:12.5px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .right{margin-left:auto}
+    .hr{height:1px; background: var(--border); margin:14px 0}
+
+    /* Top progress */
+    .scrollbar{
+      position:fixed; inset:0 0 auto 0;
+      height:3px;
+      background: var(--blue2);
+      transform-origin:left center;
+      transform: scaleX(0);
+      z-index:70;
+      pointer-events:none;
+    }
+
+    /* Header */
+    .topbar{
+      position:sticky; top:0; z-index:60;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar-inner{display:flex; align-items:center; gap:14px; padding:12px 0}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:1000; letter-spacing:.2px}
+    .logo{
+      width:38px; height:38px;
+      border-radius: 12px;
+      background: var(--blue2);
+      display:grid; place-items:center;
+      box-shadow: 0 10px 18px rgba(37,99,235,.25);
+      overflow:hidden;
+    }
+    .logo svg{width:20px; height:20px; color:#fff}
+
+    .nav{display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; align-items:center}
+
+    .chip{
+      padding:8px 10px;
+      border-radius: 999px;
+      border:1px solid transparent;
+      background: transparent;
+      font-weight:850;
+      color: var(--muted);
+      cursor:pointer;
+      transition: background .14s ease, transform .14s ease, color .14s ease, border-color .14s ease;
+    }
+    .chip:hover{transform: translateY(-1px); background: rgba(15,23,42,.04)}
+    .chip.active{
+      color: var(--blue);
+      background: var(--blueSoft);
+      border-color: rgba(29,78,216,.18);
+    }
+
+    .btn{
+      padding:10px 14px;
+      border-radius: 999px;
+      border:1px solid transparent;
+      background: var(--blue2);
+      color:#fff;
+      font-weight:950;
+      cursor:pointer;
+      transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+      box-shadow: 0 14px 28px rgba(37,99,235,.20);
+    }
+    .btn:hover{transform: translateY(-1px); box-shadow: var(--shadow2); background: var(--blue)}
+    .btn:active{transform: translateY(0)}
+    .btn.secondary{
+      background: #fff;
+      color: var(--text);
+      border-color: var(--border);
+      box-shadow:none;
+      font-weight:900;
+    }
+    .btn.secondary:hover{background: var(--surface2)}
+    .btn.danger{
+      background:#fff1f2;
+      border-color:#fecdd3;
+      color:#9f1239;
+      box-shadow:none;
+      font-weight:900;
+    }
+    .iconbtn{
+      padding:10px 12px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background:#fff;
+      font-weight:900;
+      cursor:pointer;
+      display:flex; align-items:center; gap:8px;
+      transition: transform .14s ease, background .14s ease, box-shadow .14s ease;
+    }
+    .iconbtn:hover{transform: translateY(-1px); background: var(--surface2); box-shadow: var(--shadow)}
+
+    main{padding:0 0 44px}
+
+    /* Cards */
+    .card{
+      background: var(--surface);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-inner{padding:16px}
+    .section-title{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      background: #fff;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .section-title h2{margin:0; font-size:16px}
+    .section-title small{color:var(--muted); font-weight:900}
+    .link{color:var(--blue); text-decoration: underline; cursor:pointer; font-weight:900}
+
+    /* Layout */
+    .grid{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px}
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+
+    /* ===== FULLSCREEN HERO ===== (text centered; common pattern: image cover + overlay) */
+    .hero{
+      height: 92vh;
+      min-height: 640px;
+      max-height: 980px;
+      position:relative;
+      overflow:hidden;
+      border-bottom:1px solid var(--border);
+      background:#0b1226;
+    }
+    @media (max-width: 980px){
+      .hero{height:auto; min-height: 0}
+    }
+    .hero::before{
+      content:"";
+      position:absolute; inset:0;
+      background-image: var(--hero-img);
+      background-size: cover;
+      background-position: center;
+      background-repeat:no-repeat;
+      transform: scale(1.03);
+      filter: saturate(1.08) contrast(1.05);
+      z-index:0;
+    }
+    .hero::after{
+      content:"";
+      position:absolute; inset:0;
+      background: rgba(2,6,23,.58); /* не градиент */
+      z-index:1;
+    }
+    .hero-inner{
+      position:relative;
+      z-index:2;
+      height:100%;
+      display:grid;
+      align-items:center;
+      padding: 18px 0 28px;
+    }
+    .hero-content{display:flex; justify-content:center}
+    .hero-copy{
+      text-align:center;
+      color:#fff;
+      max-width: 80ch;
+      margin: 0 auto;
+    }
+    .hero-copy h1{
+      margin:0;
+      font-size: clamp(36px, 5.2vw, 70px);
+      line-height:1.01;
+      letter-spacing:.2px;
+      text-wrap: balance;
+    }
+    .hero-copy p{
+      margin:16px auto 0;
+      color: rgba(255,255,255,.86);
+      line-height:1.75;
+      font-weight:650;
+      font-size: 17px;
+      max-width: 62ch;
+    }
+    .hero-actions{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+    .hero-actions .btn.secondary{
+      background: rgba(255,255,255,.14);
+      border-color: rgba(255,255,255,.18);
+      color:#fff;
+    }
+    .hero-actions .btn.secondary:hover{ background: rgba(255,255,255,.20); }
+
+    .hero-down{
+      margin-top: 18px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      color: rgba(255,255,255,.82);
+      font-weight:850;
+      font-size:13px;
+    }
+    .hero-down button{
+      border:none;
+      background: rgba(255,255,255,.12);
+      color:#fff;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:999px;
+      padding:10px 12px;
+      cursor:pointer;
+      transition: transform .14s ease, background .14s ease;
+    }
+    .hero-down button:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.18);
+    }
+
+    /* Hover feel (card hover: transform + shadow is a standard modern pattern) */
+    .project, .news-item, .step, .catcard, .feature, .quote{
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .project:hover, .news-item:hover, .step:hover, .catcard:hover, .feature:hover, .quote:hover{
+      transform: translateY(-4px);
+      box-shadow: var(--shadow2);
+      border-color: rgba(29,78,216,.22);
+    }
+
+    /* KPI */
+    .kpis{display:grid; grid-template-columns: repeat(3,1fr); gap:12px}
+    @media (max-width: 560px){ .kpis{grid-template-columns:1fr} }
+    .kpi{
+      padding:14px;
+      border-radius: 16px;
+      background: #fff;
+      border:1px solid var(--border);
+    }
+    .kpi .num{font-weight:1000; font-size:26px; color: var(--blue)}
+    .kpi .lab{margin-top:4px; color:var(--muted); font-weight:850}
+
+    /* Category cards */
+    .cats{display:grid; grid-template-columns: repeat(5,1fr); gap:12px; padding:16px}
+    @media (max-width: 980px){ .cats{grid-template-columns: repeat(2,1fr)} }
+    @media (max-width: 520px){ .cats{grid-template-columns:1fr} }
+    .catcard{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background:#fff;
+      padding:12px;
+      cursor:pointer;
+      overflow:hidden;
+      position:relative;
+      min-height: 110px;
+    }
+    .catcard::after{
+      content:"";
+      position:absolute;
+      inset:auto -40px -60px auto;
+      width:160px; height:160px;
+      border-radius:999px;
+      background: rgba(37,99,235,.10);
+    }
+    .catcard .t{font-weight:1000}
+    .catcard .d{margin-top:6px; color:var(--muted); font-size:13px; line-height:1.45}
+    .catbadge{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:950;
+      padding:6px 10px;
+      border-radius: 999px;
+      background: var(--blueSoft);
+      border:1px solid rgba(29,78,216,.16);
+      color:#1e3a8a;
+    }
+    .dot{width:9px; height:9px; border-radius:999px; background: var(--blue2)}
+
+    /* Features block */
+    .features{display:grid; grid-template-columns: repeat(3,1fr); gap:12px; padding:16px}
+    @media (max-width: 920px){ .features{grid-template-columns:1fr} }
+    .feature{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background:#fff;
+      padding:14px;
+    }
+    .feature .icon{
+      width:38px; height:38px;
+      border-radius: 14px;
+      background: var(--blueSoft);
+      border:1px solid rgba(29,78,216,.16);
+      display:grid; place-items:center;
+      color: var(--blue);
+      font-weight:1000;
+    }
+    .feature .title{margin-top:10px; font-weight:1000}
+    .feature .text{margin-top:6px; color:var(--muted); line-height:1.6; font-size:13.5px}
+
+    /* Project cards */
+    .project-grid{display:grid; grid-template-columns: repeat(2, 1fr); gap:12px}
+    @media (max-width: 740px){ .project-grid{grid-template-columns:1fr} }
+    .project{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      overflow:hidden;
+      background: #fff;
+      display:flex;
+      flex-direction:column;
+      box-shadow:none;
+    }
+    .pimg{
+      height: 350px;
+      background:#eaf1ff;
+      background-size: cover;
+      background-position:center;
+      border-bottom:1px solid var(--border);
+      position:relative;
+    }
+    .flags{
+      position:absolute; right:10px; top:10px;
+      display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;
+    }
+    .flag{
+      font-size:12px; font-weight:1000;
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.92);
+      border:1px solid var(--border);
+      color: var(--muted);
+      backdrop-filter: blur(8px);
+    }
+    .flag.urgent{border-color: rgba(239,68,68,.35); color:#991b1b}
+    .flag.few{border-color: rgba(29,78,216,.35); color:#1d4ed8}
+
+    .pbody{padding:12px 12px 14px; display:flex; flex-direction:column; gap:10px; flex:1}
+    .ptitle{margin:0; font-size:15px; font-weight:1000}
+    .pdesc{margin:0; color: var(--muted); line-height:1.45; font-size:13.5px}
+
+    .tagrow{display:flex; gap:8px; flex-wrap:wrap}
+    .tag{
+      font-size:12px; font-weight:900;
+      padding:6px 10px;
+      border-radius: 999px;
+      background: #fff;
+      border:1px solid var(--border);
+      color: var(--muted);
+    }
+    .meta{display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-weight:850; font-size:13px}
+
+    .bar{height:8px; background:#eef2ff; border-radius:999px; overflow:hidden}
+    .bar>div{height:100%; width:0%; background: var(--blue2); transition: width .6s ease}
+
+    .actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:auto}
+
+    /* News list */
+    .list{display:flex; flex-direction:column; gap:10px; padding:16px}
+    .news-item{
+      display:flex; gap:12px;
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      padding:12px;
+      cursor:pointer;
+    }
+    .thumb{
+      width:92px; height:72px;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      background-size:cover;
+      background-position:center;
+      flex:0 0 auto;
+    }
+    .news-item h3{margin:0; font-size:14px; font-weight:1000}
+    .news-item p{margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.35}
+    .news-meta{margin-top:6px; color:var(--muted); font-size:12.5px; font-weight:900}
+
+    /* Steps */
+    .steps{display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; padding:16px}
+    @media (max-width: 860px){ .steps{grid-template-columns:1fr 1fr} }
+    @media (max-width: 480px){ .steps{grid-template-columns:1fr} }
+    .step{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      padding:12px;
+    }
+    .step .n{
+      width:34px; height:34px; border-radius: 12px;
+      display:grid; place-items:center;
+      font-weight:1000; color:#fff; background: var(--blue2);
+      margin-bottom:8px;
+    }
+    .step .t{font-weight:1000}
+    .step .d{margin-top:6px; color:var(--muted); line-height:1.35; font-size:13px}
+
+    /* Quotes/testimonials */
+    .quotes{display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; padding:16px}
+    @media (max-width: 980px){ .quotes{grid-template-columns:1fr} }
+    .quote{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background:#fff;
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .quote .q{color:var(--muted); line-height:1.7}
+    .quote .who{display:flex; align-items:center; gap:10px; margin-top:auto}
+    .avatar{
+      width:40px; height:40px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background-size:cover;
+      background-position:center;
+      flex: 0 0 auto;
+    }
+
+    /* FAQ */
+    details.faq{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background:#fff;
+      overflow:hidden;
+    }
+    details.faq + details.faq{margin-top:10px}
+    details.faq summary{
+      list-style:none;
+      cursor:pointer;
+      padding:12px 14px;
+      font-weight:1000;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    details.faq summary::-webkit-details-marker{display:none}
+    details.faq .ans{
+      border-top:1px solid var(--border);
+      padding:12px 14px;
+      color:var(--muted);
+      line-height:1.7;
+      background: var(--surface2);
+    }
+
+    /* Filters */
+    .split{display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:16px}
+    @media (max-width: 980px){ .split{grid-template-columns:1fr} }
+    .sidebar{
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      padding:12px;
+      box-shadow:none;
+    }
+    .field{display:flex; flex-direction:column; gap:6px; margin:10px 0}
+    label{font-weight:950; font-size:13px}
+    input,select,textarea{
+      border:1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 14px;
+      padding:10px 12px;
+      outline:none;
+    }
+    textarea{min-height:100px; resize:vertical}
+    input:focus,select:focus,textarea:focus{
+      border-color: rgba(29,78,216,.35);
+      box-shadow: 0 0 0 4px rgba(29,78,216,.10);
+    }
+    .two{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media (max-width: 560px){ .two{grid-template-columns:1fr} }
+    .hint{color:var(--muted); font-size:12.5px; line-height:1.45}
+
+    /* Modal */
+    .modal{
+      position:fixed; inset:0;
+      background: rgba(15,23,42,.55);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:16px; z-index:100;
+    }
+    .modal.open{display:flex}
+    .modal-card{
+      width: min(980px, 100%);
+      max-height: 86vh;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 24px 70px rgba(15,23,42,.30);
+    }
+    .modal-head{
+      position:sticky; top:0;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      background: #fff;
+      z-index:1;
+    }
+    .modal-title{margin:0; font-size:15px; font-weight:1000}
+    .modal-body{padding:16px}
+
+    /* Toasts */
+    .toast{
+      position:fixed; right:12px; bottom:12px;
+      width: min(420px, calc(100% - 24px));
+      display:flex; flex-direction:column; gap:10px;
+      z-index:200;
+    }
+    .toast .t{
+      border:1px solid var(--border);
+      background: #fff;
+      border-radius: 16px;
+      padding:12px;
+      box-shadow: var(--shadow);
+      display:flex; gap:10px; align-items:flex-start;
+    }
+    .dot2{width:10px; height:10px; border-radius:999px; margin-top:5px; background: var(--blue2)}
+    .dot2.warn{background: #f59e0b}
+    .dot2.danger{background: #ef4444}
+    .dot2.ok{background: #10b981}
+
+    /* Table */
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      overflow:hidden;
+      border-radius: 16px;
+      border:1px solid var(--border);
+      background: #fff;
+    }
+    .table th,.table td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+      font-size:13.5px;
+    }
+    .table th{font-weight:1000; background: #f9fafb}
+    .table tr:last-child td{border-bottom:none}
+
+    @media (prefers-reduced-motion: reduce){
+      *{scroll-behavior:auto!important; transition:none!important; animation:none!important}
+    }
+
+
+        /* === СТИЛИ ДЛЯ НОВОГО КАБИНЕТА === */
+    .cab-grid { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 800px) { .cab-grid { grid-template-columns: 1fr; } }
+
+    /* Карточка профиля слева */
+    .profile-card { text-align: center; padding: 24px; position: relative; overflow: hidden; }
+    .avatar-wrapper {
+      width: 120px; height: 120px; margin: 0 auto 16px; border-radius: 50%;
+      position: relative; cursor: pointer; border: 4px solid var(--surface2);
+      box-shadow: var(--shadow2); overflow: hidden; group: hover;
+    }
+    .avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; transition: filter 0.2s; }
+    .avatar-wrapper:hover img { filter: brightness(0.7); }
+    .avatar-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #fff; opacity: 0; transition: opacity 0.2s; font-size: 24px; font-weight: bold;
+    }
+    .avatar-wrapper:hover .avatar-overlay { opacity: 1; }
+
+    .user-name { font-size: 20px; font-weight: 1000; color: var(--text); margin-bottom: 4px; }
+    .user-role { 
+      display: inline-block; padding: 4px 12px; background: var(--blueSoft); 
+      color: var(--blue); border-radius: 99px; font-size: 12px; font-weight: 800; margin-bottom: 16px;
+    }
+
+    /* Статистика и Прогресс */
+    .level-box { background: var(--surface2); padding: 16px; border-radius: 12px; margin-top: 16px; text-align: left; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+    .progress-container { height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--blue), #8b5cf6); width: 0%; transition: width 0.6s ease; }
+
+    /* Сетка статистики */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px; text-align: center; }
+    .stat-val { font-size: 24px; font-weight: 1000; color: var(--blue); }
+    .stat-lbl { font-size: 12px; color: var(--muted); font-weight: 700; margin-top: 4px; }
+
+    /* Форма редактирования */
+    .settings-box { padding: 0; background: transparent; border: none; box-shadow: none; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .inp-group label { display: block; margin-bottom: 6px; font-weight: 700; font-size: 13px; color: var(--muted); }
+    .inp-modern { 
+      width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); 
+      background: var(--surface2); font-weight: 600; transition: all 0.2s;
+    }
+    .inp-modern:focus { background: #fff; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(29,78,216,0.1); }
+
+        /* === СТИЛИ ДОСТИЖЕНИЙ === */
+    .badges-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .badge-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 8px;
+      text-align: center;
+      transition: all 0.3s ease;
+      filter: grayscale(1); /* По умолчанию серые */
+      opacity: 0.6;
+      cursor: pointer;
+    }
+    .badge-item.unlocked {
+      filter: grayscale(0); /* Цветные, если разблокированы */
+      opacity: 1;
+      background: #fff;
+      border-color: var(--blueSoft);
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.08);
+    }
+    .badge-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+      display: block;
+      cursor: pointer;
+    }
+    .badge-name {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.2;
+      cursor: pointer;
+    }
+
+    .badge-modal-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7);
+      display: flex; align-items: center; justify-content: center; z-index: 2000;
+      backdrop-filter: blur(4px); animation: fadeIn 0.2s;
+    }
+    .badge-modal {
+      background: #fff; width: 90%; max-width: 400px; padding: 32px;
+      border-radius: 24px; text-align: center; box-shadow: var(--shadow2);
+      position: relative; animation: slideUp 0.3s;
+    }
+    .badge-modal .badge-icon-big { font-size: 64px; margin-bottom: 16px; display: block; }
+    .badge-modal h3 { font-size: 24px; margin-bottom: 8px; color: var(--text); }
+    .badge-modal p { color: var(--muted); line-height: 1.5; margin-bottom: 20px; }
+
+    .badge-status-tag {
+      display: inline-block; padding: 6px 16px; border-radius: 99px;
+      font-size: 13px; font-weight: 700; margin-bottom: 20px;
+    }
+    .status-unlocked { background: #dcfce7; color: #166534; }
+    .status-locked { background: #f1f5f9; color: #475569; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .cabinet-fav-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      padding: 10px 0;
+    }
+    .project-card-cab {
+      border: 1px solid var(--border);
+      transition: transform 0.2s;
+    }
+    .project-card-cab:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+    }
+
+    /* Контейнер для сетки избранного */
+    #favGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+      padding: 20px 0;
+    }
+
+    /* Стили карточки проекта в кабинете */
+    .project-card-cab {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      height: 100%;
+    }
+
+    .project-card-cab:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow2);
+      border-color: var(--blue);
+    }
+
+    /* Исправление отображения изображения */
+    .project-card-cab img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover; /* Это заставляет картинку заполнять блок без искажений */
+      display: block;
+      background-color: #f1f5f9; /* Цвет заглушки, пока грузится фото */
+    }
+
+    /* Контент внутри карточки */
+    .project-card-cab .card-content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .project-card-cab h4 {
+      font-size: 1.1rem;
+      margin: 10px 0;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    /* Кнопки в карточке */
+    .project-card-cab .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .project-card-cab .btn {
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+    }
+
+    /* Ссылка на удаление */
+    .btn-remove-fav {
+      background: none;
+      border: none;
+      color: #ef4444; /* Красный цвет для удаления */
+      font-size: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      margin-top: 15px;
+      padding: 5px;
+      transition: opacity 0.2s;
+      text-align: center;
+      width: 100%;
+    }
+
+    .btn-remove-fav:hover {
+      text-decoration: underline;
+      opacity: 0.8;
+    }
+        /* Контейнер картинки */
+    .card-img-wrapper {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      overflow: hidden;
+    }
+
+    /* Красивый бейдж категории поверх фото */
+    .cab-cat-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(255, 255, 255, 0.85); /* Полупрозрачный белый */
+      backdrop-filter: blur(8px); /* Эффект размытия сзади */
+      -webkit-backdrop-filter: blur(8px);
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue); /* Используем ваш основной синий цвет */
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      z-index: 2;
+    }
+
+    /* Стили заголовка, чтобы он не слипался */
+    .project-card-cab h4 {
+      margin: 0 0 16px 0;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2; /* Ограничение в 2 строки */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      height: 42px;
+    }
+    .project-card-cab .btn-group .btn:last-child {
+    background: var(--blue);
+    color: white;
+    border: none;
+    transition: background 0.2s;
+    }
+
+    .project-card-cab .btn-group .btn:last-child:hover {
+        background: var(--blue2);
+        transform: scale(1.02);
+    }
+    /* Структура Сообщества */
+.community-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr 300px;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .community-layout { grid-template-columns: 1fr; }
+    .community-aside-left, .community-aside-right { order: 2; }
+    .community-main { order: 1; }
+}
+
+/* Структура Сообщества */
+.community-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr 300px;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .community-layout { grid-template-columns: 1fr; }
+    .community-aside-left, .community-aside-right { order: 2; }
+    .community-main { order: 1; }
+}
+
+/* Стили рейтинга */
+.rank-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 12px;
+    transition: background 0.2s;
+}
+.rank-item:hover { background: var(--blueSoft); }
+.rank-number {
+    width: 24px; font-weight: 800; color: var(--muted); font-size: 14px;
+}
+
+/* Стили постов */
+.post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+.post-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.post-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.post-content { font-size: 15px; line-height: 1.6; color: var(--text); }
+
+/* Кнопка создания поста */
+.create-post-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-align: left;
+    color: var(--muted);
+    margin-bottom: 24px;
+    transition: 0.3s;
+}
+.create-post-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+/* Модалка для создания поста */
+.post-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease;
+}
+
+.post-modal {
+    background: var(--surface);
+    width: 100%;
+    max-width: 550px;
+    border-radius: 20px;
+    box-shadow: var(--shadow2);
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.post-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.post-modal-body { padding: 20px; }
+
+.post-area {
+    width: 100%;
+    height: 150px;
+    border: none;
+    resize: none;
+    font-size: 17px;
+    font-family: inherit;
+    outline: none;
+    margin-top: 10px;
+}
+
+.post-modal-footer {
+    padding: 12px 20px;
+    background: var(--surface2);
+    display: flex;
+    justify-content: flex-end;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Кнопки взаимодействия в посте */
+.post-actions {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+.action-btn:hover { color: var(--blue); }
+.action-btn.liked { color: #ef4444; font-weight: bold; }
+
+/* Комментарии */
+.comments-section {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 10px;
+    margin-top: 10px;
+}
+.comment-item {
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+/* Иконки в модалке создания */
+.post-attach-btns {
+    display: flex;
+    gap: 15px;
+    color: var(--muted);
+    font-size: 20px;
+}
+.post-attach-btns span { cursor: pointer; transition: 0.2s; }
+.post-attach-btns span:hover { color: var(--blue); transform: scale(1.1); }
+
+/* Кнопка удаления */
+.post-delete-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.5;
+    transition: 0.2s;
+}
+.post-delete-btn:hover { opacity: 1; color: #ef4444; }
+
+/* Комментарии VK Style */
+.vk-comments-wrapper {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border);
+}
+.vk-comment {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    animation: fadeIn 0.3s ease;
+}
+.vk-comment img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.vk-comment-bubble {
+    background: var(--bg);
+    padding: 8px 12px;
+    border-radius: 12px;
+    flex: 1;
+}
+.vk-comment-name { font-weight: 700; font-size: 13px; margin-bottom: 2px; color: var(--blue); cursor: pointer; }
+.vk-comment-text { font-size: 13px; line-height: 1.4; }
+
+.vk-comment-input-area {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+.vk-comment-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    outline: none;
+}
+.vk-comment-input:focus { border-color: var(--blue); background: #fff; }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(15, 23, 42, 0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Контейнер в ленте: адаптируется под фото, но не выше 550px */
+.post-media-container {
+    margin: 12px 0;
+    border-radius: 12px;
+    background: #ebedf0; /* Светло-серый как в VK */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    max-height: 550px; 
+    width: 100%;
+    overflow: hidden;
+}
+
+.post-media-container img, 
+.post-media-container video {
+    max-width: 100%;
+    max-height: 550px;
+    width: auto; /* Позволяет фото сохранять свои пропорции */
+    height: auto;
+    object-fit: contain; /* ФОТО НЕ ОБРЕЗАЕТСЯ, видно всё */
+    display: block;
+}
+
+/* Компактное превью при создании поста (чтобы не на весь экран) */
+#postMediaPreview {
+    margin-top: 10px;
+    border-radius: 8px;
+    max-height: 200px; /* Жесткое ограничение в модалке */
+    overflow: hidden;
+    background: var(--bg);
+    display: none;
+    border: 1px solid var(--border);
+}
+
+#postMediaPreview img, 
+#postMediaPreview video {
+    width: 100%;
+    max-height: 200px;
+    object-fit: cover; /* В маленьком превью можно прикрыть */
+}
+/* Сетка карточек */
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+/* Карточка новости */
+.news-card {
+    position: relative;
+    height: 350px;
+    border-radius: 20px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: transform 0.3s ease;
+}
+
+.news-card:hover {
+    transform: scale(1.02);
+}
+
+.news-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Градиент поверх фото, чтобы текст читался */
+.news-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 25px;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 60%;
+}
+
+.news-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.3;
+}
+
+/* Контент новости в модалке */
+.full-news-content {
+    max-width: 800px;
+    margin: 0 auto;
+    line-height: 1.8;
+    font-size: 17px;
+    color: var(--text);
+}
+  </style>
+</head>
+
+<body>
+<div class="scrollbar" id="scrollbar"></div>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="#/">
+      <div class="logo" aria-hidden="true">
+        <img src="logo.png" alt="Логотип" style="width:100%; height:100%; object-fit:cover;">
+      </div>
+      <div>Доброе_дело.by</div>
+    </a>
+
+    <nav class="nav" aria-label="Навигация">
+      <span class="chip" data-route="#/">Главная</span>
+      <span class="chip" data-route="#/projects">Проекты</span>
+      <span class="chip" data-route="#/community">Сообщество</span>
+      <span class="chip" data-route="#/news">Новости</span>
+      <span class="chip" data-route="#/about">О нас</span>
+      <span class="chip" data-route="#/contacts">Контакты</span>
+      <button class="iconbtn" id="btnOpenAuth">Вход</button>
+      <button class="btn" id="btnCtaHelp">Хочу помочь</button>
+    </nav>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 class="modal-title" id="modalTitle">Окно</h3>
+      <button class="btn secondary" id="modalClose">Закрыть</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toasts" aria-live="assertive"></div>
+
+<script>
+/* ===== State / storage (из твоего исходника) ===== */
+const LS_KEY = "ddby_flat_v1"; // [file:87]
+
+const CATEGORIES = [
+  { id:"elderly", name:"Помощь пожилым" },
+  { id:"animals", name:"Защита животных" },
+  { id:"eco", name:"Экология" },
+  { id:"children", name:"Дети и семья" },
+  { id:"events", name:"События" },
+];
+const FORMATS = ["Разовое","Регулярное","Удалённое"];
+const HELP_TYPES = ["Бытовая помощь","Доставка","Сопровождение","Консультация","Другое"];
+const REGIONS = ["Минск","Минская","Брестская","Витебская","Гомельская","Гродненская","Могилёвская"];
+
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const uid = (p="id") => `${p}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+
+function esc(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString("ru-RU",{year:"numeric",month:"2-digit",day:"2-digit"}); }
+function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+function nowISO(){ return new Date().toISOString(); }
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY); // [file:87]
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state)); // [file:87]
+}
+
+function toast(type,title,msg){
+  const wrap = $("#toasts");
+  const el = document.createElement("div");
+  el.className="t";
+  const dot = document.createElement("div");
+  dot.className = "dot2 " + (type==="warn"?"warn": type==="danger"?"danger":"ok");
+  const body = document.createElement("div");
+  body.innerHTML = `<b>${esc(title)}</b><div class="muted">${esc(msg)}</div>`;
+  el.append(dot, body);
+  wrap.append(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+/* progress bar */
+const sb = $("#scrollbar");
+function updateScrollBar(){
+  const h = document.documentElement;
+  const max = (h.scrollHeight - h.clientHeight) || 1;
+  const v = clamp(h.scrollTop / max, 0, 1);
+  sb.style.transform = `scaleX(${v})`;
+}
+document.addEventListener("scroll", updateScrollBar);
+
+/* Stock photos (Unsplash CDN hotlink) */
+const STOCK = {
+  hero:    "images/bg.avif",
+  elderly: "images/img1.png",
+  animals: "images/img2.jpg",
+  eco:     "images/img3.jpg",
+  children:"images/img4.png",
+  events:  "images/events.avif",
+  news:    "images/news.avif",
+  avatar1: "images/img5.png",
+  avatar2: "images/img6.avif",
+  avatar3: "images/img7.avif"
+};
+function projectPhoto(catId){
+  if(catId==="elderly") return STOCK.elderly;
+  if(catId==="animals") return STOCK.animals;
+  if(catId==="eco") return STOCK.eco;
+  if(catId==="children") return STOCK.children;
+  return STOCK.events;
+}
+
+/* seed (как у тебя) */
+function seed(){
+  const admin = { id: uid("u"), role:"ADMIN", email:"admin@demo.by", pass:"admin", name:"Администратор", city:"Минск", phone:"+375(00)000-00-00", points: 999, privacy:"public", createdAt: nowISO() };
+  const vol1  = { id: uid("u"), role:"VOLUNTEER", email:"vol@demo.by", pass:"vol", name:"Алина К.", city:"Минск", phone:"+375(29)123-45-67", points: 120, privacy:"public", createdAt: nowISO() };
+  const vol2  = { id: uid("u"), role:"VOLUNTEER", email:"ivan@demo.by", pass:"vol", name:"Иван С.", city:"Брест", phone:"+375(33)555-11-22", points: 80, privacy:"public", createdAt: nowISO() };
+  const orgU  = { id: uid("u"), role:"ORGANIZER", email:"org@demo.by", pass:"org", name:"Организатор", city:"Минск", phone:"+375(44)222-33-44", points: 0, privacy:"public", createdAt: nowISO() };
+  const org = { id: uid("org"), ownerUserId: orgU.id, name:"ОО «Добрые люди»", status:"VERIFIED", contacts:"org@demo.by", rating: 4.8, createdAt: nowISO() };
+
+  const projects = [
+    {
+      id: uid("p"), orgId: org.id, categoryId:"elderly",
+      title:"Сопровождение пожилых в поликлинику",
+      descriptionShort:"Нужны волонтёры для сопровождения (Минск), 2–3 часа.",
+      descriptionFull:"Помощь пожилым людям: встретить у дома, сопроводить в поликлинику и обратно. Важно: внимательность и доброжелательность.",
+      region:"Минск", city:"Минск", address:"ул. Примерная, 10",
+      startDate: new Date(Date.now()+86400000*3).toISOString(),
+      endDate: new Date(Date.now()+86400000*3).toISOString(),
+      format:"Разовое", skills:["Сопровождение","Коммуникация"],
+      flags:{urgent:true, few:false},
+      capacity: 8, approved: 3,
+      allowKids:false, minorsAllowed:true,
+      status:"PUBLISHED",
+      createdAt: nowISO()
+    },
+    {
+      id: uid("p"), orgId: org.id, categoryId:"animals",
+      title:"Приют: выгул собак и уборка территории",
+      descriptionShort:"Нужно 10 человек. Перчатки и инвентарь выдаём на месте.",
+      descriptionFull:"Помогаем приюту: выгул собак, уборка, сортировка кормов. С собой удобная одежда и закрытая обувь.",
+      region:"Минская", city:"Жодино", address:"Приют (условный адрес)",
+      startDate: new Date(Date.now()+86400000*5).toISOString(),
+      endDate: new Date(Date.now()+86400000*5).toISOString(),
+      format:"Разовое", skills:["Любовь к животным"],
+      flags:{urgent:false, few:true},
+      capacity: 10, approved: 8,
+      allowKids:true, minorsAllowed:true,
+      status:"PUBLISHED",
+      createdAt: nowISO()
+    },
+    {
+      id: uid("p"), orgId: org.id, categoryId:"eco",
+      title:"Эко-субботник у реки",
+      descriptionShort:"Сбор мусора, сортировка. После — чай и фотоотчёт.",
+      descriptionFull:"Выездная уборка берега реки. Выдадим пакеты и перчатки. Важна безопасность и соблюдение инструктажа.",
+      region:"Гродненская", city:"Гродно", address:"Набережная (точка сбора в чате проекта)",
+      startDate: new Date(Date.now()+86400000*10).toISOString(),
+      endDate: new Date(Date.now()+86400000*10).toISOString(),
+      format:"Разовое", skills:["Командная работа"],
+      flags:{urgent:false, few:false},
+      capacity: 25, approved: 9,
+      allowKids:true, minorsAllowed:true,
+      status:"PUBLISHED",
+      createdAt: nowISO()
+    },
+    {
+      id: uid("p"), orgId: org.id, categoryId:"children",
+      title:"Мастер‑класс по программированию для подростков",
+      descriptionShort:"Нужны наставники: базовый JS/логика. Формат: 2 встречи.",
+      descriptionFull:"Проводим мастер‑класс для подростков. Требуется умение объяснять простыми словами и поддерживать дружелюбную атмосферу.",
+      region:"Минск", city:"Минск", address:"Коворкинг (условный адрес)",
+      startDate: new Date(Date.now()+86400000*7).toISOString(),
+      endDate: new Date(Date.now()+86400000*14).toISOString(),
+      format:"Регулярное", skills:["Работа с детьми","Публичные выступления"],
+      flags:{urgent:true, few:true},
+      capacity: 6, approved: 5,
+      allowKids:false, minorsAllowed:false,
+      status:"PUBLISHED",
+      createdAt: nowISO()
+    }
+  ];
+
+  const news = [
+    { id: uid("n"), title:"Доброе_дело.by — старт!", date: nowISO(), excerpt:"Запустили демо‑платформу: проекты, заявки, новости, кабинет.", body:"Это автономная версия на HTML/CSS/JS. Данные сохраняются в localStorage вашего браузера.", comments:[], likes:0 },
+    { id: uid("n"), title:"Как начать помогать", date: new Date(Date.now()-86400000*2).toISOString(), excerpt:"Регистрация → выбор проекта → участие → история успеха.", body:"Откройте «Проекты», выберите город и категорию, нажмите «Откликнуться». В демо подтверждение автоматическое.", comments:[], likes:0 },
+    { id: uid("n"), title:"Субботник: итоги (демо)", date: new Date(Date.now()-86400000*12).toISOString(), excerpt:"Собрали мусор и отправили часть на переработку (демо).", body:"Спасибо участникам! Фотоотчёт — следующий шаг для расширения.", comments:[], likes:0 }
+  ];
+
+  const stories = [
+    { id: uid("s"), title:"Волонтёрство помогло мне поверить в себя", author: vol1.name, date: new Date(Date.now()-86400000*30).toISOString(),
+      excerpt:"Один проект дал новых друзей и уверенность.", body:"Первые шаги были страшными, но организатор поддержал. Теперь участвую регулярно.", likes: 7, comments:[] }
+  ];
+
+  return {
+    users:[admin, vol1, vol2, orgU],
+    organizations:[org],
+    projects,
+    news,
+    stories,
+    helpRequests:[],
+    applications:[],
+    favorites:{},
+    messages:[],
+    session:{ userId:null }
+  };
+}
+
+let state = loadState();
+if(!state){ state = seed(); saveState(); }
+
+function currentUser(){ return state.users.find(u=>u.id===state.session.userId) || null; }
+function requireAuth(){ if(!currentUser()){ openAuthModal(); return false; } return true; }
+
+/* modal */
+const modal = $("#modal");
+$("#modalClose").addEventListener("click", closeModal);
+modal.addEventListener("click",(e)=>{ if(e.target===modal) closeModal(); });
+window.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeModal(); });
+
+function openModal(title, html){
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = html;
+  modal.classList.add("open");
+}
+function closeModal(){
+  modal.classList.remove("open");
+  $("#modalBody").innerHTML = "";
+}
+
+/* router */
+function navigate(hash){ location.hash = hash; renderApp(); }
+function setActiveNav(){
+  const h = location.hash || "#/";
+  const path = h.replace(/^#/, "");
+  $$(".chip[data-route]").forEach(ch => ch.classList.toggle("active", ch.dataset.route === "#"+path));
+  const u = currentUser();
+  $("#btnOpenAuth").textContent = u ? (u.name.split(" ")[0] + " ▾") : "Вход";
+}
+
+/* components */
+function projectCard(p){
+  const cat = CATEGORIES.find(c=>c.id===p.categoryId)?.name || "Категория";
+  const fill = p.capacity ? Math.round((p.approved/p.capacity)*100) : 0;
+  const flags = [
+    p.flags?.urgent ? `<span class="flag urgent">Срочно</span>` : "",
+    (p.flags?.few || (p.capacity - p.approved <= 2)) ? `<span class="flag few">Мало мест</span>` : ""
+  ].join("");
+
+  const img = projectPhoto(p.categoryId);
+
+  return `
+    <article class="project">
+      <div class="pimg" style="background-image:url('${img}')">
+        <div class="flags">${flags}</div>
+      </div>
+      <div class="pbody">
+        <div class="tagrow">
+          <span class="tag">${esc(cat)}</span>
+          <span class="tag">${esc(p.format||"—")}</span>
+          <span class="tag">${esc(p.city)}</span>
+        </div>
+        <h3 class="ptitle">${esc(p.title)}</h3>
+        <p class="pdesc">${esc(p.descriptionShort||"")}</p>
+        <div class="meta">
+          <span>📅 ${fmtDate(p.startDate)}</span>
+          <span>👥 ${p.approved}/${p.capacity}</span>
+        </div>
+        <div class="bar"><div style="width:${clamp(fill,0,100)}%"></div></div>
+        <div class="actions">
+          <button class="btn secondary" data-action="details" data-id="${p.id}">Подробнее</button>
+          <button class="btn secondary" data-action="fav" data-id="${p.id}">В избранное</button>
+          <button class="btn" data-action="apply" data-id="${p.id}">Откликнуться</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+function bindProjectButtons(root){
+  $$("[data-action]", root).forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      const a=e.currentTarget.dataset.action;
+      const id=e.currentTarget.dataset.id;
+      if(a==="details") openProjectModal(id);
+      if(a==="fav") toggleFavorite(id);
+      if(a==="apply") applyToProject(id);
+    });
+  });
+}
+
+function helpFormHTML(formId){
+  return `
+    <form id="${formId}">
+      <div class="two">
+        <div class="field">
+          <label>Имя</label>
+          <input name="name" required placeholder="Например, Мария" />
+        </div>
+        <div class="field">
+          <label>Телефон или email</label>
+          <input name="contact" required placeholder="+375… или email" />
+        </div>
+      </div>
+      <div class="two">
+        <div class="field">
+          <label>Тип помощи</label>
+          <select name="helpType" required>
+            <option value="" selected disabled>Выберите…</option>
+            ${HELP_TYPES.map(x=>`<option>${esc(x)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Комментарий (необязательно)</label>
+          <input name="message" placeholder="Коротко опишите ситуацию" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="small"><input type="checkbox" name="consent" required /> Согласен(на) на обработку данных для связи.</label>
+        <div class="hint"></div>
+      </div>
+      <div class="row">
+        <button class="btn" type="submit">Отправить</button>
+
+      </div>
+    </form>
+  `;
+}
+function onSubmitHelpForm(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  if(!fd.get("consent")){ toast("warn","Нужно согласие","Отметьте чекбокс."); return; }
+  state.helpRequests.unshift({
+    id: uid("hr"),
+    name: String(fd.get("name")||"").trim(),
+    contact: String(fd.get("contact")||"").trim(),
+    helpType: String(fd.get("helpType")||"").trim(),
+    message: String(fd.get("message")||"").trim(),
+    status:"NEW",
+    createdAt: nowISO()
+  });
+  saveState();
+  e.target.reset();
+  toast("ok","Отправлено","Заявка сохранена (демо).");
+}
+
+function toggleFavorite(projectId){
+  if(!requireAuth()) return;
+  const u=currentUser();
+  state.favorites[u.id]=state.favorites[u.id]||[];
+  const i=state.favorites[u.id].indexOf(projectId);
+  if(i>=0){ state.favorites[u.id].splice(i,1); toast("ok","Избранное","Удалено."); }
+  else{ state.favorites[u.id].push(projectId); toast("ok","Избранное","Добавлено."); }
+  saveState();
+}
+
+function applyToProject(projectId){
+  if(!requireAuth()) return;
+  const u=currentUser();
+  const p=state.projects.find(x=>x.id===projectId);
+  if(!p){ toast("danger","Ошибка","Проект не найден."); return; }
+  if(p.approved>=p.capacity){ toast("warn","Нет мест","Набор закрыт."); return; }
+
+  const exists=state.applications.find(a=>a.projectId===projectId && a.userId===u.id && a.status!=="CANCELLED");
+  if(exists){ toast("warn","Уже есть","Вы уже откликались."); return; }
+
+  state.applications.unshift({ id: uid("app"), projectId, userId:u.id, status:"PENDING", createdAt: nowISO() });
+  saveState();
+  toast("ok","Отклик отправлен","Статус: ожидает подтверждения (демо).");
+
+  setTimeout(()=>{
+    const app = state.applications.find(a=>a.projectId===projectId && a.userId===u.id);
+    if(!app) return;
+    app.status="APPROVED";
+    p.approved = clamp(p.approved+1, 0, p.capacity);
+    if(u.role==="VOLUNTEER"){ u.points=(u.points||0)+5; }
+    state.messages.unshift({ id: uid("m"), projectId, fromId:"system", toId:u.id, text:`Отклик подтверждён: «${p.title}».`, date: nowISO() });
+    saveState();
+    toast("ok","Подтверждено","Вы добавлены в участники.");
+    renderApp();
+  }, 850);
+}
+
+/* Modals */
+function openProjectModal(projectId){
+  const p=state.projects.find(x=>x.id===projectId);
+  if(!p) return;
+  const org=state.organizations.find(o=>o.id===p.orgId);
+  const cat=CATEGORIES.find(c=>c.id===p.categoryId)?.name||"—";
+  const fill=p.capacity?Math.round((p.approved/p.capacity)*100):0;
+  const u=currentUser();
+  const isFav = u && (state.favorites[u.id]||[]).includes(p.id);
+  const myApp = u ? state.applications.find(a=>a.projectId===p.id && a.userId===u.id && a.status!=="CANCELLED") : null;
+
+  openModal("Проект", `
+    <div class="pimg" style="height:200px;border-radius:16px;border:1px solid var(--border);background-image:url('${projectPhoto(p.categoryId)}')"></div>
+    <div class="hr"></div>
+
+    <div class="tagrow">
+      <span class="tag">${esc(cat)}</span>
+      <span class="tag">📍 ${esc(p.city)}</span>
+      <span class="tag">🕒 ${esc(p.format)}</span>
+    </div>
+
+    <h2 style="margin:12px 0 6px">${esc(p.title)}</h2>
+    <div class="muted">📅 ${fmtDate(p.startDate)} · 👥 ${p.approved}/${p.capacity}</div>
+
+    <div class="hr"></div>
+    <div class="k">Описание</div>
+    <div class="muted" style="line-height:1.7; margin-top:6px">${esc(p.descriptionFull)}</div>
+
+    <div class="hr"></div>
+    <div class="k">Набор</div>
+    <div class="muted" style="margin-top:6px">Заполнение: ${fill}%</div>
+    <div class="bar" style="margin-top:8px"><div style="width:${clamp(fill,0,100)}%"></div></div>
+
+    <div class="hr"></div>
+    <div class="k">Организатор</div>
+    <div class="muted" style="margin-top:6px">${esc(org?.name||"—")} · статус: ${esc(org?.status||"—")} · рейтинг: ${org?.rating ?? "—"}</div>
+
+    <div class="hr"></div>
+    <div class="row">
+      <button class="btn secondary" id="pmFav">${isFav ? "Убрать из избранного":"В избранное"}</button>
+      <button class="btn" id="pmApply">Откликнуться</button>
+      <span class="right"></span>
+      <span class="catbadge"><span class="dot"></span>${u ? ("Статус: "+(myApp?myApp.status:"нет")) : "Нужен вход"}</span>
+    </div>
+  `);
+
+  $("#pmFav").onclick = ()=>{ toggleFavorite(p.id); closeModal(); openProjectModal(p.id); };
+  $("#pmApply").onclick = ()=>{ applyToProject(p.id); closeModal(); };
+}
+
+function openNewsModal(id){
+  const n=state.news.find(x=>x.id===id);
+  if(!n) return;
+
+  openModal("Новость", `
+    <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.news}')"></div>
+    <div class="hr"></div>
+    <h2 style="margin:0 0 6px">${esc(n.title)}</h2>
+    <div class="muted">${fmtDate(n.date)} · 👍 ${n.likes} · 💬 ${n.comments.length}</div>
+
+    <div class="hr"></div>
+    <div class="muted" style="line-height:1.7; white-space:pre-wrap">${esc(n.body)}</div>
+
+    <div class="hr"></div>
+    <div class="row">
+      <button class="btn secondary" id="likeNews">👍 Лайк</button>
+      <button class="btn secondary" id="openComments">Комментарии</button>
+    </div>
+
+    <div class="hr"></div>
+    <div id="commentsBox"></div>
+  `);
+
+  const renderComments = ()=>{
+    $("#commentsBox").innerHTML = `
+      ${(n.comments||[]).slice().reverse().map(c=>`
+        <div class="card" style="box-shadow:none; border-radius:12px; margin-top:10px">
+          <div class="card-inner" style="padding:12px">
+            <div class="row"><span class="k">${esc(c.author)}</span><span class="right muted small">${fmtDate(c.date)}</span></div>
+            <div class="muted" style="margin-top:6px; white-space:pre-wrap">${esc(c.text)}</div>
+          </div>
+        </div>
+      `).join("") || `<div class="muted">Комментариев пока нет.</div>`}
+
+      <div class="hr"></div>
+      <form id="commentForm">
+        <div class="field"><label>Комментарий</label><textarea name="text" required></textarea></div>
+        <button class="btn secondary" type="submit">Отправить</button>
+      </form>
+    `;
+
+    $("#commentForm").onsubmit = (e)=>{
+      e.preventDefault();
+      if(!requireAuth()) return;
+      const me=currentUser();
+      const fd=new FormData(e.target);
+      n.comments.push({ id: uid("c"), author: me.name, text: String(fd.get("text")).trim(), date: nowISO() });
+      saveState();
+      toast("ok","Готово","Комментарий добавлен.");
+      renderComments();
+    };
+  };
+
+  $("#likeNews").onclick = ()=>{ n.likes++; saveState(); toast("ok","Спасибо!","Лайк добавлен."); closeModal(); renderApp(); };
+  $("#openComments").onclick = renderComments;
+  renderComments();
+}
+
+function openStoryModal(id){
+  const s=state.stories.find(x=>x.id===id);
+  if(!s) return;
+  openModal("История", `
+    <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.hero}')"></div>
+    <div class="hr"></div>
+    <h2 style="margin:0 0 6px">${esc(s.title)}</h2>
+    <div class="muted">${fmtDate(s.date)} · ${esc(s.author)} · ❤️ ${s.likes}</div>
+    <div class="hr"></div>
+    <div class="muted" style="line-height:1.7; white-space:pre-wrap">${esc(s.body)}</div>
+    <div class="hr"></div>
+    <button class="btn secondary" id="likeStory">❤️ Лайк</button>
+  `);
+  $("#likeStory").onclick=()=>{ s.likes++; saveState(); toast("ok","Спасибо!","Лайк добавлен."); closeModal(); renderApp(); };
+}
+
+function openHelpModal(){
+  openModal("Нужна помощь?", `
+    <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.hero}')"></div>
+    <div class="hr"></div>
+    <div class="muted">Оставьте контакты — модератор уточнит детали (демо).</div>
+    <div class="hr"></div>
+    ${helpFormHTML("helpModal")}
+  `);
+  $("#helpModal").addEventListener("submit",(e)=>{ onSubmitHelpForm(e); closeModal(); });
+  $("#helpHow").onclick = ()=> openModal("Как это работает?", `<div class="muted">Заявка попадает модератору, он связывается и подбирает помощь. В демо всё сохраняется локально.</div>`);
+}
+
+function openAuthModal(){
+  openModal("Вход / регистрация", `
+    <div class="muted">Демо‑режим: данные хранятся в вашем браузере.</div>
+    <div class="hr"></div>
+
+    <div class="two">
+      <div class="card" style="box-shadow:none">
+        <div class="card-inner">
+          <div class="k">Вход</div>
+          <form id="loginForm" style="margin-top:10px">
+            <div class="field"><label>Email</label><input name="email" type="email" required placeholder="vol@demo.by"></div>
+            <div class="field"><label>Пароль</label><input name="pass" type="password" required placeholder="vol"></div>
+            <button class="btn" type="submit">Войти</button>
+            <div class="hint" style="margin-top:10px">Тесты: admin@demo.by/admin · vol@demo.by/vol · org@demo.by/org</div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="box-shadow:none">
+        <div class="card-inner">
+          <div class="k">Регистрация</div>
+          <form id="regForm" style="margin-top:10px">
+            <div class="field">
+              <label>Роль</label>
+              <select name="role" required>
+                <option value="VOLUNTEER" selected>Волонтёр</option>
+                <option value="ORGANIZER">Организатор</option>
+              </select>
+            </div>
+            <div class="field"><label>Имя</label><input name="name" required></div>
+            <div class="two">
+              <div class="field"><label>Email</label><input name="email" type="email" required></div>
+              <div class="field"><label>Пароль</label><input name="pass" type="password" required minlength="3"></div>
+            </div>
+            <div class="field">
+              <label class="small"><input type="checkbox" name="consent" required> Согласен(на) с правилами и обработкой данных.</label>
+            </div>
+            <button class="btn secondary" type="submit">Создать аккаунт</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  `);
+
+    // === ПЕРЕОПРЕДЕЛЕНИЕ ДЛЯ MONGODB ===
+    (function() {
+        const API_URL = 'http://localhost:3000';
+        let authToken = localStorage.getItem('authToken');
+
+        // Перезаписываем loginForm
+        $("#loginForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const email = String(fd.get("email")).trim();
+            const pass = String(fd.get("pass")).trim();
+
+            console.log('📤 ЛОГИН:', email);
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pass })
+                });
+
+                const data = await res.json();
+                console.log('📥 Ответ сервера:', data);
+
+                if (!res.ok) {
+                    toast("danger", "Не вошли", data.message || "Неверный логин или пароль.");
+                    return;
+                }
+
+                authToken = data.token;
+                localStorage.setItem('authToken', authToken);
+
+                let existingUser = state.users.find(u => u.email === data.user.email);
+                if (!existingUser) {
+                    state.users.push({
+                        id: data.user.id,
+                        email: data.user.email,
+                        name: data.user.name,
+                        role: data.user.role,
+                        city: data.user.city || '',
+                        phone: data.user.phone || '',
+                        pass: pass,
+                        points: data.user.points || 0,
+                        privacy: 'public',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                state.session.userId = data.user.id;
+                saveState();
+                closeModal();
+                toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
+                renderApp();
+
+            } catch (err) {
+                console.error('❌ Ошибка:', err);
+                toast("danger", "Ошибка", "Сервер недоступен");
+            }
+        };
+
+        // Перезаписываем regForm
+        $("#regForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+
+            if (!fd.get("consent")) {
+                toast("warn", "Нужно согласие", "Отметьте чекбокс.");
+                return;
+            }
+
+            const email = String(fd.get("email")).trim();
+            const role = String(fd.get("role"));
+            const name = String(fd.get("name")).trim();
+            const pass = String(fd.get("pass")).trim();
+
+            console.log('📤 РЕГИСТРАЦИЯ:', { email, name, role });
+
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        password: pass,
+                        name,
+                        role,
+                        username: email.split('@')[0]
+                    })
+                });
+
+                const data = await res.json();
+                console.log('📥 Ответ сервера:', data);
+
+                if (!res.ok) {
+                    toast("warn", "Ошибка", data.message || "Проверьте данные");
+                    return;
+                }
+
+                authToken = data.token;
+                localStorage.setItem('authToken', authToken);
+
+                const newUser = {
+                    id: data.user.id,
+                    email: data.user.email,
+                    name: data.user.name,
+                    role: data.user.role,
+                    city: data.user.city || '',
+                    phone: data.user.phone || '',
+                    pass: pass,
+                    points: data.user.points || 0,
+                    privacy: 'public',
+                    createdAt: new Date().toISOString()
+                };
+
+                state.users.push(newUser);
+                state.session.userId = data.user.id;
+
+                if (role === "ORGANIZER") {
+                    state.organizations.push({
+                        id: `org-${data.user.id}`,
+                        ownerUserId: data.user.id,
+                        name: `Организация ${data.user.name}`,
+                        status: "PENDING",
+                        contacts: data.user.email,
+                        rating: 0,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                saveState();
+                closeModal();
+                toast("ok", "Готово", `Аккаунт создан! Добро пожаловать, ${data.user.name}!`);
+                renderApp();
+
+            } catch (err) {
+                console.error('❌ Ошибка:', err);
+                toast("danger", "Ошибка", "Сервер недоступен");
+            }
+        };
+
+        // Загрузка сессии
+        async function loadServerSession() {
+            if (!authToken) return;
+
+            try {
+                const res = await fetch(`${API_URL}/check-session`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('✓ Сессия восстановлена:', data.user.name);
+
+                    let existingUser = state.users.find(u => u.id === data.user.id);
+                    if (!existingUser) {
+                        state.users.push({
+                            id: data.user.id,
+                            email: data.user.email,
+                            name: data.user.name,
+                            role: data.user.role,
+                            city: data.user.city || '',
+                            phone: data.user.phone || '',
+                            pass: 'restored',
+                            points: data.user.points || 0,
+                            privacy: 'public',
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+
+                    state.session.userId = data.user.id;
+                    saveState();
+                } else {
+                    localStorage.removeItem('authToken');
+                    authToken = null;
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки сессии:', err);
+            }
+        }
+
+        loadServerSession();
+    })();
+}
+
+function openUserMenu(){
+  const u=currentUser();
+  if(!u) return openAuthModal();
+  openModal("Меню", `
+    <div class="row">
+      <span class="catbadge"><span class="dot"></span>${esc(u.role)}</span>
+      <span class="catbadge"><span class="dot"></span>Баллы: ${u.points||0}</span>
+      <span class="catbadge"><span class="dot"></span>${esc(u.email)}</span>
+    </div>
+    <div class="hr"></div>
+    <div class="row">
+      <button class="btn" id="goCab">Личный кабинет</button>
+      <button class="btn secondary" id="goProj">Проекты</button>
+      <button class="btn secondary" id="goNews">Новости</button>
+      <span class="right"></span>
+      <button class="btn danger" id="doLogout">Выйти</button>
+    </div>
+  `);
+  $("#goCab").onclick=()=>{ closeModal(); navigate("#/cabinet"); };
+  $("#goProj").onclick=()=>{ closeModal(); navigate("#/projects"); };
+  $("#goNews").onclick=()=>{ closeModal(); navigate("#/news"); };
+  $("#doLogout").onclick=()=>{
+      localStorage.removeItem('authToken');
+      state.session.userId = null;
+      saveState();
+      closeModal();
+      toast('ok', 'Выход', 'Вы вышли из системы.');
+      renderApp();
+  };
+}
+
+/* ===== Pages ===== */
+function renderHome(){
+  const u = currentUser();
+  const published = state.projects ? state.projects.filter(p => p.status === "PUBLISHED") : [];
+  const kpiProjects = published.length;
+  const kpiVols = state.users ? state.users.filter(x => x.role === "VOLUNTEER").length : 0;
+  const kpiStories = state.stories ? state.stories.length : 0;
+
+  const preview = published.slice(0, 6);
+  const latestNews = state.news ? [...state.news].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 3) : [];
+
+  const catDesc = {
+    elderly: "Помощь пожилым: доставка продуктов, общение и бытовая поддержка.",
+    animals: "Помощь приютам: выгул, кормление и поиск нового дома.",
+    eco: "Экология: субботники, переработка и защита природы.",
+    children: "Детям: репетиторство, организация досуга и мастер-классы.",
+    events: "События: помощь в организации городских фестивалей."
+  };
+
+  $("#app").innerHTML = `
+      <section class="modern-hero" style="min-height: 85vh; display: flex; align-items: center; background: linear-gradient(135deg, #f8f9fa 0%, #eef2ff 100%); overflow: hidden; position: relative; margin-bottom: 80px; ы">
+
+    <div class="container" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 60px; align-items: center; padding-top: 40px; padding-bottom: 40px;">
+
+      <div style="animation: slideInLeft 0.8s ease-out; z-index: 2;">
+
+        <h1 style="font-size: clamp(48px, 5vw, 72px); font-weight: 850; line-height: 1.05; color: var(--text); margin-bottom: 24px; letter-spacing: -1.5px;">
+          Ваше пространство <br>
+          <span style="color: var(--blue);">добрых дел</span>
+        </h1>
+        <p style="font-size: 20px; color: var(--muted); line-height: 1.6; margin-bottom: 40px; max-width: 500px;">
+          Превращаем желание помочь в реальные действия. Присоединяйтесь к тысячам волонтеров, меняющих мир прямо сейчас.
+        </p>
+
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <button class="btn" id="homeWantHelp" style="padding: 18px 40px; font-size: 17px; border-radius: 16px; box-shadow: 0 10px 30px rgba(37,99,235,0.3);">
+            Найти проект
+          </button>
+          <button class="btn secondary" id="homeNeedHelpPersonal" style="padding: 18px 40px; font-size: 17px; border-radius: 16px; background: #fff; border: 1px solid var(--border);">
+            Нужна помощь
+          </button>
+        </div>
+
+        <div style="margin-top: 60px; display: flex; gap: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 30px;">
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiProjects}</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Активных проектов</div>
+          </div>
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiVols}+</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Волонтеров</div>
+          </div>
+          <div>
+            <div style="font-size: 32px; font-weight: 900; color: var(--text);">${kpiStories}</div>
+            <div style="font-size: 13px; color: var(--muted); font-weight: 600;">Добрых историй</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: relative; animation: slideInRight 0.8s ease-out; ">
+        <div style="height: 600px; width: 100%; border-radius: 40px; overflow: hidden; box-shadow: 0 20px 80px rgba(0,0,0,0.1); position: relative; z-index: 1;">
+          <img src="${STOCK.hero}" style="width: 100%; height: 100%; object-fit: cover; object-position: 5% center;" alt="Volunteers">
+        </div>
+
+        <div style="position: absolute; top: 40px; left: -30px; background: #fff; padding: 15px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); z-index: 2; display: flex; align-items: center; gap: 15px; animation: float 6s ease-in-out infinite;">
+          <div style="background: #dcfce7; color: #166534; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛡️</div>
+          <div>
+            <div style="font-weight: 800; font-size: 14px;">Верифицировано</div>
+            <div style="font-size: 12px; color: var(--muted);">Все заявки проверены</div>
+          </div>
+        </div>
+
+        <div style="position: absolute; bottom: 60px; right: -20px; background: #fff; padding: 20px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); z-index: 2; animation: float 7s ease-in-out infinite reverse;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 50%; overflow: hidden;">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" width="40">
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">Алексей М.</div>
+              <div style="font-size: 11px; color: var(--blue);">Только что помог</div>
+            </div>
+          </div>
+          <div style="font-size: 13px; color: var(--muted); line-height: 1.4;">
+            "Это заняло всего час, <br>но эмоций — на неделю!"
+          </div>
+        </div>
+
+        <div style="position: absolute; top: -10%; right: -10%; width: 300px; height: 300px; background: var(--blue); opacity: 0.05; border-radius: 50%; z-index: 0; filter: blur(50px);"></div>
+      </div>
+
+    </div>
+    </section>
+
+    <style>
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes slideInRight { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+
+    /* Адаптив для Hero */
+    @media (max-width: 900px) {
+      .modern-hero .container { grid-template-columns: 1fr !important; text-align: center; }
+      .modern-hero h1 { font-size: 40px !important; }
+      .modern-hero p { margin: 0 auto 30px !important; }
+      /* Центрирование кнопок на мобильных */
+      .modern-hero .container > div:first-child > div[style*="display: flex; gap: 16px"] { justify-content: center; }
+      /* Центрирование статистики на мобильных */
+      .modern-hero .container > div:first-child > div[style*="margin-top: 60px"] { justify-content: center; }
+    }
+    </style>
+
+    <div class="container" style="padding: 0 var(--pad);">
+
+
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; margin-bottom: 100px;">
+        <div style="padding: 40px; background: var(--blue); color: #fff; border-radius: 30px;">
+          <h3 style="color: #fff; font-size: 28px; margin-bottom: 20px;">Наша миссия</h3>
+          <p style="font-size: 18px; line-height: 1.6; opacity: 0.9;">
+            Сделать благотворительность естественной частью жизни. Мы создаем мост между искренним желанием помочь и теми, кто ждет поддержки.
+          </p>
+        </div>
+        <div style="padding: 40px; background: var(--surface2); border: 1px solid var(--border); border-radius: 30px;">
+          <h3 style="font-size: 28px; margin-bottom: 20px;">Цель проекта</h3>
+          <p class="muted" style="font-size: 18px; line-height: 1.6;">
+            Построить прозрачное сообщество, где каждый участник видит результат своего вклада, а помощь приходит вовремя и по адресу.
+          </p>
+        </div>
+      </section>
+
+      <section style="margin-bottom: 100px;">
+        <div class="section-title"><h2>Категории помощи</h2></div>
+        <div id="catsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-top: 30px;">
+          ${CATEGORIES.map(c => `
+            <div class="catcard" data-cat="${c.id}" style="background: #fff; padding: 30px; border-radius: 20px; border: 1px solid var(--border); transition: 0.3s; cursor: pointer;">
+              <div style="font-size: 36px; margin-bottom: 15px;">${c.id === 'elderly' ? '👵' : c.id === 'animals' ? '🐾' : c.id === 'eco' ? '🌱' : c.id === 'children' ? '👶' : '🎉'}</div>
+              <h4 style="margin-bottom: 10px; font-weight: 800;">${esc(c.name)}</h4>
+              <p style="font-size: 14px; color: var(--muted); line-height: 1.5;">${esc(catDesc[c.id] || "Поддержка в этой сфере.")}</p>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+
+      <section style="margin-bottom: 100px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px;">
+          <h2 style="font-size: 32px; font-weight: 850;">Популярные проекты</h2>
+          <button class="btn secondary" id="homeAllProjects">Все проекты →</button>
+        </div>
+        <div class="project-grid" id="homeProjects" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px;">
+          ${preview.map(projectCard).join("")}
+        </div>
+      </section>
+
+      <section style="margin-bottom: 100px;">
+        <h2 style="font-size: 32px; font-weight: 850; margin-bottom: 30px;">Новости и события</h2>
+        <div id="homeNews" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+          ${latestNews.map(n => `
+            <div class="news-item" data-news="${n.id}" style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: 0.3s;">
+              <div style="height: 180px; background: url('${n.image || STOCK.news}') center/cover;"></div>
+              <div style="padding: 20px;">
+                <h3 style="font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3;">${esc(n.title)}</h3>
+                <div style="margin-top: 12px; font-size: 12px; color: var(--blue); font-weight: 700; text-transform: uppercase;">${fmtDate(n.date)}</div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+
+      <section id="helpSection" style="background: var(--surface2); padding: 60px; border-radius: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-bottom: 100px;">
+        <div>
+          <h2 style="font-size: 36px; font-weight: 850; margin-bottom: 25px;">Нужна помощь?</h2>
+          <p style="color: var(--muted); font-size: 18px; line-height: 1.7; margin-bottom: 30px;">
+            Расскажите нам о своей ситуации. Мы верифицируем заявки и направляем волонтеров для адресной помощи людям, оказавшимся в непростых обстоятельствах.
+          </p>
+          <div style="display: flex; gap: 30px;">
+             <div style="text-align: center;"><div style="font-size: 32px;">🍎</div><div style="font-weight: 700; font-size: 12px;">Продукты</div></div>
+             <div style="text-align: center;"><div style="font-size: 32px;">📦</div><div style="font-weight: 700; font-size: 12px;">Доставка</div></div>
+             <div style="text-align: center;"><div style="font-size: 32px;">🤝</div><div style="font-weight: 700; font-size: 12px;">Поддержка</div></div>
+          </div>
+        </div>
+        <div id="homeHelpFormWrap" style="background: #fff; padding: 40px; border-radius: 30px; box-shadow: var(--shadow);">
+        </div>
+      </section>
+
+      <section style="max-width: 900px; margin: 0 auto 100px;">
+        <h2 style="text-align: center; font-size: 36px; font-weight: 850; margin-bottom: 50px;">Вопросы и ответы</h2>
+        <div style="display: grid; gap: 16px;">
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Кто может стать волонтером? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Любой желающий старше 14 лет. Мы подберем проект, соответствующий вашему времени и возможностям. Для подростков до 18 лет требуется согласие родителей.</p>
+          </details>
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Как происходит проверка заявок на помощь? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Модераторы связываются с заявителем для уточнения деталей. Это необходимо для обеспечения безопасности наших волонтеров и адресности помощи.</p>
+          </details>
+          <details style="background: #fff; border: 1px solid var(--border); padding: 25px; border-radius: 20px; cursor: pointer;">
+            <summary style="font-weight: 800; font-size: 18px; display: flex; justify-content: space-between;">Зачем мне копить баллы? <span>↓</span></summary>
+            <p style="margin-top: 15px; color: var(--muted); line-height: 1.6;">Баллы — это ваша репутация. Они открывают доступ к специальным бонусам, мерчу и приоритету в участии в крупных городских событиях.</p>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <footer style="background: var(--text); color: #fff; padding: 80px 0 40px;">
+      <div class="container">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 60px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 60px;">
+          <div>
+            <div style="font-size: 26px; font-weight: 850; margin-bottom: 20px;">Доброе_дело.by</div>
+            <p style="opacity: 0.6; line-height: 1.6; max-width: 400px;">Единая платформа волонтерства и социальной взаимопомощи. Сделаем наш город добрее вместе.</p>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Навигация</h4>
+            <div style="display: grid; gap: 12px; opacity: 0.8; font-size: 15px;">
+              <span class="link" onclick="navigate('#/projects')">Проекты</span>
+              <span class="link" onclick="navigate('#/news')">Новости</span>
+              <span class="link" onclick="navigate('#/about')">О нас</span>
+            </div>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Контакты</h4>
+            <p style="opacity: 0.8; font-size: 15px;">info@ddby.by</p>
+            <p style="opacity: 0.8; font-size: 15px;">+375 (29) 000-00-00</p>
+          </div>
+        </div>
+        <div style="margin-top: 40px; text-align: center; opacity: 0.4; font-size: 13px;">© 2026 Доброе_дело.by. Все права защищены.</div>
+      </div>
+    </footer>
+
+    <style>
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .catcard:hover, .news-item:hover { border-color: var(--blue) !important; transform: translateY(-5px); box-shadow: var(--shadow); }
+      details summary { list-style: none; }
+      details summary::-webkit-details-marker { display: none; }
+    </style>
+  `;
+
+  // Логика кнопок
+  $("#homeWantHelp").onclick = () => navigate("#/projects");
+  $("#homeAllProjects").onclick = () => navigate("#/projects");
+  $("#homeNeedHelpPersonal").onclick = () => document.getElementById('helpSection').scrollIntoView({behavior:'smooth'});
+
+  const fw = $("#homeHelpFormWrap");
+  if(fw) {
+    fw.innerHTML = helpFormHTML("homeHelp");
+    $("#homeHelp").addEventListener("submit", onSubmitHelpForm);
+  }
+
+  $$("#homeNews .news-item").forEach(el => el.onclick = () => openNewsModal(el.dataset.news));
+
+  $$("#catsGrid .catcard").forEach(el => el.onclick = () => {
+    navigate("#/projects");
+    setTimeout(() => {
+        const sel = $("#fCategory");
+        if(sel) { sel.value = el.dataset.cat; $("#btnApplyFilters")?.click(); }
+    }, 0);
+  });
+
+  bindProjectButtons($("#homeProjects"));
+}
+
+function renderProjects(){
+  const u=currentUser();
+  $("#app").innerHTML=`
+    <div class="container" style="padding-top:16px">
+      <section class="card">
+        <div class="section-title"><h2>Каталог проектов</h2><small>${u ? `Вы: ${esc(u.name)} (${esc(u.role)})` : "Гость"}</small></div>
+        <div class="split">
+          <aside class="sidebar">
+            <div class="k">Фильтры</div>
+            <div class="field">
+              <label>Категория</label>
+              <select id="fCategory">
+                <option value="">Все</option>
+                ${CATEGORIES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Регион</label>
+              <select id="fRegion">
+                <option value="">Любой</option>
+                ${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field"><label>Город</label><input id="fCity" placeholder="Например, Минск" /></div>
+            <div class="field">
+              <label>Формат</label>
+              <select id="fFormat">
+                <option value="">Любой</option>
+                ${FORMATS.map(x=>`<option>${esc(x)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field"><label>Поиск</label><input id="fQuery" placeholder="Название, описание…" /></div>
+
+            <div class="row">
+              <button class="btn" id="btnApplyFilters">Показать</button>
+              <button class="btn secondary" id="btnResetFilters">Сброс</button>
+            </div>
+
+            <div class="hr"></div>
+            <div class="hint">Демо‑данные сохраняются в localStorage.</div>
+          </aside>
+
+          <section>
+            <div class="row" style="margin-bottom:10px">
+              <span class="catbadge"><span class="dot"></span><span id="foundBadge">—</span></span>
+              <span class="right"></span>
+              <button class="btn secondary" id="openHelpFromCatalog">Нужна помощь?</button>
+            </div>
+            <div class="project-grid" id="projectsGrid"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+  `;
+
+  $("#openHelpFromCatalog").onclick=openHelpModal;
+  $("#btnApplyFilters").onclick=applyProjectFilters;
+  $("#btnResetFilters").onclick=()=>{
+    $("#fCategory").value=""; $("#fRegion").value=""; $("#fCity").value="";
+    $("#fFormat").value=""; $("#fQuery").value="";
+    applyProjectFilters();
+  };
+  applyProjectFilters();
+}
+function applyProjectFilters(){
+  const f={
+    category: $("#fCategory").value,
+    region: $("#fRegion").value,
+    city: $("#fCity").value.trim().toLowerCase(),
+    format: $("#fFormat").value,
+    q: $("#fQuery").value.trim().toLowerCase(),
+  };
+  const list = state.projects.filter(p=>p.status==="PUBLISHED");
+  const out = list.filter(p=>{
+    if(f.category && p.categoryId!==f.category) return false;
+    if(f.region && p.region!==f.region) return false;
+    if(f.city && !p.city.toLowerCase().includes(f.city)) return false;
+    if(f.format && p.format!==f.format) return false;
+    if(f.q){
+      const hay = (p.title+" "+p.descriptionShort+" "+(p.skills||[]).join(" ")+" "+p.region+" "+p.city).toLowerCase();
+      if(!hay.includes(f.q)) return false;
+    }
+    return true;
+  });
+
+  $("#foundBadge").textContent=`Найдено: ${out.length}`;
+  const grid=$("#projectsGrid");
+  grid.innerHTML = out.length ? out.map(projectCard).join("") : `<div class="muted">Ничего не найдено.</div>`;
+  bindProjectButtons(grid);
+}
+
+/* Остальные страницы — из твоего исходника (логика прежняя) */
+function renderCommunity(){
+  const vols = state.users
+    .filter(u=>u.role==="VOLUNTEER" && u.privacy!=="hidden")
+    .slice().sort((a,b)=>(b.points||0)-(a.points||0)).slice(0,20);
+
+  $("#app").innerHTML=`
+    <div class="container" style="padding-top:16px">
+      <div class="grid">
+        <section class="card">
+          <div class="section-title"><h2>Рейтинг волонтёров</h2><small>топ‑20</small></div>
+          <div class="card-inner">
+            <table class="table">
+              <thead><tr><th>Место</th><th>Имя</th><th>Город</th><th>Баллы</th><th>Уровень</th></tr></thead>
+              <tbody>
+                ${vols.map((v,i)=>{
+                  const pts=v.points||0;
+                  const lvl = pts>=200 ? "Лидер" : pts>=100 ? "Активист" : "Новичок";
+                  return `<tr><td>#${i+1}</td><td>${esc(v.name)}</td><td class="muted">${esc(v.city||"—")}</td><td>${pts}</td><td class="muted">${lvl}</td></tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+            <div class="hint" style="margin-top:10px">Баллы начисляются в демо при подтверждении участия.</div>
+          </div>
+        </section>
+
+        <aside class="card">
+          <div class="section-title"><h2>Истории</h2><small>сообщество</small></div>
+          <div class="list" id="storiesList">
+            ${state.stories.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8).map(s=>`
+              <div class="news-item" data-story="${s.id}">
+                <div class="thumb" style="background-image:url('${STOCK.hero}')"></div>
+                <div>
+                  <h3>${esc(s.title)}</h3>
+                  <div class="news-meta">${fmtDate(s.date)} · ${esc(s.author)} · ❤️ ${s.likes}</div>
+                  <p>${esc(s.excerpt)}</p>
+                </div>
+              </div>
+            `).join("") || `<div class="muted">Пока нет историй.</div>`}
+          </div>
+        </aside>
+      </div>
+    </div>
+  `;
+  $$("#storiesList .news-item").forEach(el=>el.addEventListener("click",()=>openStoryModal(el.dataset.story)));
+}
+
+function renderNews(){
+  $("#app").innerHTML=`
+    <div class="container" style="padding-top:16px">
+      <div class="grid">
+        <section class="card">
+          <div class="section-title"><h2>Новости</h2><small>блог</small></div>
+          <div class="list" id="newsList"></div>
+        </section>
+
+        <aside class="card">
+          <div class="section-title"><h2>Добавить пост</h2><small>демо</small></div>
+          <div class="card-inner">
+            <div class="hint">Нужен вход, чтобы публиковать.</div>
+            <div class="hr"></div>
+            <form id="newsCreate">
+              <div class="field"><label>Заголовок</label><input name="title" required></div>
+              <div class="field"><label>Анонс</label><input name="excerpt" required maxlength="140"></div>
+              <div class="field"><label>Текст</label><textarea name="body" required></textarea></div>
+              <button class="btn" type="submit">Опубликовать</button>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </div>
+  `;
+
+  renderNewsList();
+
+  $("#newsCreate").onsubmit=(e)=>{
+    e.preventDefault();
+    if(!requireAuth()) return;
+    const fd=new FormData(e.target);
+    state.news.unshift({
+      id: uid("n"),
+      title: String(fd.get("title")).trim(),
+      excerpt: String(fd.get("excerpt")).trim(),
+      body: String(fd.get("body")).trim(),
+      date: nowISO(),
+      comments:[],
+      likes:0
+    });
+    saveState();
+    e.target.reset();
+    toast("ok","Опубликовано","Пост добавлен.");
+    renderNewsList();
+  };
+}
+function renderNewsList(){
+  const list=$("#newsList");
+  const items=state.news.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  list.innerHTML = items.map(n=>`
+    <div class="news-item" data-news="${n.id}">
+      <div class="thumb" style="background-image:url('${STOCK.news}')"></div>
+      <div>
+        <h3>${esc(n.title)}</h3>
+        <div class="news-meta">${fmtDate(n.date)} · 👍 ${n.likes} · 💬 ${n.comments.length}</div>
+        <p>${esc(n.excerpt)}</p>
+      </div>
+    </div>
+  `).join("") || `<div class="muted">Пока нет новостей.</div>`;
+  $$("#newsList .news-item").forEach(el=>el.addEventListener("click",()=>openNewsModal(el.dataset.news)));
+}
+
+function renderAbout(){
+  $("#app").innerHTML=`
+    <div class="container" style="padding-top:16px">
+      <div class="grid">
+        <section class="card">
+          <div class="section-title"><h2>О нас</h2><small>миссия</small></div>
+          <div class="card-inner">
+            <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.hero}')"></div>
+            <div class="hr"></div>
+            <div class="k">Миссия</div>
+            <div class="muted" style="margin-top:6px; line-height:1.7">
+              Сделать волонтёрство удобным: минимум шагов от намерения до участия.
+            </div>
+          </div>
+        </section>
+
+        <aside class="card">
+          <div class="section-title"><h2>Документы</h2><small>демо</small></div>
+          <div class="card-inner">
+            <div class="muted">Здесь обычно: политика конфиденциальности, правила, отчёты.</div>
+            <div class="hr"></div>
+            <div class="row">
+              <button class="btn secondary" onclick="openModal('Политика (демо)','<div class=muted>Добавьте текст политики отдельной страницей.</div>')">Политика</button>
+              <button class="btn secondary" onclick="openModal('Правила (демо)','<div class=muted>Добавьте правила участия и поведения.</div>')">Правила</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  `;
+}
+
+function renderContacts(){
+  $("#app").innerHTML=`
+    <div class="container" style="padding-top:16px">
+      <div class="grid">
+        <section class="card">
+          <div class="section-title"><h2>Контакты</h2><small>обратная связь</small></div>
+          <div class="card-inner">
+            <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.news}')"></div>
+            <div class="hr"></div>
+
+            <form id="contactForm">
+              <div class="two">
+                <div class="field">
+                  <label>Тема</label>
+                  <select name="topic" required>
+                    <option value="" selected disabled>Выберите…</option>
+                    <option>Вопрос по проектам</option>
+                    <option>Партнёрство</option>
+                    <option>Жалоба/модерация</option>
+                    <option>Другое</option>
+                  </select>
+                </div>
+                <div class="field"><label>Имя</label><input name="name" required /></div>
+              </div>
+              <div class="two">
+                <div class="field"><label>Email</label><input name="email" type="email" required /></div>
+                <div class="field"><label>Сообщение</label><input name="message" required /></div>
+              </div>
+              <div class="field">
+                <label class="small"><input type="checkbox" name="consent" required /> Согласен(на) на обработку данных.</label>
+              </div>
+              <button class="btn" type="submit">Отправить</button>
+            </form>
+          </div>
+        </section>
+
+        <aside class="card">
+          <div class="section-title"><h2>Последние обращения</h2><small>демо</small></div>
+          <div class="list" id="tickets"></div>
+        </aside>
+      </div>
+    </div>
+  `;
+
+  $("#contactForm").onsubmit=(e)=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    if(!fd.get("consent")){ toast("warn","Нужно согласие","Отметьте чекбокс."); return; }
+    state.helpRequests.unshift({
+      id: uid("t"),
+      name: String(fd.get("name")).trim(),
+      contact: String(fd.get("email")).trim(),
+      helpType: "Обращение: " + String(fd.get("topic")),
+      message: String(fd.get("message")).trim(),
+      status:"TICKET",
+      createdAt: nowISO()
+    });
+    saveState();
+    e.target.reset();
+    toast("ok","Отправлено","Обращение зарегистрировано.");
+    renderTickets();
+  };
+  renderTickets();
+}
+function renderTickets(){
+  const list=$("#tickets");
+  const t=state.helpRequests.filter(x=>x.status==="TICKET").slice(0,10);
+  list.innerHTML = t.length ? t.map(x=>`
+    <div class="card" style="box-shadow:none; border-radius:12px">
+      <div class="card-inner" style="padding:12px">
+        <div class="k">${esc(x.helpType)}</div>
+        <div class="muted small" style="margin-top:6px">${fmtDate(x.createdAt)} · ${esc(x.name)} · ${esc(x.contact)}</div>
+        <div class="muted" style="margin-top:6px">${esc(x.message||"")}</div>
+      </div>
+    </div>
+  `).join("") : `<div class="muted">Пока обращений нет.</div>`;
+}
+
+/* ===== ОБНОВЛЕННЫЙ ЛИЧНЫЙ КАБИНЕТ ===== */
+/* === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ГЕЙМИФИКАЦИИ === */
+
+function calcLevel(points) {
+  const step = 100;
+  const lvl = Math.floor((points || 0) / step) + 1;
+  const currentLvlPoints = (points || 0) % step;
+  const percent = (currentLvlPoints / step) * 100;
+
+  let name = "Новичок";
+  if (lvl >= 5) name = "Активист";
+  if (lvl >= 10) name = "Герой";
+  if (lvl >= 20) name = "Мастер добра";
+
+  return { name, level: lvl, next: lvl * step, percent };
+}
+
+function getUserBadges(user) {
+  const myApps = state.applications.filter(a => a.userId === user.id && a.status === "APPROVED");
+
+  // Список достижений
+  return [
+    { id: 'reg', name: 'Первый шаг', icon: '🌱', desc: 'За регистрацию', unlocked: true },
+    { id: 'profile', name: 'В деталях', icon: '📝', desc: 'Профиль заполнен', unlocked: !!(user.city && user.phone) },
+    { id: 'hero', name: 'Герой города', icon: '🏙️', desc: '5 проектов', unlocked: myApps.length >= 5 },
+    { id: 'star', name: 'Звезда добра', icon: '⭐', desc: '500 баллов', unlocked: (user.points || 0) >= 500 }
+  ];
+}
+
+/* === ПОЛНАЯ ФУНКЦИЯ ЛИЧНОГО КАБИНЕТА === */
+
+/* === ГЕЙМИФИКАЦИЯ: УРОВНИ И ДОСТИЖЕНИЯ === */
+
+function calcLevel(points) {
+  const step = 100;
+  const lvl = Math.floor((points || 0) / step) + 1;
+  const currentLvlPoints = (points || 0) % step;
+  const percent = (currentLvlPoints / step) * 100;
+
+  let name = "Новичок";
+  if (lvl >= 5) name = "Активист";
+  if (lvl >= 10) name = "Герой";
+  if (lvl >= 20) name = "Мастер добра";
+
+  return { name, level: lvl, next: lvl * step, percent };
+}
+
+function getUserBadges(user) {
+  const myApps = state.applications.filter(a => a.userId === user.id && a.status === "APPROVED");
+  const points = user.points || 0;
+
+  return [
+    { id: 'reg', name: 'Первый шаг', icon: '🌱', desc: 'Выдаётся каждому участнику за присоединение к сообществу Доброе_дело.by.', unlocked: true, progress: 100 },
+    { id: 'profile', name: 'В деталях', icon: '📝', desc: 'Заполните город и телефон в профиле, чтобы организаторы могли быстрее связаться с вами.', unlocked: !!(user.city && user.phone), progress: (user.city && user.phone) ? 100 : 50 },
+    { id: 'hero', name: 'Герой города', icon: '🏙️', desc: 'Нужно успешно завершить 5 волонтерских проектов.', unlocked: myApps.length >= 5, progress: Math.min((myApps.length / 5) * 100, 100) },
+    { id: 'star', name: 'Звезда добра', icon: '⭐', desc: 'Наберите 500 баллов опыта (XP), помогая другим.', unlocked: points >= 500, progress: Math.min((points / 500) * 100, 100) }
+  ];
+}
+
+/* === ИНТЕРАКТИВНОЕ ОКНО ДОСТИЖЕНИЯ === */
+
+function openBadgeDetails(badgeId) {
+  const u = currentUser();
+  const badge = getUserBadges(u).find(b => b.id === badgeId);
+  if (!badge) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'badge-modal-overlay';
+  overlay.onclick = () => overlay.remove();
+
+  overlay.innerHTML = `
+    <div class="badge-modal" onclick="event.stopPropagation()">
+      <span class="badge-icon-big">${badge.icon}</span>
+      <div class="badge-status-tag" style="background: ${badge.unlocked ? '#dcfce7' : '#fee2e2'}; color: ${badge.unlocked ? '#166534' : '#991b1b'};">
+        ${badge.unlocked ? '🔓 Разблокировано' : '🔒 Заблокировано'}
+      </div>
+      <h3 style="margin-bottom:10px">${badge.name}</h3>
+      <p style="margin-bottom:20px; color:var(--muted)">${badge.desc}</p>
+
+      <div style="background: var(--surface2); padding: 16px; border-radius: 16px; text-align: left;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+          <span class="small k">Прогресс</span>
+          <span class="small k">${Math.floor(badge.progress)}%</span>
+        </div>
+        <div class="progress-container" style="height:8px; background:#e2e8f0">
+          <div class="progress-fill" style="width: ${badge.progress}%"></div>
+        </div>
+      </div>
+
+      <button class="btn" style="width: 100%; margin-top: 24px;" onclick="this.parentElement.parentElement.remove()">Понятно</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+/* === ОСНОВНАЯ ФУНКЦИЯ КАБИНЕТА === */
+/* 1. Исправленная карточка проекта для кабинета */
+function cabinetProjectCard(p) {
+  if (!p) return "";
+  const cat = (state.categories || []).find(c => c.id === p.categoryId);
+  const imgUrl = p.image ? (p.image.startsWith('http') ? p.image : 'img/' + p.image) : projectPhoto(p.categoryId);
+
+  return `
+    <div class="project-card-cab">
+      <div class="card-img-wrapper">
+        <img src="${imgUrl}" alt="Project" onerror="this.src='img/social.jpg'">
+        <div class="cab-cat-badge">${esc(cat?.name || "Проект")}</div>
+      </div>
+      <div class="card-content">
+        <h4>${esc(p.title)}</h4>
+        <div class="btn-group">
+          <button class="btn secondary" onclick="openProjectModal('${p.id}')">Инфо</button>
+
+          <button class="btn" onclick="directApply('${p.id}')">Откликнуться</button>
+        </div>
+        <button class="btn-remove-fav" onclick="toggleFavorite('${p.id}'); renderCabinet();">
+          Удалить из избранного
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+/* 2. Глобальная функция отмены заявки */
+window.cancelAppFromCabinet = function(appId) {
+  if (!confirm("Вы уверены, что хотите отменить заявку?")) return;
+  const app = state.applications.find(a => a.id === appId);
+  if (app) {
+    app.status = "CANCELLED";
+    saveState();
+    toast("warn", "Отменено", "Заявка отозвана");
+    renderCabinet();
+  }
+};
+
+window.directApply = function(projectId) {
+  const u = currentUser();
+  if (!u) {
+    toast("error", "Ошибка", "Нужна авторизация");
+    return;
+  }
+
+  // Находим все отклики пользователя на ЭТОТ проект, кроме отмененных
+  const hasActiveApp = state.applications.some(a =>
+    a.userId === u.id &&
+    a.projectId === projectId &&
+    a.status !== "CANCELLED"
+  );
+
+  if (hasActiveApp) {
+    toast("warn", "Внимание", "Вы уже откликнулись на этот проект");
+    return;
+  }
+
+  // Создаем новый отклик
+  const newApp = {
+    id: "app-" + Date.now(),
+    projectId: projectId,
+    userId: u.id,
+    date: new Date().toISOString(),
+    status: "PENDING"
+  };
+
+  state.applications.push(newApp);
+
+  // Начисляем баллы
+  u.points = (u.points || 0) + 10;
+
+  saveState();
+  toast("ok", "Успешно", "Ваш отклик отправлен!");
+
+  // Обновляем кабинет
+  renderCabinet();
+};
+
+/* 3. Основная функция отрисовки кабинета */
+/* === ОБНОВЛЕННАЯ ФУНКЦИЯ КАБИНЕТА С РЕДАКТИРОВАНИЕМ === */
+
+function renderCabinet() {
+  if (!requireAuth()) { navigate("#/"); return; }
+  const u = currentUser();
+
+  const allProjects = state.projects || [];
+  const allApps = state.applications || [];
+  const projectsById = Object.fromEntries(allProjects.map(p => [p.id, p]));
+
+  const myApps = allApps.filter(a => a.userId === u.id && a.status !== "CANCELLED");
+  const favIds = state.favorites[u.id] || [];
+  const fav = favIds.map(pid => projectsById[pid]).filter(Boolean);
+
+  const lvl = calcLevel(u.points || 0);
+  const badges = getUserBadges(u);
+  const finishedCount = myApps.filter(a => a.status === "APPROVED").length;
+
+  $("#app").innerHTML = `
+    <div class="container" style="padding-top:24px; padding-bottom: 60px;">
+      <div class="cab-grid">
+        <aside>
+          <div class="card profile-card">
+            <input type="file" id="avatarUpload" style="display:none" accept="image/*">
+            <div class="avatar-wrapper" onclick="document.getElementById('avatarUpload').click()">
+              <img src="${u.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" id="avatarPreview">
+              <div class="avatar-overlay">📷</div>
+            </div>
+            <div class="user-name">${esc(u.name)}</div>
+            <div class="user-role">${u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
+
+            <div class="level-box">
+              <div class="stat-row"><span>Уровень: ${lvl.name}</span><span>${u.points || 0} XP</span></div>
+              <div class="progress-container"><div class="progress-fill" style="width:${lvl.percent}%"></div></div>
+            </div>
+            <div style="margin-top: 24px;">
+              <h4 style="margin-bottom:12px; font-size:14px; color: var(--muted)">Достижения</h4>
+              <div class="badges-container">
+                ${badges.map(b => `<div class="badge-item ${b.unlocked ? 'unlocked' : ''}" onclick="openBadgeDetails('${b.id}')"><span class="badge-icon">${b.icon}</span><span class="badge-name">${b.name}</span></div>`).join('')}
+              </div>
+            </div>
+            <div class="hr"></div>
+            <button class="btn danger" style="width:100%" onclick="state.session.userId=null; saveState(); navigate('#/'); renderApp();">Выйти</button>
+          </div>
+        </aside>
+
+        <main>
+          <details class="card" style="margin-bottom:24px; border:none; overflow:hidden;" open>
+            <summary style="padding:20px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border)">
+              <h2 style="margin:0; font-size:20px;">⚙️ Настройки профиля</h2>
+              <span style="color:var(--blue); font-size:14px;">нажмите, чтобы скрыть/показать</span>
+            </summary>
+            <div style="padding:24px;">
+              <form id="profileFormCabinet" onsubmit="event.preventDefault(); handleUpdateProfile(this);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Ваше имя</label>
+                    <input type="text" name="name" class="inp-modern" value="${esc(u.name)}" required style="width:100%">
+                  </div>
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Город</label>
+                    <input type="text" name="city" class="inp-modern" value="${esc(u.city || '')}" style="width:100%">
+                  </div>
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Телефон</label>
+                    <input type="text" name="phone" class="inp-modern" value="${esc(u.phone || '')}" style="width:100%">
+                  </div>
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email</label>
+                    <input type="email" name="email" class="inp-modern" value="${esc(u.email || '')}" style="width:100%">
+                  </div>
+                </div>
+                <div style="margin-top:24px; text-align:right">
+                  <button type="submit" class="btn">Сохранить данные</button>
+                </div>
+              </form>
+            </div>
+          </details>
+
+          <div class="stats-grid" style="margin-bottom:24px">
+            <div class="stat-card"><div class="stat-val">${u.points || 0}</div><div class="stat-lbl">Опыт</div></div>
+            <div class="stat-card"><div class="stat-val">${myApps.length}</div><div class="stat-lbl">Заявки</div></div>
+            <div class="stat-card"><div class="stat-val">${finishedCount}</div><div class="stat-lbl">Проекты</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-title"><h2>Мои отклики</h2></div>
+            <div class="card-inner" style="padding:15px">
+              ${myApps.length ? myApps.map(a => {
+                const p = projectsById[a.projectId];
+                return `
+                  <div class="card" style="box-shadow:none; border:1px solid var(--border); background:var(--surface2); margin-bottom:12px; padding:16px">
+                    <div class="row">
+                      <span style="font-weight:600">${esc(p?.title || "Проект удален")}</span>
+                      <span class="catbadge">${esc(a.status)}</span>
+                    </div>
+                    <div class="row" style="margin-top:10px">
+                      <button class="btn secondary" onclick="openProjectModal('${a.projectId}')">Открыть</button>
+                      <button class="btn secondary danger" onclick="window.cancelAppFromCabinet('${a.id}')">Отменить</button>
+                    </div>
+                  </div>`;
+              }).join("") : `<div class="muted">У вас пока нет активных откликов.</div>`}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title"><h2>Избранное</h2></div>
+            <div class="card-inner" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding:15px">
+              ${fav.length ? fav.map(p => cabinetProjectCard(p)).join("") : `<div class="muted">В избранном пусто.</div>`}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  `;
+
+  // Обработка загрузки аватара
+  const avInp = document.getElementById('avatarUpload');
+  if (avInp) {
+    avInp.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => { u.avatar = ev.target.result; saveState(); renderCabinet(); };
+        reader.readAsDataURL(file);
+      }
+    };
+  }
+}
+
+// Глобальная функция сохранения профиля
+window.handleUpdateProfile = function(form) {
+  const u = currentUser();
+  const fd = new FormData(form);
+
+  u.name = fd.get('name');
+  u.city = fd.get('city');
+  u.phone = fd.get('phone');
+  u.email = fd.get('email');
+
+  saveState();
+  toast("ok", "Успешно", "Данные обновлены");
+  renderCabinet(); // Перерисовываем для обновления данных в боковой панели
+};
+
+/* routes */
+const routes = {
+  "/": renderHome,
+  "/projects": renderProjects,
+  "/community": renderCommunity,
+  "/news": renderNews,
+  "/about": renderAbout,
+  "/contacts": renderContacts,
+  "/cabinet": renderCabinet // Проверь, чтобы эта строка была
+};
+
+
+
+function renderApp(){
+  setActiveNav();
+  const path = (location.hash || "#/").slice(1);
+  const fn = routes[path] || renderHome;
+  fn();
+  updateScrollBar();
+}
+
+/* nav */
+$$(".chip[data-route]").forEach(el=>el.addEventListener("click",()=>navigate(el.dataset.route)));
+$("#btnCtaHelp").addEventListener("click", ()=>navigate("#/projects"));
+$("#btnOpenAuth").onclick = () => {
+  if (currentUser()) {
+    // Если юзер есть, переходим в кабинет
+    navigate("#/cabinet");
+  } else {
+    // Если юзера нет, открываем модалку входа
+    openAuthModal();
+  }
+};
+
+window.addEventListener("hashchange", renderApp);
+if(!location.hash) location.hash="#/";
+renderApp();
+
+/* === ГЛОБАЛЬНЫЕ ФУНКЦИИ ПРОФИЛЯ === */
+window.openPublicProfile = function(userId) {
+    const u = state.users.find(user => user.id === userId);
+    if (!u) return;
+    const lvl = calcLevel(u.points || 0);
+    const badges = getUserBadges(u);
+    const html = `
+        <div class="public-profile-header" style="background: linear-gradient(135deg, var(--blue), var(--blue2)); padding: 40px 20px; border-radius: 18px 18px 0 0; text-align: center; color: white;">
+            <img src="${u.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.3); object-fit: cover; margin-bottom: 15px;">
+            <h2 style="margin:0">${esc(u.name)}</h2>
+            <div style="opacity:0.9; font-size:14px">${u.city || 'Город не указан'} • ${u.points || 0} XP</div>
+        </div>
+        <div style="padding:24px">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px">
+                <div class="card" style="text-align:center; padding:15px; background:var(--bg)">
+                    <div style="font-size:18px; font-weight:700">${lvl.name}</div>
+                    <div class="muted" style="font-size:11px">Ранг</div>
+                </div>
+                <div class="card" style="text-align:center; padding:15px; background:var(--bg)">
+                    <div style="font-size:18px; font-weight:700">${(state.applications || []).filter(a=>a.userId===u.id && a.status==='APPROVED').length}</div>
+                    <div class="muted" style="font-size:11px">Добрых дел</div>
+                </div>
+            </div>
+            <h4 style="margin-bottom:10px">Достижения</h4>
+            <div style="display:flex; flex-wrap:wrap; gap:10px">
+                ${badges.map(b => `<span style="font-size:24px; filter: ${b.unlocked ? 'none' : 'grayscale(1)'}" title="${b.name}">${b.icon}</span>`).join('')}
+            </div>
+            <button class="btn" style="width:100%; margin-top:20px" onclick="closeModal()">Закрыть</button>
+        </div>
+    `;
+    showModal(html);
+};
+
+/* === ЛОГИКА МЕДИА И ПОСТОВ === */
+let tempPostMedia = { type: null, src: null };
+
+window.handlePostMedia = function(input, type) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Проверка на размер (max 2MB для localStorage)
+    if (file.size > 2 * 1024 * 1024) {
+        alert("Файл слишком большой! Максимум 2МБ.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        tempPostMedia = { type: type, src: e.target.result };
+        const prev = $('#postMediaPreview');
+        prev.style.display = 'block';
+        // Компактное превью в окне создания
+        prev.innerHTML = type === 'image'
+            ? `<img src="${e.target.result}">`
+            : `<video src="${e.target.result}" muted autoplay></video>`;
+    };
+    reader.readAsDataURL(file);
+};
+
+window.createPost = function() {
+    const u = currentUser();
+    if (!u) return toast("error", "Ошибка", "Войдите в систему");
+    tempPostMedia = { type: null, src: null };
+    const modalHtml = `
+        <div class="post-modal-overlay" id="postModal" onclick="if(event.target === this) closePostModal()">
+            <div class="post-modal">
+                <div class="post-modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:15px; border-bottom:1px solid var(--border)">
+                    <h3 style="margin:0; font-size:18px">Создать запись</h3>
+                    <button class="btn secondary" onclick="closePostModal()">✕</button>
+                </div>
+                <div class="post-modal-body" style="padding:20px">
+                    <textarea id="postText" class="post-area" placeholder="Что у вас нового?" style="width:100%; border:none; outline:none; font-size:17px; min-height:120px; resize:none"></textarea>
+                    <div id="postMediaPreview" style="margin-top:10px; display:none; position:relative"></div>
+                </div>
+                <div class="post-modal-footer" style="padding:15px; background:var(--surface2); display:flex; justify-content:space-between; align-items:center">
+                    <div style="display:flex; gap:20px; font-size:22px">
+                        <span style="cursor:pointer" onclick="$('#fileImg').click()">🖼️</span>
+                        <span style="cursor:pointer" onclick="$('#fileVid').click()">🎥</span>
+                        <input type="file" id="fileImg" hidden accept="image/*" onchange="handlePostMedia(this, 'image')">
+                        <input type="file" id="fileVid" hidden accept="video/*" onchange="handlePostMedia(this, 'video')">
+                    </div>
+                    <button class="btn" onclick="submitPost()">Опубликовать</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('postText').focus();
+};
+
+window.submitPost = function() {
+    const u = currentUser();
+    const text = $('#postText').value.trim();
+    if (!text && !tempPostMedia.src) return;
+    if (!state.posts) state.posts = [];
+    state.posts.unshift({
+        id: "post-" + Date.now(),
+        userId: u.id,
+        userName: u.name,
+        userAvatar: u.avatar,
+        text: text,
+        media: tempPostMedia.src ? { ...tempPostMedia } : null,
+        date: new Date().toLocaleString('ru-RU', {hour:'2-digit', minute:'2-digit', day:'numeric', month:'short'}),
+        likes: [],
+        comments: []
+    });
+    saveState();
+    closePostModal();
+    renderCommunity();
+};
+
+window.deletePost = function(id) {
+    if(confirm("Удалить этот пост?")) {
+        state.posts = state.posts.filter(p => p.id !== id);
+        saveState();
+        renderCommunity();
+    }
+};
+
+/* === КОММЕНТАРИИ (VK STYLE) === */
+window.vkComment = function(e, postId) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const text = e.target.value.trim();
+        const u = currentUser();
+        if (!text || !u) return;
+
+        const post = state.posts.find(p => p.id === postId);
+        if (!post.comments) post.comments = [];
+        post.comments.push({
+            userId: u.id,
+            userName: u.name,
+            userAvatar: u.avatar,
+            text: text,
+            date: Date.now()
+        });
+        e.target.value = "";
+        saveState();
+        renderCommunity();
+    }
+};
+
+window.toggleLike = function(postId) {
+    const u = currentUser();
+    if (!u) return toast("error", "Ошибка", "Нужна авторизация");
+    const post = state.posts.find(p => p.id === postId);
+    const idx = (post.likes || []).indexOf(u.id);
+    if (idx === -1) post.likes.push(u.id);
+    else post.likes.splice(idx, 1);
+    saveState();
+    renderCommunity();
+};
+
+// Базовая функция для модальных окон
+window.showModal = function(html) {
+    // Удаляем старую модалку, если она есть
+    const old = document.getElementById('globalModal');
+    if (old) old.remove();
+
+    const modalHtml = `
+        <div id="globalModal" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+            <div class="modal-content card" style="max-width:500px; width:90%; position:relative; animation: slideUp 0.3s ease;">
+                ${html}
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+window.closeModal = function() {
+    const m = document.getElementById('globalModal');
+    if (m) m.remove();
+};
+
+/* === ОСНОВНОЙ РЕНДЕР === */
+function renderCommunity() {
+    const u = currentUser();
+    const allVolunteers = (state.users || []).filter(u => u.role === "VOLUNTEER");
+    const top20 = [...allVolunteers].sort((a,b) => (b.points||0) - (a.points||0)).slice(0, 20);
+    const posts = state.posts || [];
+
+    $("#app").innerHTML = `
+    <div class="container" style="padding-top: 30px; padding-bottom: 60px;">
+        <div class="community-layout" style="display: grid; grid-template-columns: 280px 1fr 280px; gap: 20px;">
+
+            <aside>
+                <div class="card" style="padding:15px; position: sticky; top: 20px;">
+                    <h4 style="margin-bottom:15px">🏆 ТОП-20 волонтеров</h4>
+                    ${top20.map((v, i) => `
+                        <div class="rank-item" onclick="window.openPublicProfile('${v.id}')" style="display:flex; align-items:center; gap:8px; padding:6px; cursor:pointer; border-radius:8px">
+                            <span style="font-weight:800; width:15px; font-size:11px; color:var(--muted)">${i+1}</span>
+                            <img src="${v.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:28px; height:28px; border-radius:50%; object-fit: cover;">
+                            <div style="flex:1; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${esc(v.name)}</div>
+                            <div style="font-size:11px; color:var(--blue)">${v.points||0}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </aside>
+
+            <main>
+                <div class="card" onclick="createPost()" style="padding:15px 20px; margin-bottom:20px; cursor:pointer; display:flex; align-items:center; gap:12px; border: 1px solid var(--border)">
+                    <img src="${u?.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:34px; height:34px; border-radius:50%; object-fit: cover;">
+                    <div style="color:var(--muted); font-size:15px">Что у вас нового?</div>
+                </div>
+
+                <div class="posts-feed">
+                    ${posts.map(p => {
+                        const isLiked = p.likes && p.likes.includes(u?.id);
+                        const canDelete = u && u.id === p.userId;
+
+                        return `
+                        <div class="post-card" style="background:var(--surface); border-radius:16px; padding:20px; margin-bottom:20px; border:1px solid var(--border); position:relative">
+
+                            ${canDelete ? `
+                                <button onclick="deletePost('${p.id}')"
+                                    style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:18px">✕</button>
+                            ` : ''}
+
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px; cursor:pointer" onclick="window.openPublicProfile('${p.userId}')">
+                                <img src="${p.userAvatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:40px; height:40px; border-radius:50%; object-fit: cover;">
+                                <div>
+                                    <div style="font-weight:700; font-size:14px">${esc(p.userName)}</div>
+                                    <div style="font-size:11px; color:var(--muted)">${p.date}</div>
+                                </div>
+                            </div>
+
+                            <div style="font-size:15px; margin-bottom:12px; line-height:1.5">${esc(p.text)}</div>
+
+                            ${p.media ? `
+                                <div class="post-media-container">
+                                    ${p.media.type === 'image'
+                                        ? `<img src="${p.media.src}" onclick="window.openFullImage('${p.media.src}')" title="Открыть во весь экран">`
+                                        : `<video src="${p.media.src}" controls></video>`
+                                    }
+                                </div>
+                            ` : ''}
+
+                            <div style="padding: 10px 0; border-top: 1px solid var(--border); display:flex; gap:15px; margin-top:10px">
+                                <button onclick="toggleLike('${p.id}')" style="background:none; border:none; cursor:pointer; color:${isLiked ? '#ef4444' : 'var(--muted)'}; display:flex; align-items:center; gap:5px; font-size:14px">
+                                    ${isLiked ? '❤️' : '🤍'} <b>${p.likes.length}</b>
+                                </button>
+                                <span style="color:var(--muted); font-size:14px">💬 ${p.comments?.length || 0}</span>
+                            </div>
+
+                            <div class="vk-comments" style="background:var(--surface2); border-radius:12px; padding:12px; margin-top:5px">
+                                <div class="comments-list">
+                                    ${(p.comments || []).map(c => `
+                                        <div style="display:flex; gap:10px; margin-bottom:10px">
+                                            <img src="${c.userAvatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:30px; height:30px; border-radius:50%; object-fit:cover">
+                                            <div style="background:var(--bg); padding:8px 12px; border-radius:14px; flex:1">
+                                                <div style="font-weight:700; font-size:12px; color:var(--blue); margin-bottom:2px">${esc(c.userName)}</div>
+                                                <div style="font-size:13px">${esc(c.text)}</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div style="display:flex; gap:10px; margin-top:10px">
+                                    <img src="${u?.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:30px; height:30px; border-radius:50%; object-fit:cover">
+                                    <input type="text" onkeydown="vkComment(event, '${p.id}')" placeholder="Написать комментарий..." style="flex:1; border:1px solid var(--border); border-radius:18px; padding:7px 15px; font-size:13px; outline:none; background:var(--surface)">
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </main>
+
+            <aside>
+                <div class="card" style="padding:20px; position:sticky; top:20px">
+                    <h4 style="margin-bottom:10px">🔍 Поиск волонтеров</h4>
+                    <input type="text" id="commSearch" class="inp-modern" placeholder="Имя..." oninput="applyCommunityFilters()" style="width:100%; margin-bottom:10px">
+                    <div id="miniSearchGrid"></div>
+                </div>
+            </aside>
+        </div>
+    </div>`;
+}
+
+window.openFullImage = function(src) {
+    showModal(`
+        <div style="padding:10px; text-align:center">
+            <img src="${src}" style="width:100%; max-height:80vh; object-fit:contain; border-radius:10px">
+            <button class="btn" style="margin-top:15px; width:100%" onclick="closeModal()">Закрыть</button>
+        </div>
+    `);
+};
+
+window.applyCommunityFilters = function() {
+    const q = $("#commSearch").value.toLowerCase();
+    const grid = $("#miniSearchGrid");
+    if (!q) { grid.innerHTML = ""; return; }
+    const filtered = state.users.filter(u => u.role === "VOLUNTEER" && u.name.toLowerCase().includes(q)).slice(0, 5);
+    grid.innerHTML = filtered.map(u => `
+        <div class="rank-item" onclick="window.openPublicProfile('${u.id}')" style="display:flex; align-items:center; gap:8px; padding:8px; cursor:pointer; background:var(--bg); border-radius:10px; margin-bottom:5px">
+            <img src="${u.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:24px; height:24px; border-radius:50%">
+            <div style="font-size:12px; font-weight:600">${esc(u.name)}</div>
+        </div>`).join('');
+};
+
+window.closePostModal = () => { const m = $('#postModal'); if(m) m.remove(); };
+
+function renderNews() {
+    const u = currentUser();
+    const news = state.news || [];
+
+    $("#app").innerHTML = `
+    <div class="container" style="padding-top: 40px; padding-bottom: 80px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <h1 style="font-size: 28px; margin:0">Новости</h1>
+                <p class="muted">Делитесь важными событиями сообщества</p>
+            </div>
+            ${u ? `<button class="btn" onclick="openCreateNewsModal()">+ Создать новость</button>` : ''}
+        </div>
+
+        <div class="news-grid">
+            ${news.length > 0 ? news.map(n => {
+                // Проверка: является ли текущий пользователь автором
+                const isAuthor = u && u.id === n.authorId;
+
+                return `
+                <div class="news-card" style="position: relative;">
+                    ${isAuthor ? `
+                        <button onclick="deleteNews(event, '${n.id}')"
+                            style="position: absolute; top: 15px; right: 15px; z-index: 10; background: rgba(239, 68, 68, 0.9); color: white; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;"
+                            onmouseover="this.style.transform='scale(1.1)'"
+                            onmouseout="this.style.transform='scale(1)'"
+                            title="Удалить новость">
+                            ✕
+                        </button>
+                    ` : ''}
+
+                    <div onclick="openFullNews('${n.id}')" style="height: 100%;">
+                        <img src="${n.image}" alt="news">
+                        <div class="news-overlay">
+                            <div style="font-size: 11px; opacity: 0.8; margin-bottom: 8px;">
+                                📅 ${n.date} • ${esc(n.authorName || 'Автор')}
+                            </div>
+                            <h3 class="news-card-title">${esc(n.title)}</h3>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('') : `
+                <div style="grid-column: 1/-1; text-align: center; padding: 100px 20px; background: var(--surface); border-radius: 20px; border: 2px dashed var(--border);">
+                    <h3>Новостей пока нет</h3>
+                </div>
+            `}
+        </div>
+    </div>`;
+}
+
+window.deleteNews = function(event, newsId) {
+    // Останавливаем всплытие, чтобы не сработал onclick основной карточки
+    if (event) event.stopPropagation();
+
+    if (!confirm("Вы уверены, что хотите удалить эту новость?")) return;
+
+    // Фильтруем массив, удаляя новость с нужным ID
+    state.news = (state.news || []).filter(n => n.id !== newsId);
+
+    saveState();   // Сохраняем в localStorage
+    renderNews();  // Перерисовываем экран
+    toast("ok", "Удалено", "Новость успешно удалена");
+};
+
+// Открытие полной новости в модальном окне
+window.openFullNews = function(id) {
+    const n = (state.news || []).find(item => item.id === id);
+
+    if (!n) {
+        toast("error", "Ошибка", "Не удалось загрузить содержание новости");
+        return;
+    }
+
+    const html = `
+        <div style="max-height: 90vh; overflow-y: auto;">
+            <img src="${n.image}" style="width:100%; height:350px; object-fit:cover; border-radius: 18px 18px 0 0;">
+            <div style="padding: 30px;">
+                <div style="display:flex; justify-content:space-between; color:var(--muted); font-size:13px; margin-bottom:15px;">
+                    <span>📅 ${n.date}</span>
+                    <span>✍️ ${esc(n.authorName || 'Автор')}</span>
+                </div>
+                <h2 style="margin-bottom:20px; line-height:1.4; font-size:24px;">${esc(n.title)}</h2>
+                <div style="line-height:1.8; font-size:16px; color:var(--text); white-space: pre-wrap;">
+                    ${esc(n.text)}
+                </div>
+                <button class="btn secondary" style="width:100%; margin-top:30px; padding:12px;" onclick="closeModal()">Закрыть</button>
+            </div>
+        </div>
+    `;
+    showModal(html);
+};
+
+// Окно создания новости (только для ADMIN)
+window.openCreateNewsModal = function() {
+    const html = `
+        <div style="padding: 24px;">
+            <h3>Новая публикация</h3>
+            <div style="margin-top:20px;">
+                <label class="muted" style="font-size:12px;">Заголовок</label>
+                <input type="text" id="newsInpTitle" class="inp-modern" style="width:100%; margin-bottom:15px;" placeholder="Введите название...">
+
+                <label class="muted" style="font-size:12px;">Ссылка на обложку (URL)</label>
+                <input type="text" id="newsInpImg" class="inp-modern" style="width:100%; margin-bottom:15px;" placeholder="https://...">
+
+                <label class="muted" style="font-size:12px;">Текст новости</label>
+                <textarea id="newsInpText" class="inp-modern" style="width:100%; height:200px; resize:none; padding:12px;" placeholder="Напишите содержание..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" style="flex:1" onclick="saveAdminNews()">Опубликовать</button>
+                <button class="btn secondary" onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    `;
+    showModal(html);
+};
+
+window.saveAdminNews = function() {
+    const u = currentUser();
+    if (!u) return toast("error", "Ошибка", "Нужно войти в аккаунт");
+
+    const title = $('#newsInpTitle').value.trim();
+    const img = $('#newsInpImg').value.trim() || 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000';
+    const text = $('#newsInpText').value.trim();
+
+    if (!title || !text) {
+        toast("error", "Ошибка", "Заполните заголовок и текст новости");
+        return;
+    }
+
+    if (!state.news) state.news = [];
+
+    // Добавляем новость в начало списка
+    state.news.unshift({
+        id: 'n-' + Date.now(),
+        title: title,
+        image: img,
+        text: text,
+        date: new Date().toLocaleDateString('ru-RU'),
+        authorName: u.name,
+        authorId: u.id
+    });
+
+    saveState();
+    closeModal();
+    renderNews(); // Перерисовываем страницу новостей
+    toast("ok", "Готово", "Ваша новость опубликована!");
+};
+
+function renderAbout() {
+    $("#app").innerHTML = `
+    <div class="container" style="padding-top: 80px; padding-bottom: 120px;">
+
+        <header style="max-width: 900px; margin-bottom: 80px;">
+            <div style="display: inline-block; background: var(--blueSoft); color: var(--blue); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 24px; text-transform: uppercase;">
+                Социально-образовательная инициатива
+            </div>
+            <h1 style="font-size: clamp(34px, 5vw, 68px); line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 30px; font-weight: 800;">
+                Платформа для тех, кто <br><span style="color: var(--blue)">не привык оставаться в стороне.</span>
+            </h1>
+            <p style="font-size: 20px; color: var(--text); line-height: 1.6; max-width: 750px; opacity: 0.85;">
+                Доброе_дело.by — это наш ответ на вопрос о том, как сделать волонтерство частью жизни современного человека. Мы создаем пространство, где помощь становится простой, честной и доступной каждому.
+            </p>
+        </header>
+
+        <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; margin-bottom: 80px;">
+
+            <div class="card" style="grid-column: span 8; padding: 50px; background: var(--blueSoft); border: none; display: flex; flex-direction: column; justify-content: center;">
+                <h3 style="font-size: 26px; margin-bottom: 20px; color: var(--blue);">Почему мы это делаем?</h3>
+                <p style="font-size: 17px; color: var(--text); line-height: 1.7;">
+                    Мы заметили, что многие хотят приносить пользу, но не знают, с чего начать. Проект объединяет запросы о помощи от приютов, активистов и социальных центров в единую систему. Теперь, чтобы сделать шаг навстречу важному делу, достаточно лишь намерения и доступа к платформе.
+                </p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 40px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 50px; margin-bottom: 15px;">📍</div>
+                <h3 style="margin-bottom: 10px; font-size: 20px;">Свои для своих</h3>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Мы создаем инструмент, который помогает локальным инициативам находить поддержку прямо здесь и сейчас. Это проект о людях, которые живут рядом.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Честность</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">На платформе размещаются только проверенные инициативы. Мы за то, чтобы каждый участник был уверен в прозрачности и значимости своего вклада.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Развитие</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Волонтерство — это не только помощь другим, но и прокачка собственных навыков, новые знакомства и накопление уникального опыта.</p>
+            </div>
+
+            <div class="card" style="grid-column: span 4; padding: 35px;">
+                <h4 style="color: var(--blue); margin-bottom: 12px; font-size: 18px;">Технологии</h4>
+                <p class="muted" style="font-size: 14px; line-height: 1.5;">Мы используем цифровой потенциал, чтобы автоматизировать поиск проектов и сделать взаимодействие волонтера и организатора мгновенным.</p>
+            </div>
+        </div>
+
+        <div style="background: var(--surface2); border-radius: 30px; padding: 60px; border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1.2fr; gap: 60px; align-items: center;">
+            <div>
+                <h2 style="font-size: 32px; margin-bottom: 25px;">Задачи проекта</h2>
+                <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 18px;">
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">01</span>
+                        <span style="font-size: 16px;">Сформировать удобную инфраструктуру для реализации социальных идей.</span>
+                    </li>
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">02</span>
+                        <span style="font-size: 16px;">Дать возможность каждому стать частью масштабного движения взаимопомощи.</span>
+                    </li>
+                    <li style="display: flex; gap: 15px;">
+                        <span style="color: var(--blue); font-weight: bold;">03</span>
+                        <span style="font-size: 16px;">Показать потенциал студенческих инициатив в решении актуальных проблем общества.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div style="text-align: right; padding-left: 40px; border-left: 1px solid var(--border);">
+                <div style="font-size: 80px; margin-bottom: 20px; opacity: 0.2;">✨</div>
+                <h3 style="margin-bottom: 15px; font-size: 26px;">Культура соучастия</h3>
+                <p class="muted" style="font-size: 16px; line-height: 1.7;">
+                    Мы строим не просто инструмент, а среду, основанную на взаимном уважении и искренности. Если ваша организация разделяет наши ценности или вам нужна поддержка в реализации доброй идеи — мы готовы стать вашей технической и информационной опорой в рамках развития этого проекта.
+                </p>
+            </div>
+        </div>
+
+        <div style="margin-top: 80px; text-align: center;">
+            <p style="color: var(--muted); margin-bottom: 20px;">Остались вопросы или есть предложения по сотрудничеству?</p>
+            <div style="display: flex; justify-content: center; gap: 15px;">
+                <button class="btn" onclick="location.href='mailto:info@ddby.by'">Связаться с командой</button>
+                <button class="btn secondary" onclick="location.hash='#/projects'">Перейти к проектам</button>
+            </div>
+        </div>
+
+    </div>
+    `;
+}
+
+// === ИНТЕГРАЦИЯ С MONGODB СЕРВЕРОМ ===
+const API_URL = 'http://localhost:3000';
+let authToken = localStorage.getItem('authToken');
+
+// === МОДИФИЦИРОВАННАЯ РЕГИСТРАЦИЯ ===
+regForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+
+    if (!fd.get('consent')) {
+        toast('warn', 'Внимание', 'Необходимо согласие на обработку данных.');
+        return;
+    }
+
+    const email = String(fd.get('email')).trim();
+    const role = String(fd.get('role'));
+    const name = String(fd.get('name')).trim();
+    const pass = String(fd.get('pass')).trim();
+
+    console.log('📤 Отправка регистрации на сервер:', { email, name, role });
+
+    try {
+        const res = await fetch(`${API_URL}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email,
+                password: pass,
+                name,
+                role,
+                username: email.split('@')[0]
+            })
+        });
+
+        const data = await res.json();
+        console.log('📥 Ответ сервера:', data);
+
+        if (!res.ok) {
+            toast('warn', 'Ошибка регистрации', data.message || 'Проверьте данные');
+            return;
+        }
+
+        authToken = data.token;
+        localStorage.setItem('authToken', authToken);
+
+        const newUser = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            role: data.user.role,
+            city: data.user.city || '',
+            phone: data.user.phone || '',
+            pass: pass,
+            points: data.user.points || 0,
+            privacy: 'public',
+            createdAt: new Date().toISOString()
+        };
+
+        state.users.push(newUser);
+        state.session.userId = data.user.id;
+
+        if (role === 'ORGANIZER') {
+            state.organizations.push({
+                id: `org-${data.user.id}`,
+                ownerUserId: data.user.id,
+                name: data.user.name,
+                status: 'PENDING',
+                contacts: data.user.email,
+                rating: 0,
+                createdAt: new Date().toISOString()
+            });
+        }
+
+        saveState();
+        closeModal();
+        toast('ok', 'Регистрация завершена', `Добро пожаловать, ${data.user.name}!`);
+        renderApp();
+
+    } catch (err) {
+        console.error('❌ Ошибка регистрации:', err);
+        toast('danger', 'Ошибка', 'Не удалось подключиться к серверу. Проверьте что сервер запущен.');
+    }
+};
+
+// === МОДИФИЦИРОВАННЫЙ ЛОГИН ===
+loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const email = String(fd.get('email')).trim();
+    const pass = String(fd.get('pass')).trim();
+
+    console.log('📤 Отправка логина на сервер:', email);
+
+    try {
+        const res = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass })
+        });
+
+        const data = await res.json();
+        console.log('📥 Ответ сервера:', data);
+
+        if (!res.ok) {
+            toast('danger', 'Ошибка входа', data.message || 'Неверный email или пароль');
+            return;
+        }
+
+        authToken = data.token;
+        localStorage.setItem('authToken', authToken);
+
+        let existingUser = state.users.find(u => u.email === data.user.email);
+        if (!existingUser) {
+            state.users.push({
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.name,
+                role: data.user.role,
+                city: data.user.city || '',
+                phone: data.user.phone || '',
+                pass: pass,
+                points: data.user.points || 0,
+                privacy: 'public',
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            Object.assign(existingUser, data.user);
+        }
+
+        state.session.userId = data.user.id;
+        saveState();
+        closeModal();
+        toast('ok', 'Успешно', `Добро пожаловать, ${data.user.name}!`);
+        renderApp();
+
+    } catch (err) {
+        console.error('❌ Ошибка входа:', err);
+        toast('danger', 'Ошибка', 'Не удалось подключиться к серверу');
+    }
+};
+
+// === ЗАГРУЗКА СЕССИИ ПРИ СТАРТЕ ===
+async function loadServerSession() {
+    if (!authToken) return;
+
+    try {
+        const res = await fetch(`${API_URL}/check-session`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            console.log('✓ Сессия восстановлена:', data.user.name);
+
+            let existingUser = state.users.find(u => u.id === data.user.id);
+            if (!existingUser) {
+                state.users.push({
+                    id: data.user.id,
+                    email: data.user.email,
+                    name: data.user.name,
+                    role: data.user.role,
+                    city: data.user.city || '',
+                    phone: data.user.phone || '',
+                    pass: 'restored',
+                    points: data.user.points || 0,
+                    privacy: 'public',
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            state.session.userId = data.user.id;
+            saveState();
+        } else {
+            localStorage.removeItem('authToken');
+            authToken = null;
+        }
+    } catch (err) {
+        console.error('Ошибка загрузки сессии:', err);
+    }
+}
+
+// Загрузить сессию при старте
+loadServerSession();
+
+</script>
+</body>
+</html>
