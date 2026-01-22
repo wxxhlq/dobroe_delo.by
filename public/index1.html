@@ -2731,11 +2731,12 @@ window.directApply = function(projectId) {
 /* 3. Основная функция отрисовки кабинета */
 /* === ОБНОВЛЕННАЯ ФУНКЦИЯ КАБИНЕТА С РЕДАКТИРОВАНИЕМ === */
 
-function renderCabinet() {
+async function renderCabinet() {
   if (!requireAuth()) { navigate("#/"); return; }
-  const u = currentUser();
+  await loadProfileFromServer();
 
-  const allProjects = state.projects || [];
+  const u = currentUser();
+  const allProjects = state.projects;
   const allApps = state.applications || [];
   const projectsById = Object.fromEntries(allProjects.map(p => [p.id, p]));
 
@@ -2860,18 +2861,52 @@ function renderCabinet() {
 }
 
 // Глобальная функция сохранения профиля
-window.handleUpdateProfile = function(form) {
-  const u = currentUser();
-  const fd = new FormData(form);
+window.handleUpdateProfile = async function(form) {
+    const u = currentUser();
+    if (!u) return;
 
-  u.name = fd.get('name');
-  u.city = fd.get('city');
-  u.phone = fd.get('phone');
-  u.email = fd.get('email');
+    const fd = new FormData(form);
+    const updateData = {
+        name: fd.get('name'),
+        city: fd.get('city'),
+        phone: fd.get('phone')
+    };
 
-  saveState();
-  toast("ok", "Успешно", "Данные обновлены");
-  renderCabinet(); // Перерисовываем для обновления данных в боковой панели
+    console.log('📤 Отправка данных на сервер:', updateData);
+
+    try {
+        const res = await fetch(`http://localhost:3000/me`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(updateData)
+        });
+
+        const data = await res.json();
+        console.log('📥 Ответ сервера:', data);
+
+        if (!res.ok) {
+            toast('danger', 'Ошибка', data.message || 'Не удалось обновить');
+            return;
+        }
+
+        // Обновляем ТОЛЬКО в памяти, БЕЗ localStorage
+        Object.assign(u, {
+            name: data.user.name,
+            city: data.user.city,
+            phone: data.user.phone
+        });
+
+        // НЕ вызываем saveState() - данные только на сервере!
+        toast('ok', '✓', 'Профиль обновлён в БД');
+        renderCabinet();
+
+    } catch (err) {
+        console.error('❌ Ошибка:', err);
+        toast('danger', 'Ошибка', 'Проблема соединения с сервером');
+    }
 };
 
 /* routes */
@@ -3587,6 +3622,40 @@ loginForm.onsubmit = async (e) => {
         toast('danger', 'Ошибка', 'Не удалось подключиться к серверу');
     }
 };
+
+// === Загрузка профиля с сервера ===
+async function loadProfileFromServer() {
+    if (!authToken) return;
+
+    console.log('🔄 Загрузка профиля с сервера...');
+
+    try {
+        const res = await fetch(`http://localhost:3000/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            console.log('✅ Профиль загружен из БД:', data);
+
+            const u = currentUser();
+            if (u) {
+                // Обновляем данные в памяти из БД
+                Object.assign(u, {
+                    name: data.name,
+                    city: data.city,
+                    phone: data.phone,
+                    points: data.points
+                });
+                // НЕ сохраняем в localStorage!
+            }
+        }
+    } catch (err) {
+        console.error('❌ Ошибка загрузки из БД:', err);
+    }
+}
 
 // === ЗАГРУЗКА СЕССИИ ПРИ СТАРТЕ ===
 async function loadServerSession() {

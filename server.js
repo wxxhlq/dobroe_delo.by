@@ -11,6 +11,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 setTimeout(() => {
@@ -204,8 +214,7 @@ app.get('/me', authMiddleware, async (req, res) => {
 // === ОБНОВИТЬ ПРОФИЛЬ ===
 app.put('/me', authMiddleware, async (req, res) => {
     try {
-        const { name, city, phone } = req.body;
-
+        const { name, city, phone, privacy, notifications } = req.body;
         const db = getDB();
         const usersCollection = db.collection('users');
 
@@ -213,6 +222,8 @@ app.put('/me', authMiddleware, async (req, res) => {
         if (name) updateData.name = name;
         if (city) updateData.city = city;
         if (phone) updateData.phone = phone;
+        if (privacy) updateData.privacy = privacy;
+        if (notifications !== undefined) updateData.notifications = notifications;
 
         await usersCollection.updateOne(
             { _id: new ObjectId(req.user.userId) },
@@ -234,6 +245,7 @@ app.put('/me', authMiddleware, async (req, res) => {
                 role: updatedUser.role,
                 city: updatedUser.city,
                 phone: updatedUser.phone,
+                privacy: updatedUser.privacy,
                 points: updatedUser.points || 0
             }
         });
