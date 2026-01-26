@@ -1397,6 +1397,10 @@
 <div class="toast" id="toasts" aria-live="assertive"></div>
 
 <script>
+/* ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ API ===== */
+const API_URL = 'http://localhost:3000';
+let authToken = localStorage.getItem('authToken');
+
 /* ===== State / storage (из твоего исходника) ===== */
 const LS_KEY = "ddby_flat_v1"; // [file:87]
 
@@ -1945,8 +1949,7 @@ function openAuthModal(){
 
     // === ПЕРЕОПРЕДЕЛЕНИЕ ДЛЯ MONGODB ===
     (function() {
-        const API_URL = 'http://localhost:3000';
-        let authToken = localStorage.getItem('authToken');
+        // Используем глобальные переменные API_URL и authToken
 
         // Перезаписываем loginForm
         $("#loginForm").onsubmit = async (e) => {
@@ -2083,47 +2086,7 @@ function openAuthModal(){
             }
         };
 
-        // Загрузка сессии
-        async function loadServerSession() {
-            if (!authToken) return;
-
-            try {
-                const res = await fetch(`${API_URL}/check-session`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    console.log('✓ Сессия восстановлена:', data.user.name);
-
-                    let existingUser = state.users.find(u => u.id === data.user.id);
-                    if (!existingUser) {
-                        state.users.push({
-                            id: data.user.id,
-                            email: data.user.email,
-                            name: data.user.name,
-                            role: data.user.role,
-                            city: data.user.city || '',
-                            phone: data.user.phone || '',
-                            pass: 'restored',
-                            points: data.user.points || 0,
-                            privacy: 'public',
-                            createdAt: new Date().toISOString()
-                        });
-                    }
-
-                    state.session.userId = data.user.id;
-                    saveState();
-                } else {
-                    localStorage.removeItem('authToken');
-                    authToken = null;
-                }
-            } catch (err) {
-                console.error('Ошибка загрузки сессии:', err);
-            }
-        }
-
-        loadServerSession();
+        // Обработчики форм уже установлены выше
     })();
 }
 
@@ -3120,9 +3083,49 @@ $("#btnOpenAuth").onclick = () => {
   }
 };
 
+// === ЗАГРУЗКА СЕССИИ ПРИ СТАРТЕ ===
+async function loadServerSession() {
+    if (!authToken) return;
+
+    try {
+        const res = await fetch(`${API_URL}/check-session`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            console.log('✓ Сессия восстановлена:', data.user.name);
+
+            let existingUser = state.users.find(u => u.id === data.user.id);
+            if (!existingUser) {
+                state.users.push({
+                    id: data.user.id,
+                    email: data.user.email,
+                    name: data.user.name,
+                    role: data.user.role,
+                    city: data.user.city || '',
+                    phone: data.user.phone || '',
+                    pass: 'restored',
+                    points: data.user.points || 0,
+                    privacy: 'public',
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            state.session.userId = data.user.id;
+            saveState();
+        } else {
+            localStorage.removeItem('authToken');
+            authToken = null;
+        }
+    } catch (err) {
+        console.error('Ошибка загрузки сессии:', err);
+    }
+}
+
 window.addEventListener("hashchange", renderApp);
 if(!location.hash) location.hash="#/";
-renderApp();
+loadServerSession().then(() => renderApp());
 
 /* === ГЛОБАЛЬНЫЕ ФУНКЦИИ ПРОФИЛЯ === */
 window.openPublicProfile = function(userId) {
@@ -3659,147 +3662,6 @@ function renderAbout() {
     `;
 }
 
-// === ИНТЕГРАЦИЯ С MONGODB СЕРВЕРОМ ===
-const API_URL = 'http://localhost:3000';
-let authToken = localStorage.getItem('authToken');
-
-// === МОДИФИЦИРОВАННАЯ РЕГИСТРАЦИЯ ===
-regForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-
-    if (!fd.get('consent')) {
-        toast('warn', 'Внимание', 'Необходимо согласие на обработку данных.');
-        return;
-    }
-
-    const email = String(fd.get('email')).trim();
-    const role = String(fd.get('role'));
-    const name = String(fd.get('name')).trim();
-    const pass = String(fd.get('pass')).trim();
-
-    console.log('📤 Отправка регистрации на сервер:', { email, name, role });
-
-    try {
-        const res = await fetch(`${API_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email,
-                password: pass,
-                name,
-                role,
-                username: email.split('@')[0]
-            })
-        });
-
-        const data = await res.json();
-        console.log('📥 Ответ сервера:', data);
-
-        if (!res.ok) {
-            toast('warn', 'Ошибка регистрации', data.message || 'Проверьте данные');
-            return;
-        }
-
-        authToken = data.token;
-        localStorage.setItem('authToken', authToken);
-
-        const newUser = {
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.name,
-            role: data.user.role,
-            city: data.user.city || '',
-            phone: data.user.phone || '',
-            pass: pass,
-            points: data.user.points || 0,
-            privacy: 'public',
-            createdAt: new Date().toISOString()
-        };
-
-        state.users.push(newUser);
-        state.session.userId = data.user.id;
-
-        if (role === 'ORGANIZER') {
-            state.organizations.push({
-                id: `org-${data.user.id}`,
-                ownerUserId: data.user.id,
-                name: data.user.name,
-                status: 'PENDING',
-                contacts: data.user.email,
-                rating: 0,
-                createdAt: new Date().toISOString()
-            });
-        }
-
-        saveState();
-        closeModal();
-        toast('ok', 'Регистрация завершена', `Добро пожаловать, ${data.user.name}!`);
-        renderApp();
-
-    } catch (err) {
-        console.error('❌ Ошибка регистрации:', err);
-        toast('danger', 'Ошибка', 'Не удалось подключиться к серверу. Проверьте что сервер запущен.');
-    }
-};
-
-// === МОДИФИЦИРОВАННЫЙ ЛОГИН ===
-loginForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const email = String(fd.get('email')).trim();
-    const pass = String(fd.get('pass')).trim();
-
-    console.log('📤 Отправка логина на сервер:', email);
-
-    try {
-        const res = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: pass })
-        });
-
-        const data = await res.json();
-        console.log('📥 Ответ сервера:', data);
-
-        if (!res.ok) {
-            toast('danger', 'Ошибка входа', data.message || 'Неверный email или пароль');
-            return;
-        }
-
-        authToken = data.token;
-        localStorage.setItem('authToken', authToken);
-
-        let existingUser = state.users.find(u => u.email === data.user.email);
-        if (!existingUser) {
-            state.users.push({
-                id: data.user.id,
-                email: data.user.email,
-                name: data.user.name,
-                role: data.user.role,
-                city: data.user.city || '',
-                phone: data.user.phone || '',
-                pass: pass,
-                points: data.user.points || 0,
-                privacy: 'public',
-                createdAt: new Date().toISOString()
-            });
-        } else {
-            Object.assign(existingUser, data.user);
-        }
-
-        state.session.userId = data.user.id;
-        saveState();
-        closeModal();
-        toast('ok', 'Успешно', `Добро пожаловать, ${data.user.name}!`);
-        renderApp();
-
-    } catch (err) {
-        console.error('❌ Ошибка входа:', err);
-        toast('danger', 'Ошибка', 'Не удалось подключиться к серверу');
-    }
-};
-
 // === Загрузка профиля с сервера ===
 async function loadProfileFromServer() {
     if (!authToken) return;
@@ -3807,7 +3669,7 @@ async function loadProfileFromServer() {
     console.log('🔄 Загрузка профиля с сервера...');
 
     try {
-        const res = await fetch(`http://localhost:3000/me`, {
+        const res = await fetch(`${API_URL}/me`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
             }
@@ -3833,49 +3695,6 @@ async function loadProfileFromServer() {
         console.error('❌ Ошибка загрузки из БД:', err);
     }
 }
-
-// === ЗАГРУЗКА СЕССИИ ПРИ СТАРТЕ ===
-async function loadServerSession() {
-    if (!authToken) return;
-
-    try {
-        const res = await fetch(`${API_URL}/check-session`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            console.log('✓ Сессия восстановлена:', data.user.name);
-
-            let existingUser = state.users.find(u => u.id === data.user.id);
-            if (!existingUser) {
-                state.users.push({
-                    id: data.user.id,
-                    email: data.user.email,
-                    name: data.user.name,
-                    role: data.user.role,
-                    city: data.user.city || '',
-                    phone: data.user.phone || '',
-                    pass: 'restored',
-                    points: data.user.points || 0,
-                    privacy: 'public',
-                    createdAt: new Date().toISOString()
-                });
-            }
-
-            state.session.userId = data.user.id;
-            saveState();
-        } else {
-            localStorage.removeItem('authToken');
-            authToken = null;
-        }
-    } catch (err) {
-        console.error('Ошибка загрузки сессии:', err);
-    }
-}
-
-// Загрузить сессию при старте
-loadServerSession();
 
 </script>
 </body>

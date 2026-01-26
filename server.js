@@ -3,16 +3,31 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const { getDB } = require('./db');
+const { getDB, connectDB } = require('./db');
 const { ObjectId } = require('mongodb');
+
+// Проверка обязательных переменных окружения
+if (!process.env.JWT_SECRET) {
+    console.error('❌ ОШИБКА: JWT_SECRET не установлен в переменных окружения!');
+    console.error('   Установите JWT_SECRET в файле .env');
+    process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Настройка CORS (можно настроить через переменную окружения)
+const allowedOrigins = process.env.CORS_ORIGINS 
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['*']; // По умолчанию разрешаем все (для разработки)
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin))) {
+        res.header('Access-Control-Allow-Origin', origin || '*');
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') {
@@ -22,12 +37,6 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-
-setTimeout(() => {
-    app.listen(PORT, () => {
-        console.log(`✓ Server running on http://localhost:${PORT}`);
-    });
-}, 2000);
 
 // === ГЛАВНАЯ СТРАНИЦА ===
 app.get('/', (req, res) => {
@@ -46,6 +55,9 @@ app.post('/register', async (req, res) => {
 
     try {
         const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
         const usersCollection = db.collection('users');
 
         // Проверка существования
@@ -97,6 +109,8 @@ app.post('/register', async (req, res) => {
                 email: newUser.email,
                 name: newUser.name,
                 role: newUser.role,
+                city: newUser.city,
+                phone: newUser.phone,
                 points: newUser.points
             }
         });
@@ -114,6 +128,9 @@ app.post('/login', async (req, res) => {
 
     try {
         const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
         const usersCollection = db.collection('users');
 
         // Поиск по email
@@ -183,6 +200,9 @@ function authMiddleware(req, res, next) {
 app.get('/me', authMiddleware, async (req, res) => {
     try {
         const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
         const usersCollection = db.collection('users');
 
         const user = await usersCollection.findOne(
@@ -216,6 +236,9 @@ app.put('/me', authMiddleware, async (req, res) => {
     try {
         const { name, city, phone, privacy, notifications } = req.body;
         const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
         const usersCollection = db.collection('users');
 
         const updateData = {};
@@ -259,6 +282,9 @@ app.put('/me', authMiddleware, async (req, res) => {
 app.get('/check-session', authMiddleware, async (req, res) => {
     try {
         const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
         const usersCollection = db.collection('users');
 
         const user = await usersCollection.findOne(
@@ -284,6 +310,26 @@ app.get('/check-session', authMiddleware, async (req, res) => {
             }
         });
     } catch (err) {
+        console.error('❌ Ошибка проверки сессии:', err);
         res.status(401).json({ valid: false });
     }
 });
+
+// === ЗАПУСК СЕРВЕРА ===
+async function startServer() {
+    try {
+        // Ждём подключения к базе данных перед запуском сервера
+        console.log('⏳ Ожидание подключения к MongoDB...');
+        await connectDB();
+        console.log('✓ База данных готова');
+
+        app.listen(PORT, () => {
+            console.log(`✓ Server running on http://localhost:${PORT}`);
+        });
+    } catch (err) {
+        console.error('❌ Ошибка запуска сервера:', err);
+        process.exit(1);
+    }
+}
+
+startServer();
