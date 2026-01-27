@@ -3004,52 +3004,102 @@ function renderAbout(){
 }
 
 function renderContacts(){
-  $("#app").innerHTML=`
-    <div class="container" style="padding-top:16px">
-      <div class="grid">
-        <section class="card">
-          <div class="section-title"><h2>Контакты</h2><small>обратная связь</small></div>
-          <div class="card-inner">
-            <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.news}')"></div>
-            <div class="hr"></div>
+  $("#app").innerHTML = `
+    <div class="container" style="padding-top:80px; padding-bottom:120px;">
+      <header style="max-width: 900px; margin-bottom: 60px;">
+        <div style="display:inline-block; background: var(--blueSoft); color: var(--blue); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase;">
+          Связь с командой
+        </div>
+        <h1 style="font-size: clamp(32px, 5vw, 52px); line-height: 1.1; letter-spacing: -1px; margin-bottom: 22px; font-weight: 800;">
+          Мы всегда на связи, <br><span style="color: var(--blue)">чтобы добрые дела случались вовремя.</span>
+        </h1>
+        <p style="font-size: 18px; color: var(--text); line-height: 1.6; max-width: 720px; opacity: 0.85;">
+          Напишите нам, если у вас есть вопрос по платформе, предложение о партнёрстве или вы столкнулись с ситуацией, требующей внимания модераторов.
+        </p>
+      </header>
 
-            <form id="contactForm">
-              <div class="two">
-                <div class="field">
-                  <label>Тема</label>
-                  <select name="topic" required>
-                    <option value="" selected disabled>Выберите…</option>
-                    <option>Вопрос по проектам</option>
-                    <option>Партнёрство</option>
-                    <option>Жалоба/модерация</option>
-                    <option>Другое</option>
-                  </select>
-                </div>
-                <div class="field"><label>Имя</label><input name="name" required /></div>
-              </div>
-              <div class="two">
-                <div class="field"><label>Email</label><input name="email" type="email" required /></div>
-                <div class="field"><label>Сообщение</label><input name="message" required /></div>
+      <div style="display:grid; grid-template-columns: repeat(12, 1fr); gap:24px; margin-bottom:60px;">
+        <section class="card" style="grid-column: span 7; padding:40px; border:none; background: var(--surface2); border-radius:30px;">
+          <h2 style="font-size:22px; margin-bottom:18px;">Форма обратной связи</h2>
+          <p class="muted" style="font-size:14px; margin-bottom:24px;">Ответим на ваш запрос в максимально короткие сроки. В демо‑версии обращения сохраняются локально.</p>
+
+          <form id="contactForm">
+            <div class="two">
+              <div class="field">
+                <label>Тема</label>
+                <select name="topic" required>
+                  <option value="" selected disabled>Выберите…</option>
+                  <option>Вопрос по проектам</option>
+                  <option>Партнёрство</option>
+                  <option>Жалоба/модерация</option>
+                  <option>Техническая ошибка</option>
+                  <option>Другое</option>
+                </select>
               </div>
               <div class="field">
-                <label class="small"><input type="checkbox" name="consent" required /> Согласен(на) на обработку данных.</label>
+                <label>Имя</label>
+                <input name="name" required placeholder="Как к вам обращаться" />
               </div>
-              <button class="btn" type="submit">Отправить</button>
-            </form>
-          </div>
+            </div>
+            <div class="two">
+              <div class="field">
+                <label>Email</label>
+                <input name="email" type="email" required placeholder="name@example.com" />
+              </div>
+              <div class="field">
+                <label>Сообщение</label>
+                <input name="message" required placeholder="Кратко опишите ситуацию" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="small">
+                <input type="checkbox" name="consent" required />
+                Согласен(на) на обработку персональных данных для связи.
+              </label>
+            </div>
+            <div class="row" style="margin-top:10px;">
+              <button class="btn" type="submit">Отправить сообщение</button>
+            </div>
+          </form>
         </section>
 
-        <aside class="card">
-          <div class="section-title"><h2>Последние обращения</h2><small>демо</small></div>
-          <div class="list" id="tickets"></div>
+        <aside style="grid-column: span 5; display:flex; flex-direction:column; gap:20px;">
+          <div class="card" style="padding:28px; border-radius:26px;">
+            <h3 style="margin:0 0 14px; font-size:18px;">Прямые контакты</h3>
+            <p class="muted" style="font-size:14px; margin-bottom:18px;">
+              Если вопрос срочный, воспользуйтесь любым удобным способом связи.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:14px;">
+              <div><span style="font-weight:700;">Email:</span> info@ddby.by</div>
+              <div><span style="font-weight:700;">Телефон:</span> +375 (29) 000‑00‑00</div>
+              <div><span style="font-weight:700;">Telegram:</span> @dobroedelo_by</div>
+            </div>
+          </div>
+
+          <div class="card" style="padding:24px; border-radius:26px;">
+            <div class="section-title" style="border-radius:22px 22px 0 0; margin:-24px -24px 16px; padding:14px 20px;">
+              <h2 style="font-size:16px;">Последние обращения</h2>
+              <small>демо</small>
+            </div>
+            <div class="list" id="tickets"></div>
+          </div>
         </aside>
+      </div>
+
+      <div style="background: var(--surface2); border-radius:26px; padding:28px 32px; border:1px solid var(--border); display:flex; flex-wrap:wrap; gap:18px; align-items:center;">
+        <div style="font-size:30px;">💬</div>
+        <div style="flex:1; min-width:220px;">
+          <div style="font-weight:750; margin-bottom:4px;">Есть идея для совместного проекта?</div>
+          <div class="muted" style="font-size:14px;">Напишите нам о своей инициативе — мы поможем упаковать её и разместить на платформе.</div>
+        </div>
+        <button class="btn secondary" onclick="navigate('/projects')">Посмотреть проекты</button>
       </div>
     </div>
   `;
 
-  $("#contactForm").onsubmit=(e)=>{
+  $("#contactForm").onsubmit = (e)=>{
     e.preventDefault();
-    const fd=new FormData(e.target);
+    const fd = new FormData(e.target);
     if(!fd.get("consent")){ toast("warn","Нужно согласие","Отметьте чекбокс."); return; }
     state.helpRequests.unshift({
       id: uid("t"),
