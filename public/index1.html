@@ -1460,6 +1460,187 @@ function handleAuthResponse(res, data) {
   return true;
 }
 
+// === Управление проектами (редактирование, закрытие, удаление) ===
+window.openProjectEditModal = function(projectId) {
+  const p = (state.projects || []).find(pr => pr.id === projectId);
+  if (!p) {
+    toast('danger', 'Ошибка', 'Проект не найден');
+    return;
+  }
+  if (!authToken) {
+    toast('error', 'Ошибка', 'Нужно заново войти в аккаунт');
+    return;
+  }
+
+  const html = `
+    <div class="modal-modern">
+      <div class="modal-body-content" style="padding: 32px; background: #fff; max-width: 720px;">
+        <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--text);">Редактирование проекта</h2>
+        <form id="editProjectForm">
+          <div class="two">
+            <div class="field">
+              <label>Категория</label>
+              <select name="categoryId" required>
+                ${CATEGORIES.map(c => `<option value="${c.id}" ${p.categoryId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Формат</label>
+              <select name="format" required>
+                ${FORMATS.map(x => `<option value="${esc(x)}" ${p.format === x ? 'selected' : ''}>${esc(x)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="two">
+            <div class="field">
+              <label>Регион</label>
+              <select name="region" required>
+                ${REGIONS.map(r => `<option value="${esc(r)}" ${p.region === r ? 'selected' : ''}>${esc(r)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Город</label>
+              <input name="city" value="${esc(p.city || '')}" required />
+            </div>
+          </div>
+          <div class="field">
+            <label>Название проекта</label>
+            <input name="title" required value="${esc(p.title)}" />
+          </div>
+          <div class="field">
+            <label>Описание</label>
+            <textarea name="description" rows="4" required>${esc(p.descriptionFull || p.descriptionShort || '')}</textarea>
+          </div>
+          <div class="field">
+            <label>Количество волонтёров</label>
+            <input type="number" name="capacity" min="1" step="1" required value="${p.capacity || 1}" />
+          </div>
+
+          <div class="hr"></div>
+          <div class="row" style="justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn secondary" onclick="window.finishProject('${p.id}')">Закончить набор</button>
+              <button type="button" class="btn secondary danger" onclick="window.deleteProject('${p.id}')">Удалить проект</button>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn secondary" onclick="closeModal()">Отмена</button>
+              <button type="submit" class="btn">Сохранить изменения</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  openModal('Редактирование проекта', html);
+
+  const form = document.getElementById('editProjectForm');
+  if (!form) return;
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const payload = {
+      title: fd.get('title'),
+      description: fd.get('description'),
+      city: fd.get('city'),
+      region: fd.get('region'),
+      categoryId: fd.get('categoryId'),
+      format: fd.get('format'),
+      capacity: Number(fd.get('capacity'))
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (!handleAuthResponse(res, data)) return;
+        toast('danger', 'Ошибка', data.message || 'Не удалось обновить проект');
+        return;
+      }
+
+      // Обновляем проект в state.projects
+      if (data.project) {
+        const idx = state.projects.findIndex(pr => pr.id === data.project.id);
+        if (idx >= 0) {
+          state.projects[idx] = data.project;
+        }
+      }
+
+      toast('ok', 'Готово', 'Проект обновлён');
+      closeModal();
+      renderCabinet();
+    } catch (err) {
+      console.error('❌ Ошибка обновления проекта:', err);
+      toast('danger', 'Ошибка', 'Сервер недоступен');
+    }
+  };
+};
+
+window.finishProject = async function(projectId) {
+  if (!confirm('Закончить набор по этому проекту? Новые отклики будут невозможны.')) return;
+  if (!authToken) {
+    toast('error', 'Ошибка', 'Нужно войти в аккаунт');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/close`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (!handleAuthResponse(res, data)) return;
+      toast('danger', 'Ошибка', data.message || 'Не удалось завершить набор');
+      return;
+    }
+    if (data.project) {
+      const idx = state.projects.findIndex(pr => pr.id === data.project.id);
+      if (idx >= 0) state.projects[idx] = data.project;
+    }
+    toast('ok', 'Готово', 'Набор по проекту завершён');
+    renderCabinet();
+  } catch (err) {
+    console.error('❌ Ошибка завершения набора:', err);
+    toast('danger', 'Ошибка', 'Сервер недоступен');
+  }
+};
+
+window.deleteProject = async function(projectId) {
+  if (!confirm('Вы уверены, что хотите удалить проект? Это действие нельзя отменить.')) return;
+  if (!authToken) {
+    toast('error', 'Ошибка', 'Нужно войти в аккаунт');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/delete`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (!handleAuthResponse(res, data)) return;
+      toast('danger', 'Ошибка', data.message || 'Не удалось удалить проект');
+      return;
+    }
+    // Удаляем проект из локального стейта
+    state.projects = state.projects.filter(pr => pr.id !== projectId);
+    toast('ok', 'Готово', 'Проект удалён');
+    closeModal();
+    renderCabinet();
+  } catch (err) {
+    console.error('❌ Ошибка удаления проекта:', err);
+    toast('danger', 'Ошибка', 'Сервер недоступен');
+  }
+}
+
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY); // [file:87]
@@ -3068,10 +3249,14 @@ window.cancelAppFromCabinet = function(appId) {
       "Authorization": `Bearer ${authToken}`
     }
   })
-    .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
-    .then(({ ok, data }) => {
+    .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data, status: r.status })))
+    .then(({ ok, data, status }) => {
       if (!ok) {
-        toast("danger", "Ошибка", data.message || "Не удалось отменить отклик");
+        if (status === 401 || status === 403) {
+          handleAuthResponse({ status }, data);
+        } else {
+          toast("danger", "Ошибка", data.message || "Не удалось отменить отклик");
+        }
         return;
       }
 
@@ -3115,6 +3300,7 @@ window.directApply = async function(projectId) {
       return;
     }
     if (!res.ok) {
+      if (!handleAuthResponse(res, data)) return;
       toast("danger", "Ошибка", data.message || "Не удалось отправить отклик");
       return;
     }
@@ -3157,6 +3343,13 @@ async function renderCabinet() {
   const myApps = allApps.filter(a => a.userId === u.id && a.status !== "CANCELLED");
   const favIds = state.favorites[u.id] || [];
   const fav = favIds.map(pid => projectsById[pid]).filter(Boolean);
+
+  // Проекты, которыми пользователь управляет (создал) или все проекты для ADMIN
+  const myManagedProjects = allProjects.filter(p => {
+    if (!p) return false;
+    if (u.role === 'ADMIN') return true;
+    return p.ownerUserId === u.id;
+  });
 
   const lvl = calcLevel(u.points || 0);
   const badges = getUserBadges(u);
@@ -3268,6 +3461,30 @@ async function renderCabinet() {
               }).join("") : `<div class="muted">У вас пока нет активных откликов.</div>`}
             </div>
           </div>
+
+          ${(u.role === 'ORGANIZER' || u.role === 'ADMIN') ? `
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-title"><h2>Мои проекты</h2></div>
+            <div class="card-inner" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding:15px">
+              ${myManagedProjects.length ? myManagedProjects.map(p => {
+                const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
+                return `
+                  <div>
+                    ${projectCard(p)}
+                    <div class="row" style="margin-top:8px; align-items:center;">
+                      <span class="catbadge">${esc(status)}</span>
+                      <span class="right" style="display:flex; gap:8px;">
+                        <button class="btn secondary" onclick="window.openProjectEditModal('${p.id}')">Редактировать</button>
+                        <button class="btn secondary" onclick="window.finishProject('${p.id}')">Закончить набор</button>
+                        <button class="btn secondary danger" onclick="window.deleteProject('${p.id}')">Удалить</button>
+                      </span>
+                    </div>
+                  </div>
+                `;
+              }).join("") : `<div class="muted">У вас пока нет собственных проектов.</div>`}
+            </div>
+          </div>
+          ` : ''}
 
           <div class="card">
             <div class="section-title"><h2>Избранное</h2></div>

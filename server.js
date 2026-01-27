@@ -285,12 +285,18 @@ function authMiddleware(req, res, next) {
     });
 }
 
-// Хелпер для проверки роли организатора
+// Хелпер для проверки роли организатора (или администратора)
 function requireOrganizer(req, res, next) {
-    if (!req.user || req.user.role !== 'ORGANIZER') {
-        return res.status(403).json({ message: 'Доступ только для организаторов' });
+    if (!req.user || (req.user.role !== 'ORGANIZER' && req.user.role !== 'ADMIN')) {
+        return res.status(403).json({ message: 'Доступ только для организаторов или администраторов' });
     }
     next();
+}
+
+function canManageProject(user, project) {
+    if (!user || !project) return false;
+    if (user.role === 'ADMIN') return true;
+    return project.ownerUserId && project.ownerUserId.toString() === user.userId;
 }
 
 // Хелпер для приведения проекта к формату фронтенда
@@ -298,6 +304,7 @@ function mapProjectForClient(doc) {
     if (!doc) return null;
     return {
         id: doc._id.toString(),
+        ownerUserId: doc.ownerUserId ? doc.ownerUserId.toString() : undefined,
         title: doc.title,
         descriptionShort: doc.descriptionShort || (doc.description ? (doc.description.length > 160 ? doc.description.slice(0, 160) + '…' : doc.description) : ''),
         descriptionFull: doc.description || '',
@@ -314,7 +321,7 @@ function mapProjectForClient(doc) {
 
 // === ПРОЕКТЫ (API) ===
 
-// Получить список всех опубликованных проектов
+// Получить список всех проектов (кроме помеченных как DELETED)
 app.get('/api/projects', async (req, res) => {
     try {
         const db = getDB();
@@ -547,6 +554,141 @@ app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
         res.json({ message: 'Отклик отменён' });
     } catch (err) {
         console.error('❌ Ошибка отмены отклика:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Обновить проект (редактирование полей организатором или админом)
+app.put('/api/projects/:id', authMiddleware, async (req, res) => {
+    const projectId = req.params.id;
+    const { title, description, city, region, categoryId, format, capacity } = req.body;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
+        if (!project) {
+            return res.status(404).json({ message: 'Проект не найден' });
+        }
+
+        if (!canManageProject(req.user, project)) {
+            return res.status(403).json({ message: 'Нет прав для редактирования этого проекта' });
+        }
+
+        const update = {};
+        if (title !== undefined) update.title = String(title).trim();
+        if (description !== undefined) update.description = String(description).trim();
+        if (city !== undefined) update.city = String(city).trim();
+        if (region !== undefined) update.region = String(region).trim();
+        if (categoryId !== undefined) update.categoryId = String(categoryId).trim();
+        if (format !== undefined) update.format = String(format).trim();
+        if (capacity !== undefined) {
+            const numericCapacity = Number(capacity);
+            if (!Number.isFinite(numericCapacity) || numericCapacity <= 0) {
+                return res.status(400).json({ message: 'Количество волонтёров должно быть положительным числом' });
+            }
+            update.capacity = numericCapacity;
+        }
+
+        if (Object.keys(update).length === 0) {
+            return res.status(400).json({ message: 'Нет полей для обновления' });
+        }
+
+        await projectsCollection.updateOne(
+            { _id: project._id },
+            { $set: update }
+        );
+
+        const updated = await projectsCollection.findOne({ _id: project._id });
+        res.json({
+            message: 'Проект обновлён',
+            project: mapProjectForClient(updated)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка обновления проекта:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Закончить набор по проекту (меняем статус)
+app.post('/api/projects/:id/close', authMiddleware, async (req, res) => {
+    const projectId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
+        if (!project) {
+            return res.status(404).json({ message: 'Проект не найден' });
+        }
+
+        if (!canManageProject(req.user, project)) {
+            return res.status(403).json({ message: 'Нет прав для изменения этого проекта' });
+        }
+
+        const updates = {
+            status: 'CLOSED'
+        };
+
+        // Если capacity меньше фактического числа откликов — подравниваем
+        const effectiveCapacity = project.capacity || project.volunteersNeeded || 0;
+        const responsesCount = project.responsesCount || 0;
+        if (responsesCount > effectiveCapacity) {
+            updates.capacity = responsesCount;
+        }
+
+        await projectsCollection.updateOne(
+            { _id: project._id },
+            { $set: updates }
+        );
+
+        const updated = await projectsCollection.findOne({ _id: project._id });
+        res.json({
+            message: 'Набор по проекту завершён',
+            project: mapProjectForClient(updated)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка завершения набора проекта:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Удалить проект (мягкое удаление по статусу)
+app.post('/api/projects/:id/delete', authMiddleware, async (req, res) => {
+    const projectId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
+        if (!project) {
+            return res.status(404).json({ message: 'Проект не найден' });
+        }
+
+        if (!canManageProject(req.user, project)) {
+            return res.status(403).json({ message: 'Нет прав для удаления этого проекта' });
+        }
+
+        await projectsCollection.updateOne(
+            { _id: project._id },
+            { $set: { status: 'DELETED', deletedAt: new Date() } }
+        );
+
+        res.json({ message: 'Проект удалён' });
+    } catch (err) {
+        console.error('❌ Ошибка удаления проекта:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
     }
 });
