@@ -1362,7 +1362,7 @@
 
 <header class="topbar">
   <div class="container topbar-inner">
-    <a class="brand" href="#/">
+    <a class="brand" href="/">
       <div class="logo" aria-hidden="true">
         <img src="images\logo.png" alt="Логотип" style="width:100%; height:100%; object-fit:cover;">
       </div>
@@ -1370,12 +1370,12 @@
     </a>
 
     <nav class="nav" aria-label="Навигация">
-      <span class="chip" data-route="#/">Главная</span>
-      <span class="chip" data-route="#/projects">Проекты</span>
-      <span class="chip" data-route="#/community">Сообщество</span>
-      <span class="chip" data-route="#/news">Новости</span>
-      <span class="chip" data-route="#/about">О нас</span>
-      <span class="chip" data-route="#/contacts">Контакты</span>
+      <span class="chip" data-route="/">Главная</span>
+      <span class="chip" data-route="/projects">Проекты</span>
+      <span class="chip" data-route="/community">Сообщество</span>
+      <span class="chip" data-route="/news">Новости</span>
+      <span class="chip" data-route="/about">О нас</span>
+      <span class="chip" data-route="/contacts">Контакты</span>
       <button class="iconbtn" id="btnOpenAuth">Вход</button>
       <button class="btn" id="btnCtaHelp">Хочу помочь</button>
     </nav>
@@ -1580,12 +1580,17 @@ function closeModal(){
   $("#modalBody").innerHTML = "";
 }
 
-/* router */
-function navigate(hash){ location.hash = hash; renderApp(); }
+/* router (без #, через history API) */
+function navigate(path){
+  if (path === undefined) return;
+  // нормализуем, чтобы пути были вида "/..." (кроме "/")
+  const url = path.startsWith('/') ? path : '/' + path.replace(/^#?\//, '');
+  history.pushState({}, '', url);
+  renderApp();
+}
 function setActiveNav(){
-  const h = location.hash || "#/";
-  const path = h.replace(/^#/, "");
-  $$(".chip[data-route]").forEach(ch => ch.classList.toggle("active", ch.dataset.route === "#"+path));
+  const path = location.pathname || "/";
+  $$(".chip[data-route]").forEach(ch => ch.classList.toggle("active", ch.dataset.route === path));
   const u = currentUser();
   $("#btnOpenAuth").textContent = u ? (u.name.split(" ")[0] + " ▾") : "Вход";
 }
@@ -1658,7 +1663,7 @@ function toggleFavorite(id) {
     localStorage.setItem('favProjects', JSON.stringify(favorites));
 
     // Если есть функция роутинга или отрисовки, вызываем её
-    if (window.location.hash.includes('profile')) {
+    if (window.location.pathname.includes('profile')) {
         renderPersonalCabinet(); // Если мы в личном кабинете
     } else {
         renderHome(); // Если мы на главной
@@ -2009,7 +2014,7 @@ function openAuthModal(){
                 const closeBtn = document.getElementById('modalClose');
                 if (closeBtn) closeBtn.click();
                 toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
-                navigate("#/cabinet");
+                navigate("/cabinet");
                 renderApp();
 
             } catch (err) {
@@ -2095,7 +2100,7 @@ function openAuthModal(){
                 const closeBtn = document.getElementById('modalClose');
                 if (closeBtn) closeBtn.click();
                 toast("ok", "Готово", `Аккаунт создан! Добро пожаловать, ${data.user.name}!`);
-                navigate("#/cabinet");
+                navigate("/cabinet");
                 renderApp();
 
             } catch (err) {
@@ -2127,8 +2132,8 @@ function openUserMenu(){
     </div>
   `);
   $("#goCab").onclick=()=>{ closeModal(); navigate("#/cabinet"); };
-  $("#goProj").onclick=()=>{ closeModal(); navigate("#/projects"); };
-  $("#goNews").onclick=()=>{ closeModal(); navigate("#/news"); };
+  $("#goProj").onclick=()=>{ closeModal(); navigate("/projects"); };
+  $("#goNews").onclick=()=>{ closeModal(); navigate("/news"); };
   $("#doLogout").onclick=()=>{
       localStorage.removeItem('authToken');
       state.session.userId = null;
@@ -2390,7 +2395,7 @@ function renderHome(){
   $$("#homeNews .news-item").forEach(el => el.onclick = () => openNewsModal(el.dataset.news));
 
   $$("#catsGrid .catcard").forEach(el => el.onclick = () => {
-    navigate("#/projects");
+    navigate("/projects");
     setTimeout(() => {
         const sel = $("#fCategory");
         if(sel) { sel.value = el.dataset.cat; $("#btnApplyFilters")?.click(); }
@@ -2890,7 +2895,7 @@ window.directApply = function(projectId) {
 /* === ОБНОВЛЕННАЯ ФУНКЦИЯ КАБИНЕТА С РЕДАКТИРОВАНИЕМ === */
 
 async function renderCabinet() {
-  if (!requireAuth()) { navigate("#/"); return; }
+  if (!requireAuth()) { navigate("/"); return; }
   await loadProfileFromServer();
 
   const u = currentUser();
@@ -2930,7 +2935,18 @@ async function renderCabinet() {
               </div>
             </div>
             <div class="hr"></div>
-            <button class="btn danger" style="width:100%" onclick="state.session.userId=null; saveState(); navigate('#/'); renderApp();">Выйти</button>
+            <button
+              class="btn danger"
+              style="width:100%"
+              onclick="
+                localStorage.removeItem('authToken');
+                if (typeof authToken !== 'undefined') authToken = null;
+                state.session.userId = null;
+                saveState();
+                navigate('/');
+                renderApp();
+              "
+            >Выйти</button>
           </div>
         </aside>
 
@@ -3120,7 +3136,8 @@ const routes = {
 
 function renderApp(){
   setActiveNav();
-  const path = (location.hash || "#/").slice(1);
+  const rawPath = location.pathname || "/";
+  const path = rawPath === "/" ? "/" : rawPath.replace(/\/+$/,""); // срежем лишний /
   const fn = routes[path] || renderHome;
   fn();
   updateScrollBar();
@@ -3128,11 +3145,11 @@ function renderApp(){
 
 /* nav */
 $$(".chip[data-route]").forEach(el=>el.addEventListener("click",()=>navigate(el.dataset.route)));
-$("#btnCtaHelp").addEventListener("click", ()=>navigate("#/projects"));
+$("#btnCtaHelp").addEventListener("click", ()=>navigate("/projects"));
 $("#btnOpenAuth").onclick = () => {
   if (currentUser()) {
     // Если юзер есть, переходим в кабинет
-    navigate("#/cabinet");
+    navigate("/cabinet");
   } else {
     // Если юзера нет, открываем модалку входа
     openAuthModal();
@@ -3187,8 +3204,11 @@ async function loadServerSession() {
     }
 }
 
-window.addEventListener("hashchange", renderApp);
-if(!location.hash) location.hash="#/";
+window.addEventListener("popstate", renderApp);
+// начальный маршрут
+if (!location.pathname || location.pathname === '') {
+  history.replaceState({}, '', '/');
+}
 loadServerSession().then(() => renderApp());
 
 /* === ГЛОБАЛЬНЫЕ ФУНКЦИИ ПРОФИЛЯ === */
@@ -3718,7 +3738,7 @@ function renderAbout() {
             <p style="color: var(--muted); margin-bottom: 20px;">Остались вопросы или есть предложения по сотрудничеству?</p>
             <div style="display: flex; justify-content: center; gap: 15px;">
                 <button class="btn" onclick="location.href='mailto:info@ddby.by'">Связаться с командой</button>
-                <button class="btn secondary" onclick="location.hash='#/projects'">Перейти к проектам</button>
+                <button class="btn secondary" onclick="navigate('/projects')">Перейти к проектам</button>
             </div>
         </div>
 

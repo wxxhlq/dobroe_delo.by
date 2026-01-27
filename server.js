@@ -112,9 +112,13 @@ async function findMatchingRefreshToken(user, refreshToken) {
     return null;
 }
 
-// === ГЛАВНАЯ СТРАНИЦА ===
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+// === ГЛАВНЫЕ FRONTEND-МАРШРУТЫ (SPA без #) ===
+const FRONTEND_ROUTES = ['/', '/projects', '/community', '/news', '/about', '/contacts', '/cabinet'];
+
+FRONTEND_ROUTES.forEach(route => {
+    app.get(route, (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+    });
 });
 
 // === РЕГИСТРАЦИЯ ===
