@@ -44,9 +44,11 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// === ЗАГРУЗКА АВАТАРА ===
+// === ЗАГРУЗКА ФАЙЛОВ (АВАТАРЫ, ОБЛОЖКИ ПРОЕКТОВ) ===
 const AVATARS_DIR = path.join(__dirname, 'public', 'uploads', 'avatars');
+const PROJECTS_DIR = path.join(__dirname, 'public', 'uploads', 'projects');
 fs.mkdirSync(AVATARS_DIR, { recursive: true });
+fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 
 const avatarUpload = multer({
     storage: multer.diskStorage({
@@ -58,6 +60,24 @@ const avatarUpload = multer({
         }
     }),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+            return cb(new Error('Можно загружать только изображения'));
+        }
+        cb(null, true);
+    }
+});
+
+const projectImageUpload = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, PROJECTS_DIR),
+        filename: (req, file, cb) => {
+            const safeExt = path.extname(file.originalname || '').toLowerCase().slice(0, 10);
+            const base = `${req.user?.userId || 'project'}-${Date.now()}`;
+            cb(null, `${base}${safeExt || ''}`);
+        }
+    }),
+    limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
     fileFilter: (req, file, cb) => {
         if (!file.mimetype || !file.mimetype.startsWith('image/')) {
             return cb(new Error('Можно загружать только изображения'));
@@ -264,6 +284,266 @@ function authMiddleware(req, res, next) {
         next();
     });
 }
+
+// Хелпер для проверки роли организатора
+function requireOrganizer(req, res, next) {
+    if (!req.user || req.user.role !== 'ORGANIZER') {
+        return res.status(403).json({ message: 'Доступ только для организаторов' });
+    }
+    next();
+}
+
+// Хелпер для приведения проекта к формату фронтенда
+function mapProjectForClient(doc) {
+    if (!doc) return null;
+    return {
+        id: doc._id.toString(),
+        title: doc.title,
+        descriptionShort: doc.descriptionShort || (doc.description ? (doc.description.length > 160 ? doc.description.slice(0, 160) + '…' : doc.description) : ''),
+        descriptionFull: doc.description || '',
+        city: doc.city || '',
+        capacity: doc.capacity || doc.volunteersNeeded || 0,
+        approved: doc.responsesCount || 0,
+        image: doc.imageUrl || '',
+        status: doc.status || 'PUBLISHED'
+    };
+}
+
+// === ПРОЕКТЫ (API) ===
+
+// Получить список всех опубликованных проектов
+app.get('/api/projects', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const docs = await projectsCollection
+            .find({ status: { $ne: 'DELETED' } })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        const projects = docs.map(mapProjectForClient);
+        res.json({ projects });
+    } catch (err) {
+        console.error('❌ Ошибка получения проектов:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Создать новый проект (только организатор)
+app.post(
+    '/api/projects',
+    authMiddleware,
+    requireOrganizer,
+    projectImageUpload.single('image'),
+    async (req, res) => {
+        const { title, description, city, capacity } = req.body;
+
+        if (!title || !description || !capacity) {
+            return res.status(400).json({ message: 'Название, описание и количество волонтёров обязательны' });
+        }
+
+        const numericCapacity = Number(capacity);
+        if (!Number.isFinite(numericCapacity) || numericCapacity <= 0) {
+            return res.status(400).json({ message: 'Количество волонтёров должно быть положительным числом' });
+        }
+
+        try {
+            const db = getDB();
+            if (!db) {
+                return res.status(503).json({ message: 'База данных недоступна' });
+            }
+
+            const projectsCollection = db.collection('projects');
+
+            const imageUrl = req.file
+                ? `/uploads/projects/${req.file.filename}`
+                : '';
+
+            const doc = {
+                ownerUserId: new ObjectId(req.user.userId),
+                title: String(title).trim(),
+                description: String(description).trim(),
+                descriptionShort: '',
+                city: String(city || '').trim(),
+                capacity: numericCapacity,
+                responsesCount: 0,
+                imageUrl,
+                status: 'PUBLISHED',
+                createdAt: new Date()
+            };
+
+            const result = await projectsCollection.insertOne(doc);
+            const created = await projectsCollection.findOne({ _id: result.insertedId });
+
+            res.status(201).json({
+                message: 'Проект создан',
+                project: mapProjectForClient(created)
+            });
+        } catch (err) {
+            console.error('❌ Ошибка создания проекта:', err);
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    }
+);
+
+// Отклик на проект (для волонтёров и организаторов)
+app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
+    const projectId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const applicationsCollection = db.collection('project_applications');
+
+        const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
+        if (!project) {
+            return res.status(404).json({ message: 'Проект не найден' });
+        }
+
+        // Проверка на уникальность отклика
+        const existing = await applicationsCollection.findOne({
+            projectId: project._id,
+            userId: new ObjectId(req.user.userId),
+            status: { $ne: 'CANCELLED' }
+        });
+
+        if (existing) {
+            return res.status(409).json({ message: 'Вы уже откликались на этот проект' });
+        }
+
+        const capacity = project.capacity || project.volunteersNeeded || 0;
+        const responsesCount = project.responsesCount || 0;
+        if (capacity > 0 && responsesCount >= capacity) {
+            return res.status(400).json({ message: 'Набор закрыт, мест больше нет' });
+        }
+
+        const appDoc = {
+            projectId: project._id,
+            userId: new ObjectId(req.user.userId),
+            userRole: req.user.role,
+            status: 'ACTIVE',
+            createdAt: new Date()
+        };
+
+        const insertResult = await applicationsCollection.insertOne(appDoc);
+
+        await projectsCollection.updateOne(
+            { _id: project._id },
+            { $inc: { responsesCount: 1 } }
+        );
+
+        res.status(201).json({
+            message: 'Отклик сохранён',
+            application: {
+                id: insertResult.insertedId.toString(),
+                projectId: project._id.toString(),
+                userId: req.user.userId,
+                status: appDoc.status,
+                createdAt: appDoc.createdAt
+            }
+        });
+    } catch (err) {
+        console.error('❌ Ошибка отклика на проект:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Получить отклики текущего пользователя + связанные проекты
+app.get('/api/my/applications', authMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const applicationsCollection = db.collection('project_applications');
+        const projectsCollection = db.collection('projects');
+
+        const apps = await applicationsCollection
+            .find({
+                userId: new ObjectId(req.user.userId),
+                status: { $ne: 'CANCELLED' }
+            })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        const projectIds = [...new Set(apps.map(a => a.projectId.toString()))].map(id => new ObjectId(id));
+
+        const projects = projectIds.length
+            ? await projectsCollection
+                  .find({ _id: { $in: projectIds }, status: { $ne: 'DELETED' } })
+                  .toArray()
+            : [];
+
+        const projectsMap = new Map(projects.map(p => [p._id.toString(), mapProjectForClient(p)]));
+
+        res.json({
+            applications: apps.map(a => ({
+                id: a._id.toString(),
+                projectId: a.projectId.toString(),
+                userId: a.userId.toString(),
+                status: a.status,
+                createdAt: a.createdAt
+            })),
+            projects: Array.from(projectsMap.values())
+        });
+    } catch (err) {
+        console.error('❌ Ошибка получения откликов:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Отменить отклик текущего пользователя
+app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
+    const appId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const applicationsCollection = db.collection('project_applications');
+        const projectsCollection = db.collection('projects');
+
+        const appDoc = await applicationsCollection.findOne({
+            _id: new ObjectId(appId),
+            userId: new ObjectId(req.user.userId)
+        });
+
+        if (!appDoc) {
+            return res.status(404).json({ message: 'Отклик не найден' });
+        }
+
+        if (appDoc.status === 'CANCELLED') {
+            return res.json({ message: 'Отклик уже отменён' });
+        }
+
+        await applicationsCollection.updateOne(
+            { _id: appDoc._id },
+            { $set: { status: 'CANCELLED', cancelledAt: new Date() } }
+        );
+
+        // Попробуем уменьшить счётчик откликов у проекта
+        await projectsCollection.updateOne(
+            { _id: appDoc.projectId },
+            { $inc: { responsesCount: -1 } }
+        );
+
+        res.json({ message: 'Отклик отменён' });
+    } catch (err) {
+        console.error('❌ Ошибка отмены отклика:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
 
 // === ПОЛУЧИТЬ ПРОФИЛЬ ===
 app.get('/me', authMiddleware, async (req, res) => {

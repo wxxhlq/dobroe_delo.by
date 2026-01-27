@@ -1603,11 +1603,22 @@ function projectCard(p) {
     // 1. ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ/КАБИНЕТЕ)
     const cat = (state.categories || []).find(c => c.id === p.categoryId);
 
-    // Формируем путь: если есть http — берем как есть, если нет — добавляем img/,
-    // если пусто — вызываем заглушку projectPhoto
-    const imgUrl = p.image
-        ? (p.image.startsWith('http') ? p.image : 'img/' + p.image)
-        : (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+    // Формируем путь:
+    // - если http — берём как есть
+    // - если загрузка с backend (`/uploads/...`) — тоже как есть
+    // - иначе добавляем `img/`
+    let imgUrl;
+    if (p.image) {
+        if (p.image.startsWith('/uploads/') || p.image.startsWith('uploads/')) {
+            imgUrl = p.image;
+        } else if (p.image.startsWith('http')) {
+            imgUrl = p.image;
+        } else {
+            imgUrl = 'img/' + p.image;
+        }
+    } else {
+        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+    }
 
     // 2. ЛОГИКА ИЗБРАННОГО
     const favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
@@ -1782,9 +1793,18 @@ function openProjectModal(id) {
     if (!p) return;
 
     // --- ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ) ---
-    const imgUrl = p.image
-        ? (p.image.startsWith('http') ? p.image : 'img/' + p.image)
-        : (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+    let imgUrl;
+    if (p.image) {
+        if (p.image.startsWith('/uploads/') || p.image.startsWith('uploads/')) {
+            imgUrl = p.image;
+        } else if (p.image.startsWith('http')) {
+            imgUrl = p.image;
+        } else {
+            imgUrl = 'img/' + p.image;
+        }
+    } else {
+        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+    }
 
     const html = `
     <div class="modal-modern">
@@ -2410,7 +2430,13 @@ function renderProjects(){
   $("#app").innerHTML=`
     <div class="container" style="padding-top:16px">
       <section class="card">
-        <div class="section-title"><h2>Каталог проектов</h2><small>${u ? `Вы: ${esc(u.name)} (${esc(u.role)})` : "Гость"}</small></div>
+        <div class="section-title">
+          <h2>Каталог проектов</h2>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <small>${u ? `Вы: ${esc(u.name)} (${esc(u.role)})` : "Гость"}</small>
+            ${u && u.role === "ORGANIZER" ? `<button class="btn secondary" id="btnCreateProject">Создать новый проект</button>` : ""}
+          </div>
+        </div>
         <div class="split">
           <aside class="sidebar">
             <div class="k">Фильтры</div>
@@ -2467,7 +2493,104 @@ function renderProjects(){
     $("#fFormat").value=""; $("#fQuery").value="";
     applyProjectFilters();
   };
-  applyProjectFilters();
+
+  if (u && u.role === "ORGANIZER") {
+    const btn = document.getElementById("btnCreateProject");
+    if (btn) btn.onclick = openCreateProjectModal;
+  }
+
+  // Загружаем проекты с сервера (если доступно API) и затем применяем фильтры
+  if (typeof loadProjectsFromServer === "function") {
+    loadProjectsFromServer().then(applyProjectFilters).catch(applyProjectFilters);
+  } else {
+    applyProjectFilters();
+  }
+}
+
+// Модалка создания нового проекта (только для организаторов)
+function openCreateProjectModal() {
+  const u = currentUser();
+  if (!u || u.role !== "ORGANIZER") {
+    toast("warn", "Недостаточно прав", "Создавать проекты могут только организаторы");
+    return;
+  }
+  if (!authToken) {
+    toast("error", "Ошибка", "Нужно заново войти в аккаунт");
+    return;
+  }
+
+  const html = `
+    <div class="modal-modern">
+      <div class="modal-body-content" style="padding: 32px; background: #fff;">
+        <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--text);">Создать новый проект</h2>
+        <form id="createProjectForm">
+          <div class="field">
+            <label>Название проекта</label>
+            <input name="title" required placeholder="Например, Сбор вещей для приюта" />
+          </div>
+          <div class="field">
+            <label>Город (необязательно)</label>
+            <input name="city" placeholder="Например, Минск" />
+          </div>
+          <div class="field">
+            <label>Описание</label>
+            <textarea name="description" rows="4" required placeholder="Кратко опишите суть проекта"></textarea>
+          </div>
+          <div class="field">
+            <label>Количество волонтёров</label>
+            <input type="number" name="capacity" min="1" step="1" required value="5" />
+          </div>
+          <div class="field">
+            <label>Обложка проекта</label>
+            <input type="file" name="image" accept="image/*" />
+            <div class="hint">Изображение будет загружено на сервер (до 8MB).</div>
+          </div>
+          <div class="row" style="margin-top: 20px;">
+            <button type="submit" class="btn">Создать</button>
+            <button type="button" class="btn secondary" onclick="closeModal()">Отмена</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  openModal("Новый проект", html);
+
+  const form = document.getElementById("createProjectForm");
+  if (!form) return;
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+
+    try {
+      const res = await fetch(`${API_URL}/api/projects`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${authToken}`
+        },
+        body: fd
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast("danger", "Ошибка", data.message || "Не удалось создать проект");
+        return;
+      }
+
+      // Добавляем проект в локальное состояние
+      if (!state.projects) state.projects = [];
+      state.projects.unshift(data.project);
+
+      toast("ok", "Готово", "Проект создан");
+      closeModal();
+      renderProjects();
+    } catch (err) {
+      console.error("❌ Ошибка создания проекта:", err);
+      toast("danger", "Ошибка", "Сервер недоступен");
+    }
+  };
 }
 function applyProjectFilters(){
   const f={
@@ -2842,53 +2965,85 @@ function cabinetProjectCard(p) {
 /* 2. Глобальная функция отмены заявки */
 window.cancelAppFromCabinet = function(appId) {
   if (!confirm("Вы уверены, что хотите отменить заявку?")) return;
-  const app = state.applications.find(a => a.id === appId);
-  if (app) {
-    app.status = "CANCELLED";
-    saveState();
-    toast("warn", "Отменено", "Заявка отозвана");
-    renderCabinet();
+
+  if (!authToken) {
+    toast("error", "Ошибка", "Нужно войти в аккаунт");
+    return;
   }
+
+  fetch(`${API_URL}/api/applications/${appId}/cancel`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${authToken}`
+    }
+  })
+    .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) {
+        toast("danger", "Ошибка", data.message || "Не удалось отменить отклик");
+        return;
+      }
+
+      const app = state.applications.find(a => a.id === appId);
+      if (app) {
+        app.status = "CANCELLED";
+      }
+
+      toast("warn", "Отменено", "Заявка отозвана");
+      renderCabinet();
+    })
+    .catch(err => {
+      console.error("❌ Ошибка отмены отклика:", err);
+      toast("danger", "Ошибка", "Сервер недоступен");
+    });
 };
 
-window.directApply = function(projectId) {
+window.directApply = async function(projectId) {
   const u = currentUser();
   if (!u) {
     toast("error", "Ошибка", "Нужна авторизация");
     return;
   }
-
-  // Находим все отклики пользователя на ЭТОТ проект, кроме отмененных
-  const hasActiveApp = state.applications.some(a =>
-    a.userId === u.id &&
-    a.projectId === projectId &&
-    a.status !== "CANCELLED"
-  );
-
-  if (hasActiveApp) {
-    toast("warn", "Внимание", "Вы уже откликнулись на этот проект");
+  if (!authToken) {
+    toast("error", "Ошибка", "Требуется повторный вход");
     return;
   }
 
-  // Создаем новый отклик
-  const newApp = {
-    id: "app-" + Date.now(),
-    projectId: projectId,
-    userId: u.id,
-    date: new Date().toISOString(),
-    status: "PENDING"
-  };
+  try {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/apply`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${authToken}`
+      }
+    });
 
-  state.applications.push(newApp);
+    const data = await res.json().catch(() => ({}));
 
-  // Начисляем баллы
-  u.points = (u.points || 0) + 10;
+    if (res.status === 409) {
+      toast("warn", "Внимание", data.message || "Вы уже откликались на этот проект");
+      return;
+    }
+    if (!res.ok) {
+      toast("danger", "Ошибка", data.message || "Не удалось отправить отклик");
+      return;
+    }
 
-  saveState();
-  toast("ok", "Успешно", "Ваш отклик отправлен!");
+    // Обновляем локальный список заявок для отображения в кабинете
+    state.applications = state.applications || [];
+    state.applications.unshift({
+      id: data.application.id,
+      projectId: data.application.projectId,
+      userId: u.id,
+      status: data.application.status || "ACTIVE",
+      createdAt: data.application.createdAt
+    });
 
-  // Обновляем кабинет
-  renderCabinet();
+    toast("ok", "Успешно", "Ваш отклик сохранён!");
+    renderCabinet();
+  } catch (err) {
+    console.error("❌ Ошибка отклика:", err);
+    toast("danger", "Ошибка", "Сервер недоступен");
+  }
 };
 
 /* 3. Основная функция отрисовки кабинета */
@@ -2897,6 +3052,11 @@ window.directApply = function(projectId) {
 async function renderCabinet() {
   if (!requireAuth()) { navigate("/"); return; }
   await loadProfileFromServer();
+
+  // Подтягиваем отклики и связанные проекты из БД
+  if (typeof loadApplicationsFromServer === "function") {
+    await loadApplicationsFromServer();
+  }
 
   const u = currentUser();
   const allProjects = state.projects;
@@ -3210,6 +3370,48 @@ if (!location.pathname || location.pathname === '') {
   history.replaceState({}, '', '/');
 }
 loadServerSession().then(() => renderApp());
+
+// === Загрузка проектов и откликов из БД ===
+async function loadProjectsFromServer() {
+    try {
+        const res = await fetch(`${API_URL}/api/projects`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.projects)) return;
+
+        // Если с сервера пришли проекты — подменяем демо-проекты
+        state.projects = data.projects;
+    } catch (err) {
+        console.error('❌ Ошибка загрузки проектов с сервера:', err);
+    }
+}
+
+async function loadApplicationsFromServer() {
+    if (!authToken) return;
+
+    try {
+        const res = await fetch(`${API_URL}/api/my/applications`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+
+        state.applications = data.applications || state.applications || [];
+
+        // Проекты, которые пришли вместе с откликами, аккуратно вливаем в state.projects
+        if (Array.isArray(data.projects) && data.projects.length) {
+            const current = Array.isArray(state.projects) ? state.projects : [];
+            const merged = Object.fromEntries(current.map(p => [p.id, p]));
+            data.projects.forEach(p => {
+                merged[p.id] = { ...(merged[p.id] || {}), ...p };
+            });
+            state.projects = Object.values(merged);
+        }
+    } catch (err) {
+        console.error('❌ Ошибка загрузки откликов из БД:', err);
+    }
+}
 
 /* === ГЛОБАЛЬНЫЕ ФУНКЦИИ ПРОФИЛЯ === */
 window.openPublicProfile = function(userId) {
