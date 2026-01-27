@@ -423,6 +423,11 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: 'Проект не найден' });
         }
 
+        // Проверяем, не закрыт ли набор
+        if (project.status === 'CLOSED') {
+            return res.status(400).json({ message: 'Набор по этому проекту завершён, новые отклики невозможны' });
+        }
+
         // Проверка на уникальность отклика
         const existing = await applicationsCollection.findOne({
             projectId: project._id,
@@ -617,6 +622,46 @@ app.put('/api/projects/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// Открыть набор по проекту (меняем статус обратно на PUBLISHED)
+app.post('/api/projects/:id/reopen', authMiddleware, async (req, res) => {
+    const projectId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const projectsCollection = db.collection('projects');
+        const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
+        if (!project) {
+            return res.status(404).json({ message: 'Проект не найден' });
+        }
+
+        if (!canManageProject(req.user, project)) {
+            return res.status(403).json({ message: 'Нет прав для изменения этого проекта' });
+        }
+
+        const updates = {
+            status: 'PUBLISHED'
+        };
+
+        await projectsCollection.updateOne(
+            { _id: project._id },
+            { $set: updates }
+        );
+
+        const updated = await projectsCollection.findOne({ _id: project._id });
+        res.json({
+            message: 'Набор по проекту открыт',
+            project: mapProjectForClient(updated)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка открытия набора:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
 // Закончить набор по проекту (меняем статус)
 app.post('/api/projects/:id/close', authMiddleware, async (req, res) => {
     const projectId = req.params.id;
@@ -684,10 +729,12 @@ app.post('/api/projects/:id/delete', authMiddleware, async (req, res) => {
             return res.status(403).json({ message: 'Нет прав для удаления этого проекта' });
         }
 
-        await projectsCollection.updateOne(
-            { _id: project._id },
-            { $set: { status: 'DELETED', deletedAt: new Date() } }
-        );
+        // Физически удаляем проект из базы данных
+        await projectsCollection.deleteOne({ _id: project._id });
+        
+        // Также удаляем все связанные отклики на этот проект
+        const applicationsCollection = db.collection('project_applications');
+        await applicationsCollection.deleteMany({ projectId: project._id });
 
         res.json({ message: 'Проект удалён' });
     } catch (err) {

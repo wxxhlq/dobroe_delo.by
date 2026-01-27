@@ -1363,6 +1363,72 @@
     .fav-btn:hover { transform: scale(1.1); background: #fff; }
     .fav-btn.active { background: #fff1f2; }
 
+    /* Кнопка меню с тремя точками */
+    .menu-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(5px);
+        border: none;
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: 0.3s;
+    }
+
+    .menu-btn:hover { transform: scale(1.1); background: #fff; }
+
+    /* Выпадающее меню */
+    .project-menu {
+        position: absolute;
+        top: 60px;
+        right: 15px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        min-width: 200px;
+        z-index: 100;
+        overflow: hidden;
+        display: none;
+    }
+
+    .project-menu.show {
+        display: block;
+    }
+
+    .project-menu-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        transition: background 0.2s;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+    }
+
+    .project-menu-item:hover {
+        background: var(--surface2);
+    }
+
+    .project-menu-item.danger {
+        color: #dc2626;
+    }
+
+    .project-menu-item.danger:hover {
+        background: #fef2f2;
+    }
+
     /* Прогресс бар */
     .progress-bar-bg { background: #f1f5f9; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
     .progress-bar-fill { background: var(--blue); height: 100%; border-radius: 10px; }
@@ -1729,6 +1795,67 @@ window.finishProject = async function(projectId) {
   }
 };
 
+window.reopenProject = async function(projectId) {
+  if (!confirm('Открыть набор по этому проекту? Теперь снова можно принимать отклики.')) return;
+  if (!authToken) {
+    toast('error', 'Ошибка', 'Нужно войти в аккаунт');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/projects/${projectId}/reopen`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (!handleAuthResponse(res, data)) return;
+      toast('danger', 'Ошибка', data.message || 'Не удалось открыть набор');
+      return;
+    }
+    if (data.project) {
+      const idx = state.projects.findIndex(pr => pr.id === data.project.id);
+      if (idx >= 0) state.projects[idx] = data.project;
+    }
+    toast('ok', 'Готово', 'Набор по проекту открыт');
+    renderCabinet();
+  } catch (err) {
+    console.error('❌ Ошибка открытия набора:', err);
+    toast('danger', 'Ошибка', 'Сервер недоступен');
+  }
+};
+
+// Функции для работы с меню проектов
+window.toggleProjectMenu = function(menuId) {
+  // Закрываем все другие меню
+  document.querySelectorAll('.project-menu').forEach(menu => {
+    if (menu.id !== menuId) {
+      menu.classList.remove('show');
+    }
+  });
+  
+  // Переключаем текущее меню
+  const menu = document.getElementById(menuId);
+  if (menu) {
+    menu.classList.toggle('show');
+  }
+};
+
+window.closeProjectMenu = function(menuId) {
+  const menu = document.getElementById(menuId);
+  if (menu) {
+    menu.classList.remove('show');
+  }
+};
+
+// Закрываем меню при клике вне его
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.menu-btn') && !e.target.closest('.project-menu')) {
+    document.querySelectorAll('.project-menu').forEach(menu => {
+      menu.classList.remove('show');
+    });
+  }
+});
+
 window.deleteProject = async function(projectId) {
   if (!confirm('Вы уверены, что хотите удалить проект? Это действие нельзя отменить.')) return;
   if (!authToken) {
@@ -1746,8 +1873,15 @@ window.deleteProject = async function(projectId) {
       toast('danger', 'Ошибка', data.message || 'Не удалось удалить проект');
       return;
     }
-    // Удаляем проект из локального стейта
-    state.projects = state.projects.filter(pr => pr.id !== projectId);
+    // Перезагружаем проекты с сервера, чтобы убедиться, что удаленный проект не вернется
+    // Сервер уже установил статус DELETED, поэтому при загрузке проект не вернется
+    if (typeof loadProjectsFromServer === "function") {
+      await loadProjectsFromServer();
+    } else {
+      // Если функция недоступна, удаляем из локального стейта
+      state.projects = (state.projects || []).filter(pr => pr.id !== projectId);
+    }
+    
     toast('ok', 'Готово', 'Проект удалён');
     closeModal();
     renderCabinet();
@@ -1926,7 +2060,7 @@ function setActiveNav(){
 
 /* components */
 
-function projectCard(p) {
+function projectCard(p, context = 'default', statusText = '') {
     if (!p) return "";
 
     // 1. УМНОЕ ОПРЕДЕЛЕНИЕ ПУТИ К КАРТИНКЕ
@@ -1942,9 +2076,10 @@ function projectCard(p) {
         }
     }
 
-    // 2. ИЗБРАННОЕ
-    const favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
-    const isFav = favorites.includes(p.id);
+    // 2. ИЗБРАННОЕ (используем state.favorites для консистентности)
+    const u = currentUser();
+    const favIds = (state.favorites && u) ? (state.favorites[u.id] || []) : [];
+    const isFav = favIds.includes(p.id);
 
     // 3. ПРОГРЕСС
     const total = p.capacity || 1;
@@ -1954,12 +2089,88 @@ function projectCard(p) {
     // Категория
     const catName = (state.categories || []).find(c => c.id === p.categoryId)?.name || "Проект";
 
+    // Определяем опции меню в зависимости от роли и контекста
+    const isOwner = u && p.ownerUserId === u.id;
+    const isAdmin = u && u.role === 'ADMIN';
+    const isOrganizer = u && u.role === 'ORGANIZER';
+    const isClosed = p.status === 'CLOSED';
+    
+    // Проверяем, есть ли отклик на этот проект
+    const userApplication = u && state.applications ? state.applications.find(a => a.projectId === p.id && a.userId === u.id && a.status !== 'CANCELLED') : null;
+
+    let menuItems = [];
+    
+    if (u) {
+        // Всегда добавляем "В избранное"
+        menuItems.push({
+            text: isFav ? 'Убрать из избранного' : 'В избранное',
+            action: `toggleFavorite('${p.id}')`,
+            danger: false
+        });
+
+        // Если есть отклик на проект, добавляем опцию отменить отклик
+        if (userApplication) {
+            menuItems.push({
+                text: 'Отменить отклик',
+                action: `window.cancelAppFromCabinet('${userApplication.id}')`,
+                danger: true
+            });
+        }
+
+        // Для администратора - всегда все опции, для организатора - только для своих проектов
+        if (isAdmin || (isOwner && isOrganizer)) {
+            menuItems.push({
+                text: 'Редактировать',
+                action: `window.openProjectEditModal('${p.id}')`,
+                danger: false
+            });
+            
+            if (isClosed) {
+                menuItems.push({
+                    text: 'Открыть набор',
+                    action: `window.reopenProject('${p.id}')`,
+                    danger: false
+                });
+            } else {
+                menuItems.push({
+                    text: 'Закончить набор',
+                    action: `window.finishProject('${p.id}')`,
+                    danger: false
+                });
+            }
+
+            // Только для администратора - удаление
+            if (isAdmin) {
+                menuItems.push({
+                    text: 'Удалить',
+                    action: `window.deleteProject('${p.id}')`,
+                    danger: true
+                });
+            }
+        }
+    }
+
+    // Создаем уникальный ID меню с учетом контекста и случайного числа, чтобы меню открывалось на правильном блоке
+    // Используем Date.now() для уникальности каждого экземпляра карточки
+    const uniqueId = `${context}-${p.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const menuId = `menu-${uniqueId}`;
+    const menuHTML = menuItems.length > 0 ? `
+      <button class="menu-btn" onclick="event.stopPropagation(); toggleProjectMenu('${menuId}')">
+        ⋯
+      </button>
+      <div class="project-menu" id="${menuId}">
+        ${menuItems.map(item => `
+          <button class="project-menu-item ${item.danger ? 'danger' : ''}" 
+                  onclick="event.stopPropagation(); ${item.action}; closeProjectMenu('${menuId}');">
+            ${esc(item.text)}
+          </button>
+        `).join('')}
+      </div>
+    ` : '';
+
     return `
     <div class="project-card" style="position: relative; display: flex; flex-direction: column; height: 100%;">
-      <button class="fav-btn ${isFav ? 'active' : ''}"
-              onclick="event.stopPropagation(); toggleFavorite('${p.id}')">
-        ${isFav ? '❤️' : '🤍'}
-      </button>
+      ${menuHTML}
 
       <div class="img-wrapper" onclick="openProjectModal('${p.id}')" style="height: 220px; overflow: hidden; position: relative;">
         <img src="${imgUrl}"
@@ -1985,6 +2196,7 @@ function projectCard(p) {
           <span style="color: var(--text);">👥 ${current} / ${total}</span>
           <span style="color: var(--blue);">${progress}%</span>
         </div>
+        ${statusText ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); overflow: hidden;"><span class="catbadge" style="display: inline-block; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; white-space: normal;">${esc(statusText)}</span></div>` : ''}
       </div>
     </div>`;
 }
@@ -2081,6 +2293,17 @@ function toggleFavorite(projectId){
   if(i>=0){ state.favorites[u.id].splice(i,1); toast("ok","Избранное","Удалено."); }
   else{ state.favorites[u.id].push(projectId); toast("ok","Избранное","Добавлено."); }
   saveState();
+  
+  // Закрываем все меню и обновляем страницу, если мы в кабинете
+  document.querySelectorAll('.project-menu').forEach(menu => {
+    menu.classList.remove('show');
+  });
+  
+  if (window.location.pathname.includes('/cabinet') || window.location.hash.includes('cabinet')) {
+    renderCabinet();
+  } else if (window.location.pathname.includes('/projects') || window.location.hash.includes('projects')) {
+    renderProjects();
+  }
 }
 
 function applyToProject(projectId){
@@ -2126,6 +2349,11 @@ function openProjectModal(id) {
         }
     }
 
+    const u = currentUser();
+    const isClosed = p.status === 'CLOSED';
+    const hasApplication = u && state.applications && state.applications.some(a => a.projectId === p.id && a.userId === u.id && a.status !== 'CANCELLED');
+    const canApply = !isClosed && !hasApplication && u;
+
     const html = `
     <div class="modal-modern">
       <div style="position: relative; width: 100%; height: 380px; overflow: hidden; background: #eee;">
@@ -2140,6 +2368,7 @@ function openProjectModal(id) {
         <div style="display: flex; gap: 10px; margin-bottom: 20px;">
            <span class="tag" style="background:var(--blueSoft); color:var(--blue)">${esc(p.categoryId)}</span>
            <span class="tag" style="background: #fef3c7; color: #92400e;">📍 ${p.city || 'Минск'}</span>
+           ${isClosed ? '<span class="tag" style="background: #fee2e2; color: #991b1b;">Набор завершён</span>' : ''}
         </div>
 
         <h2 style="font-size: 32px; font-weight: 900; margin-bottom: 20px; color: var(--text); line-height: 1.2;">${esc(p.title)}</h2>
@@ -2153,7 +2382,7 @@ function openProjectModal(id) {
             <div style="font-size: 14px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Волонтеры</div>
             <div style="font-size: 24px; font-weight: 900; color: var(--blue);">${p.approved || 0} из ${p.capacity || 0}</div>
           </div>
-          <button class="btn" style="padding: 16px 32px; border-radius: 16px;" onclick="directApply('${p.id}')">Откликнуться</button>
+          ${canApply ? `<button class="btn" style="padding: 16px 32px; border-radius: 16px;" onclick="directApply('${p.id}')">Откликнуться</button>` : isClosed ? '<div style="padding: 16px 32px; border-radius: 16px; background: #e5e7eb; color: #6b7280; font-weight: 600;">Набор завершён</div>' : hasApplication ? '<div style="padding: 16px 32px; border-radius: 16px; background: #dbeafe; color: #1e40af; font-weight: 600;">Вы уже откликнулись</div>' : ''}
         </div>
       </div>
     </div>`;
@@ -2486,7 +2715,7 @@ function openUserMenu(){
 /* ===== Pages ===== */
 function renderHome(){
   const u = currentUser();
-  const published = state.projects ? state.projects.filter(p => p.status === "PUBLISHED") : [];
+  const published = state.projects ? state.projects.filter(p => p.status === "PUBLISHED" && p.status !== "DELETED") : [];
   const kpiProjects = published.length;
   const kpiVols = state.users ? state.users.filter(x => x.role === "VOLUNTEER").length : 0;
   const kpiStories = state.stories ? state.stories.length : 0;
@@ -2996,7 +3225,7 @@ function applyProjectFilters(){
     format: $("#fFormat").value,
     q: $("#fQuery").value.trim().toLowerCase(),
   };
-  const list = state.projects.filter(p=>p.status==="PUBLISHED");
+  const list = state.projects.filter(p => p.status === "PUBLISHED" && p.status !== "DELETED");
   const out = list.filter(p=>{
     if(f.category && p.categoryId!==f.category) return false;
     if(f.region && p.region!==f.region) return false;
@@ -3299,7 +3528,8 @@ function openBadgeDetails(badgeId) {
 /* 1. Исправленная карточка проекта для кабинета */
 function cabinetProjectCard(p) {
   if (!p) return "";
-  const baseCard = projectCard(p);
+  const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
+  const baseCard = projectCard(p, 'cabinet', status);
   return baseCard;
 }
 
@@ -3399,23 +3629,30 @@ async function renderCabinet() {
   if (!requireAuth()) { navigate("/"); return; }
   await loadProfileFromServer();
 
+  // Загружаем проекты с сервера перед отображением
+  if (typeof loadProjectsFromServer === "function") {
+    await loadProjectsFromServer();
+  }
+
   // Подтягиваем отклики и связанные проекты из БД
   if (typeof loadApplicationsFromServer === "function") {
     await loadApplicationsFromServer();
   }
 
   const u = currentUser();
-  const allProjects = state.projects;
+  const allProjects = state.projects || [];
   const allApps = state.applications || [];
   const projectsById = Object.fromEntries(allProjects.map(p => [p.id, p]));
 
   const myApps = allApps.filter(a => a.userId === u.id && a.status !== "CANCELLED");
   const favIds = state.favorites[u.id] || [];
-  const fav = favIds.map(pid => projectsById[pid]).filter(Boolean);
+  const fav = favIds.map(pid => projectsById[pid]).filter(p => p && p.status !== 'DELETED');
 
   // Проекты, которыми пользователь управляет (создал) или все проекты для ADMIN
+  // Фильтруем удаленные проекты
   const myManagedProjects = allProjects.filter(p => {
     if (!p) return false;
+    if (p.status === 'DELETED') return false; // Не показываем удаленные проекты
     if (u.role === 'ADMIN') return true;
     return p.ownerUserId === u.id;
   });
@@ -3508,23 +3745,10 @@ async function renderCabinet() {
               ${myApps.length ? myApps.map(a => {
                 const p = projectsById[a.projectId];
                 if (!p) return '';
-                const statusLabel = a.status === 'ACTIVE' || a.status === 'PENDING'
-                  ? 'В ожидании'
-                  : a.status === 'APPROVED'
-                    ? 'Подтверждено'
-                    : a.status === 'CANCELLED'
-                      ? 'Отменено'
-                      : a.status;
-                const baseCard = projectCard(p);
+                const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
                 return `
                   <div>
-                    ${baseCard}
-                    <div class="row" style="margin-top:8px; align-items:center;">
-                      <span class="catbadge">${esc(statusLabel)}</span>
-                      <span class="right">
-                        <button class="btn secondary danger" onclick="window.cancelAppFromCabinet('${a.id}')">Отменить</button>
-                      </span>
-                    </div>
+                    ${projectCard(p, 'cabinet', status)}
                   </div>
                 `;
               }).join("") : `<div class="muted">У вас пока нет активных откликов.</div>`}
@@ -3539,15 +3763,7 @@ async function renderCabinet() {
                 const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
                 return `
                   <div>
-                    ${projectCard(p)}
-                    <div class="row" style="margin-top:8px; align-items:center;">
-                      <span class="catbadge">${esc(status)}</span>
-                      <span class="right" style="display:flex; gap:8px;">
-                        <button class="btn secondary" onclick="window.openProjectEditModal('${p.id}')">Редактировать</button>
-                        <button class="btn secondary" onclick="window.finishProject('${p.id}')">Закончить набор</button>
-                        <button class="btn secondary danger" onclick="window.deleteProject('${p.id}')">Удалить</button>
-                      </span>
-                    </div>
+                    ${projectCard(p, 'cabinet', status)}
                   </div>
                 `;
               }).join("") : `<div class="muted">У вас пока нет собственных проектов.</div>`}
@@ -3886,7 +4102,8 @@ async function loadProjectsFromServer() {
         if (!res.ok || !Array.isArray(data.projects)) return;
 
         // Если с сервера пришли проекты — подменяем демо-проекты
-        state.projects = data.projects;
+        // Фильтруем удаленные проекты на клиенте для дополнительной безопасности
+        state.projects = data.projects.filter(p => p.status !== 'DELETED');
     } catch (err) {
         console.error('❌ Ошибка загрузки проектов с сервера:', err);
     }
