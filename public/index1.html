@@ -1994,6 +1994,9 @@ function openAuthModal(){
                         createdAt: new Date().toISOString()
                     });
                 } else {
+                    // важно: синхронизируем id с тем, что пришёл с сервера,
+                    // иначе currentUser() не найдётся и кабинет снова откроет модалку входа
+                    existingUser.id = data.user.id;
                     existingUser.name = data.user.name;
                     existingUser.role = data.user.role;
                     existingUser.city = data.user.city || '';
@@ -2003,7 +2006,8 @@ function openAuthModal(){
 
                 state.session.userId = data.user.id;
                 saveState();
-                closeModal();
+                const closeBtn = document.getElementById('modalClose');
+                if (closeBtn) closeBtn.click();
                 toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
                 navigate("#/cabinet");
                 renderApp();
@@ -2069,7 +2073,10 @@ function openAuthModal(){
                     createdAt: new Date().toISOString()
                 };
 
-                state.users.push(newUser);
+                // если вдруг в localStorage уже был пользователь с этим email — обновим его
+                const existingUser = state.users.find(u => u.email === newUser.email);
+                if (!existingUser) state.users.push(newUser);
+                else Object.assign(existingUser, newUser);
                 state.session.userId = data.user.id;
 
                 if (role === "ORGANIZER") {
@@ -2085,7 +2092,8 @@ function openAuthModal(){
                 }
 
                 saveState();
-                closeModal();
+                const closeBtn = document.getElementById('modalClose');
+                if (closeBtn) closeBtn.click();
                 toast("ok", "Готово", `Аккаунт создан! Добро пожаловать, ${data.user.name}!`);
                 navigate("#/cabinet");
                 renderApp();
