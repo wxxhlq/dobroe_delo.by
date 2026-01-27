@@ -1987,17 +1987,25 @@ function openAuthModal(){
                         role: data.user.role,
                         city: data.user.city || '',
                         phone: data.user.phone || '',
+                        avatar: data.user.avatarUrl || '',
                         pass: pass,
                         points: data.user.points || 0,
                         privacy: 'public',
                         createdAt: new Date().toISOString()
                     });
+                } else {
+                    existingUser.name = data.user.name;
+                    existingUser.role = data.user.role;
+                    existingUser.city = data.user.city || '';
+                    existingUser.phone = data.user.phone || '';
+                    existingUser.avatar = data.user.avatarUrl || existingUser.avatar || '';
                 }
 
                 state.session.userId = data.user.id;
                 saveState();
                 closeModal();
                 toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
+                navigate("#/cabinet");
                 renderApp();
 
             } catch (err) {
@@ -2054,6 +2062,7 @@ function openAuthModal(){
                     role: data.user.role,
                     city: data.user.city || '',
                     phone: data.user.phone || '',
+                    avatar: data.user.avatarUrl || '',
                     pass: pass,
                     points: data.user.points || 0,
                     privacy: 'public',
@@ -2078,6 +2087,7 @@ function openAuthModal(){
                 saveState();
                 closeModal();
                 toast("ok", "Готово", `Аккаунт создан! Добро пожаловать, ${data.user.name}!`);
+                navigate("#/cabinet");
                 renderApp();
 
             } catch (err) {
@@ -2989,12 +2999,42 @@ async function renderCabinet() {
   // Обработка загрузки аватара
   const avInp = document.getElementById('avatarUpload');
   if (avInp) {
-    avInp.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => { u.avatar = ev.target.result; saveState(); renderCabinet(); };
-        reader.readAsDataURL(file);
+    avInp.onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!authToken) { toast('danger', 'Ошибка', 'Нужно войти в аккаунт'); return; }
+
+      // Мгновенный превью (локально), потом заменим на URL с сервера
+      const previewEl = document.getElementById('avatarPreview');
+      if (previewEl) previewEl.src = URL.createObjectURL(file);
+
+      const fd = new FormData();
+      fd.append('avatar', file);
+
+      try {
+        const res = await fetch(`${API_URL}/me/avatar`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast('danger', 'Ошибка', data.message || 'Не удалось загрузить аватар');
+          return;
+        }
+
+        // Сохраняем в памяти URL с сервера (в БД уже сохранено)
+        if (data.avatarUrl) {
+          u.avatar = data.avatarUrl;
+        }
+        toast('ok', '✓', 'Аватар сохранён');
+        renderCabinet();
+      } catch (err) {
+        console.error('❌ Ошибка загрузки аватара:', err);
+        toast('danger', 'Ошибка', 'Проблема соединения с сервером');
+      } finally {
+        // чтобы повторная загрузка того же файла снова срабатывала
+        avInp.value = '';
       }
     };
   }
@@ -3009,7 +3049,8 @@ window.handleUpdateProfile = async function(form) {
     const updateData = {
         name: fd.get('name'),
         city: fd.get('city'),
-        phone: fd.get('phone')
+        phone: fd.get('phone'),
+        email: fd.get('email')
     };
 
     console.log('📤 Отправка данных на сервер:', updateData);
@@ -3036,8 +3077,15 @@ window.handleUpdateProfile = async function(form) {
         Object.assign(u, {
             name: data.user.name,
             city: data.user.city,
-            phone: data.user.phone
+            phone: data.user.phone,
+            email: data.user.email
         });
+
+        // Если сервер вернул новый access token (например, после смены email) — обновим его
+        if (data.token) {
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken);
+        }
 
         // НЕ вызываем saveState() - данные только на сервере!
         toast('ok', '✓', 'Профиль обновлён в БД');
@@ -3105,11 +3153,19 @@ async function loadServerSession() {
                     role: data.user.role,
                     city: data.user.city || '',
                     phone: data.user.phone || '',
+                    avatar: data.user.avatarUrl || '',
                     pass: 'restored',
                     points: data.user.points || 0,
                     privacy: 'public',
                     createdAt: new Date().toISOString()
                 });
+            } else {
+                existingUser.email = data.user.email;
+                existingUser.name = data.user.name;
+                existingUser.role = data.user.role;
+                existingUser.city = data.user.city || '';
+                existingUser.phone = data.user.phone || '';
+                existingUser.avatar = data.user.avatarUrl || existingUser.avatar || '';
             }
 
             state.session.userId = data.user.id;
@@ -3686,7 +3742,9 @@ async function loadProfileFromServer() {
                     name: data.name,
                     city: data.city,
                     phone: data.phone,
-                    points: data.points
+                    email: data.email,
+                    points: data.points,
+                    avatar: data.avatarUrl || ''
                 });
                 // НЕ сохраняем в localStorage!
             }
