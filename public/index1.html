@@ -614,6 +614,18 @@
       display: inline-block; padding: 4px 12px; background: var(--blueSoft); 
       color: var(--blue); border-radius: 99px; font-size: 12px; font-weight: 800; margin-bottom: 16px;
     }
+    .user-role.role-admin {
+      background: #dc2626;
+      color: #ffffff;
+    }
+    .user-role.role-organizer {
+      background: #f97316;
+      color: #ffffff;
+    }
+    .user-role.role-volunteer {
+      background: var(--blueSoft);
+      color: var(--blue);
+    }
 
     /* Статистика и Прогресс */
     .level-box { background: var(--surface2); padding: 16px; border-radius: 12px; margin-top: 16px; text-align: left; }
@@ -2651,7 +2663,7 @@ function renderProjects(){
           <h2>Каталог проектов</h2>
           <div style="display:flex; gap:12px; align-items:center;">
             <small>${u ? `Вы: ${esc(u.name)} (${esc(roleLabel(u.role))})` : "Гость"}</small>
-            ${u && u.role === "ORGANIZER" ? `<button class="btn secondary" id="btnCreateProject">Создать новый проект</button>` : ""}
+            ${u && (u.role === "ORGANIZER" || u.role === "ADMIN") ? `<button class="btn secondary" id="btnCreateProject">Создать новый проект</button>` : ""}
           </div>
         </div>
         <div class="split">
@@ -2710,7 +2722,7 @@ function renderProjects(){
     applyProjectFilters();
   };
 
-  if (u && u.role === "ORGANIZER") {
+  if (u && (u.role === "ORGANIZER" || u.role === "ADMIN")) {
     const btn = document.getElementById("btnCreateProject");
     if (btn) btn.onclick = openCreateProjectModal;
   }
@@ -2723,11 +2735,11 @@ function renderProjects(){
   }
 }
 
-// Модалка создания нового проекта (только для организаторов)
+// Модалка создания нового проекта (только для организаторов и администраторов)
 function openCreateProjectModal() {
   const u = currentUser();
-  if (!u || u.role !== "ORGANIZER") {
-    toast("warn", "Недостаточно прав", "Создавать проекты могут только организаторы");
+  if (!u || (u.role !== "ORGANIZER" && u.role !== "ADMIN")) {
+    toast("warn", "Недостаточно прав", "Создавать проекты могут только организаторы и администраторы");
     return;
   }
   if (!authToken) {
@@ -3366,7 +3378,7 @@ async function renderCabinet() {
               <div class="avatar-overlay">📷</div>
             </div>
             <div class="user-name">${esc(u.name)}</div>
-            <div class="user-role">${u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
+            <div class="user-role ${u.role === "ADMIN" ? "role-admin" : u.role === "ORGANIZER" ? "role-organizer" : "role-volunteer"}">${u.role === "ADMIN" ? "Администратор" : u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
 
             <div class="level-box">
               <div class="stat-row"><span>Уровень: ${lvl.name}</span><span>${u.points || 0} XP</span></div>
