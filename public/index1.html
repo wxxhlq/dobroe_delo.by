@@ -1412,7 +1412,7 @@
 /* ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ API ===== */
 const API_URL = 'http://localhost:3000';
 let authToken = localStorage.getItem('authToken');
-
+let tempNewsImagePC = "";
 /* ===== State / storage (из твоего исходника) ===== */
 const LS_KEY = "ddby_flat_v1"; // [file:87]
 
@@ -1844,11 +1844,7 @@ function seed(){
         }
     ];
 
-  const news = [
-    { id: uid("n"), title:"Доброе_дело.by — старт!", date: nowISO(), excerpt:"Запустили демо‑платформу: проекты, заявки, новости, кабинет.", body:"Это автономная версия на HTML/CSS/JS. Данные сохраняются в localStorage вашего браузера.", comments:[], likes:0 },
-    { id: uid("n"), title:"Как начать помогать", date: new Date(Date.now()-86400000*2).toISOString(), excerpt:"Регистрация → выбор проекта → участие → история успеха.", body:"Откройте «Проекты», выберите город и категорию, нажмите «Откликнуться». В демо подтверждение автоматическое.", comments:[], likes:0 },
-    { id: uid("n"), title:"Субботник: итоги (демо)", date: new Date(Date.now()-86400000*12).toISOString(), excerpt:"Собрали мусор и отправили часть на переработку (демо).", body:"Спасибо участникам! Фотоотчёт — следующий шаг для расширения.", comments:[], likes:0 }
-  ];
+
 
   const stories = [
     { id: uid("s"), title:"Волонтёрство помогло мне поверить в себя", author: vol1.name, date: new Date(Date.now()-86400000*30).toISOString(),
@@ -1911,56 +1907,53 @@ function setActiveNav(){
 function projectCard(p) {
     if (!p) return "";
 
-    // 1. ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ/КАБИНЕТЕ)
-    const cat = (state.categories || []).find(c => c.id === p.categoryId);
+    // 1. УМНОЕ ОПРЕДЕЛЕНИЕ ПУТИ К КАРТИНКЕ
+    let imgUrl = p.image || "";
 
-    // Формируем путь:
-    // - если http — берём как есть
-    // - если загрузка с backend (`/uploads/...`) — тоже как есть
-    // - иначе добавляем `img/`
-    let imgUrl;
-    if (p.image) {
-        if (p.image.startsWith('/uploads/') || p.image.startsWith('uploads/')) {
-            imgUrl = p.image;
-        } else if (p.image.startsWith('http')) {
-            imgUrl = p.image;
-        } else {
-            imgUrl = 'img/' + p.image;
-        }
+    // Если картинки нет, подбираем заглушку по категории
+    if (!imgUrl) {
+        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'images/img5.png');
     } else {
-        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+        // Если это не Base64 (data:image...) и не http ссылка, и не начинается со слэша
+        if (!imgUrl.startsWith('data:') && !imgUrl.startsWith('http') && !imgUrl.startsWith('/') && !imgUrl.startsWith('images/') && !imgUrl.startsWith('img/')) {
+            imgUrl = 'images/' + imgUrl; // Добавляем папку images/ по умолчанию
+        }
     }
 
-    // 2. ЛОГИКА ИЗБРАННОГО
+    // 2. ИЗБРАННОЕ
     const favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
     const isFav = favorites.includes(p.id);
 
-    // 3. РАСЧЕТ ПРОГРЕССА
+    // 3. ПРОГРЕСС
     const total = p.capacity || 1;
     const current = p.approved || 0;
     const progress = Math.min(Math.round((current / total) * 100), 100);
 
+    // Категория
+    const catName = (state.categories || []).find(c => c.id === p.categoryId)?.name || "Проект";
+
     return `
-    <div class="project-card" style="position: relative;">
+    <div class="project-card" style="position: relative; display: flex; flex-direction: column; height: 100%;">
       <button class="fav-btn ${isFav ? 'active' : ''}"
               onclick="event.stopPropagation(); toggleFavorite('${p.id}')">
         ${isFav ? '❤️' : '🤍'}
       </button>
 
-      <div class="img-wrapper" onclick="openProjectModal('${p.id}')">
+      <div class="img-wrapper" onclick="openProjectModal('${p.id}')" style="height: 220px; overflow: hidden; position: relative;">
         <img src="${imgUrl}"
              alt="${esc(p.title)}"
-             onerror="this.onerror=null; this.src='img/social.jpg';">
-
-        <div class="card-tag">${esc(cat?.name || "Проект")}</div>
+             style="width: 100%; height: 100%; object-fit: cover; display: block;"
+             onerror="this.onerror=null; this.src='images/img1.png';"> <div class="card-tag" style="position:absolute; bottom:10px; left:10px; background:rgba(255,255,255,0.9); padding:4px 10px; border-radius:12px; font-size:12px; font-weight:700;">
+            ${esc(catName)}
+        </div>
       </div>
 
-      <div style="padding: 24px; cursor: pointer;" onclick="openProjectModal('${p.id}')">
+      <div style="padding: 24px; cursor: pointer; flex: 1; display: flex; flex-direction: column;" onclick="openProjectModal('${p.id}')">
         <div style="font-size: 12px; color: var(--blue); font-weight: 700; margin-bottom: 8px;">
-           📍 ${esc(p.city || 'Город')}
+           📍 ${esc(p.city || 'Минск')}
         </div>
-        <h3 style="font-weight: 850; font-size: 20px; color: var(--text);">${esc(p.title)}</h3>
-        <p style="color: var(--muted); font-size: 14px; margin: 12px 0 20px;">${esc(p.descriptionShort || '')}</p>
+        <h3 style="font-weight: 850; font-size: 18px; color: var(--text); margin-bottom: 10px; line-height: 1.3;">${esc(p.title)}</h3>
+        <p style="color: var(--muted); font-size: 14px; margin-bottom: 20px; flex: 1;">${esc(p.descriptionShort || '')}</p>
 
         <div class="progress-bar-bg" style="background: #f1f5f9; height: 8px; border-radius: 10px; overflow: hidden; margin-bottom: 10px;">
           <div class="progress-bar-fill" style="width: ${progress}%; background: var(--blue); height: 100%;"></div>
@@ -1973,7 +1966,6 @@ function projectCard(p) {
       </div>
     </div>`;
 }
-
 
 function toggleFavorite(id) {
     let favorites = JSON.parse(localStorage.getItem('favProjects') || '[]');
@@ -2099,48 +2091,42 @@ function applyToProject(projectId){
 /* Modals */
 
 function openProjectModal(id) {
-    // Ищем проект в стейте или глобальном массиве
-    const p = (state.projects || []).find(x => x.id === id) || projects.find(x => x.id === id);
+    const p = (state.projects || []).find(x => x.id === id);
     if (!p) return;
 
-    // --- ЛОГИКА ПОДКЛЮЧЕНИЯ ФОТО (КАК В ИЗБРАННОМ) ---
-    let imgUrl;
-    if (p.image) {
-        if (p.image.startsWith('/uploads/') || p.image.startsWith('uploads/')) {
-            imgUrl = p.image;
-        } else if (p.image.startsWith('http')) {
-            imgUrl = p.image;
-        } else {
-            imgUrl = 'img/' + p.image;
-        }
+    // ТА ЖЕ ЛОГИКА ПУТЕЙ, ЧТО И В КАРТОЧКЕ
+    let imgUrl = p.image || "";
+    if (!imgUrl) {
+        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'images/img5.png');
     } else {
-        imgUrl = (typeof projectPhoto === 'function' ? projectPhoto(p.categoryId) : 'img/social.jpg');
+        if (!imgUrl.startsWith('data:') && !imgUrl.startsWith('http') && !imgUrl.startsWith('/') && !imgUrl.startsWith('images/') && !imgUrl.startsWith('img/')) {
+            imgUrl = 'images/' + imgUrl;
+        }
     }
 
     const html = `
     <div class="modal-modern">
-      <div class="modal-header-img-container" style="position: relative; width: 100%; height: 380px; overflow: hidden; background: #eee;">
+      <div style="position: relative; width: 100%; height: 380px; overflow: hidden; background: #eee;">
         <img src="${imgUrl}"
              alt="${esc(p.title)}"
              style="width: 100%; height: 100%; object-fit: cover; display: block;"
-             onerror="this.src='img/social.jpg'">
-
+             onerror="this.src='images/img1.png'">
         <button onclick="closeModal()" class="close-modal-btn">✕</button>
       </div>
 
       <div class="modal-body-content" style="padding: 40px; background: #fff;">
         <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-           <span class="tag">${esc(categoryLabel(p.categoryId))}</span>
+           <span class="tag" style="background:var(--blueSoft); color:var(--blue)">${esc(p.categoryId)}</span>
            <span class="tag" style="background: #fef3c7; color: #92400e;">📍 ${p.city || 'Минск'}</span>
         </div>
 
-        <h2 style="font-size: 32px; font-weight: 900; margin-bottom: 20px; color: var(--text);">${esc(p.title)}</h2>
+        <h2 style="font-size: 32px; font-weight: 900; margin-bottom: 20px; color: var(--text); line-height: 1.2;">${esc(p.title)}</h2>
 
         <p style="font-size: 17px; line-height: 1.7; color: #4b5563; margin-bottom: 30px;">
             ${p.descriptionFull || p.descriptionShort || 'Описание отсутствует.'}
         </p>
 
-        <div style="background: #f8fafc; padding: 25px; border-radius: 24px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #eef2f6;">
+        <div style="background: #f8fafc; padding: 25px; border-radius: 24px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #eef2f6; flex-wrap: wrap; gap: 15px;">
           <div>
             <div style="font-size: 14px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Волонтеры</div>
             <div style="font-size: 24px; font-weight: 900; color: var(--blue);">${p.approved || 0} из ${p.capacity || 0}</div>
@@ -2626,20 +2612,22 @@ function renderHome(){
         </div>
       </section>
 
-      <section style="margin-bottom: 100px;">
-        <h2 style="font-size: 32px; font-weight: 850; margin-bottom: 30px;">Новости и события</h2>
-        <div id="homeNews" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
-          ${latestNews.map(n => `
-            <div class="news-item" data-news="${n.id}" style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: 0.3s;">
-              <div style="height: 180px; background: url('${n.image || STOCK.news}') center/cover;"></div>
-              <div style="padding: 20px;">
-                <h3 style="font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3;">${esc(n.title)}</h3>
-                <div style="margin-top: 12px; font-size: 12px; color: var(--blue); font-weight: 700; text-transform: uppercase;">${fmtDate(n.date)}</div>
+        <section style="margin-bottom: 100px;">
+          <h2 style="font-size: 32px; font-weight: 850; margin-bottom: 30px;">Новости и события</h2>
+          <div id="homeNews" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+            ${(state.news || []).slice(0, 3).map(n => `
+              <div class="news-card" onclick="openFullNewsModal('${n.id}')" style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; position: relative;">
+                <div style="height: 180px; overflow: hidden;">
+                  <img src="${n.image || 'images/img1.png'}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='images/img1.png'">
+                </div>
+                <div style="padding: 20px;">
+                  <div style="font-size: 11px; color: var(--blue); font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">📅 ${n.date}</div>
+                  <h3 style="font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3; color: var(--text);">${esc(n.title)}</h3>
+                </div>
               </div>
-            </div>
-          `).join("")}
-        </div>
-      </section>
+            `).join("")}
+          </div>
+        </section>
 
       <section id="helpSection" style="background: var(--surface2); padding: 60px; border-radius: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-bottom: 100px;">
         <div>
@@ -3042,112 +3030,17 @@ function renderCommunity(){
   $$("#storiesList .news-item").forEach(el=>el.addEventListener("click",()=>openStoryModal(el.dataset.story)));
 }
 
-function renderNews(){
-  $("#app").innerHTML=`
-    <div class="container" style="padding-top:16px">
-      <div class="grid">
-        <section class="card">
-          <div class="section-title"><h2>Новости</h2><small>блог</small></div>
-          <div class="list" id="newsList"></div>
-        </section>
-
-        <aside class="card">
-          <div class="section-title"><h2>Добавить пост</h2><small>демо</small></div>
-          <div class="card-inner">
-            <div class="hint">Нужен вход, чтобы публиковать.</div>
-            <div class="hr"></div>
-            <form id="newsCreate">
-              <div class="field"><label>Заголовок</label><input name="title" required></div>
-              <div class="field"><label>Анонс</label><input name="excerpt" required maxlength="140"></div>
-              <div class="field"><label>Текст</label><textarea name="body" required></textarea></div>
-              <button class="btn" type="submit">Опубликовать</button>
-            </form>
-          </div>
-        </aside>
-      </div>
-    </div>
-  `;
-
-  renderNewsList();
-
-  $("#newsCreate").onsubmit=(e)=>{
-    e.preventDefault();
-    if(!requireAuth()) return;
-    const fd=new FormData(e.target);
-    state.news.unshift({
-      id: uid("n"),
-      title: String(fd.get("title")).trim(),
-      excerpt: String(fd.get("excerpt")).trim(),
-      body: String(fd.get("body")).trim(),
-      date: nowISO(),
-      comments:[],
-      likes:0
-    });
-    saveState();
-    e.target.reset();
-    toast("ok","Опубликовано","Пост добавлен.");
-    renderNewsList();
-  };
-}
-function renderNewsList(){
-  const list=$("#newsList");
-  const items=state.news.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
-  list.innerHTML = items.map(n=>`
-    <div class="news-item" data-news="${n.id}">
-      <div class="thumb" style="background-image:url('${STOCK.news}')"></div>
-      <div>
-        <h3>${esc(n.title)}</h3>
-        <div class="news-meta">${fmtDate(n.date)} · 👍 ${n.likes} · 💬 ${n.comments.length}</div>
-        <p>${esc(n.excerpt)}</p>
-      </div>
-    </div>
-  `).join("") || `<div class="muted">Пока нет новостей.</div>`;
-  $$("#newsList .news-item").forEach(el=>el.addEventListener("click",()=>openNewsModal(el.dataset.news)));
-}
-
-function renderAbout(){
-  $("#app").innerHTML=`
-    <div class="container" style="padding-top:16px">
-      <div class="grid">
-        <section class="card">
-          <div class="section-title"><h2>О нас</h2><small>миссия</small></div>
-          <div class="card-inner">
-            <div class="thumb" style="width:100%;height:200px;border-radius:16px;background-image:url('${STOCK.hero}')"></div>
-            <div class="hr"></div>
-            <div class="k">Миссия</div>
-            <div class="muted" style="margin-top:6px; line-height:1.7">
-              Сделать волонтёрство удобным: минимум шагов от намерения до участия.
-            </div>
-          </div>
-        </section>
-
-        <aside class="card">
-          <div class="section-title"><h2>Документы</h2><small>демо</small></div>
-          <div class="card-inner">
-            <div class="muted">Здесь обычно: политика конфиденциальности, правила, отчёты.</div>
-            <div class="hr"></div>
-            <div class="row">
-              <button class="btn secondary" onclick="openModal('Политика (демо)','<div class=muted>Добавьте текст политики отдельной страницей.</div>')">Политика</button>
-              <button class="btn secondary" onclick="openModal('Правила (демо)','<div class=muted>Добавьте правила участия и поведения.</div>')">Правила</button>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  `;
-}
-
 function renderContacts(){
   $("#app").innerHTML = `
     <div class="container" style="padding-top:80px; padding-bottom:120px;">
       <header style="max-width: 900px; margin-bottom: 60px;">
         <div style="display:inline-block; background: var(--blueSoft); color: var(--blue); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase;">
-          Связь с командой
+
         </div>
-        <h1 style="font-size: clamp(32px, 5vw, 52px); line-height: 1.1; letter-spacing: -1px; margin-bottom: 22px; font-weight: 800;">
-          Мы всегда на связи, <br><span style="color: var(--blue)">чтобы добрые дела случались вовремя.</span>
+        <h1 style="font-size: clamp(42px, 5vw, 68px); line-height: 1.1; letter-spacing: -1px; margin-bottom: 35px; font-weight: 800;">
+          Мы всегда на связи, <br><span style="color: var(--blue)">чтобы все добрые <br> дела случались вовремя.</span>
         </h1>
-        <p style="font-size: 18px; color: var(--text); line-height: 1.6; max-width: 720px; opacity: 0.85;">
+        <p style="font-size: 20px; color: var(--text); line-height: 1.6; max-width: 750px; opacity: 0.85;">
           Напишите нам, если у вас есть вопрос по платформе, предложение о партнёрстве или вы столкнулись с ситуацией, требующей внимания модераторов.
         </p>
       </header>
@@ -3155,7 +3048,7 @@ function renderContacts(){
       <div style="display:grid; grid-template-columns: repeat(12, 1fr); gap:24px; margin-bottom:60px;">
         <section class="card" style="grid-column: span 7; padding:40px; border:none; background: var(--surface2); border-radius:30px;">
           <h2 style="font-size:22px; margin-bottom:18px;">Форма обратной связи</h2>
-          <p class="muted" style="font-size:14px; margin-bottom:24px;">Ответим на ваш запрос в максимально короткие сроки. В демо‑версии обращения сохраняются локально.</p>
+          <p class="muted" style="font-size:14px; margin-bottom:24px;">Ответим на ваш запрос в максимально короткие сроки.</p>
 
           <form id="contactForm">
             <div class="two">
@@ -3191,7 +3084,7 @@ function renderContacts(){
                 Согласен(на) на обработку персональных данных для связи.
               </label>
             </div>
-            <div class="row" style="margin-top:10px;">
+            <div class="row" style="margin-top:30px; ">
               <button class="btn" type="submit">Отправить сообщение</button>
             </div>
           </form>
@@ -3210,13 +3103,23 @@ function renderContacts(){
             </div>
           </div>
 
-          <div class="card" style="padding:24px; border-radius:26px;">
-            <div class="section-title" style="border-radius:22px 22px 0 0; margin:-24px -24px 16px; padding:14px 20px;">
-              <h2 style="font-size:16px;">Последние обращения</h2>
-              <small>демо</small>
+              <div class="card" style="padding:28px; border-radius:26px; background: var(--surface2); border: none;">
+              <h3 style="margin:0 0 20px; font-size:18px;">Путь вашего обращения</h3>
+              <div style="display:flex; flex-direction:column; gap:20px; position:relative;">
+                <div style="display:flex; gap:15px;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:var(--blue); color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;">1</div>
+                  <div style="font-size:13px;"><b style="display:block; margin-bottom:4px;">Регистрация</b>Заявка мгновенно попадает в систему мониторинга после отправки.</div>
+                </div>
+                <div style="display:flex; gap:15px;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:var(--blue); color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;">2</div>
+                  <div style="font-size:13px;"><b style="display:block; margin-bottom:4px;">Распределение</b>Модератор направляет запрос профильному специалисту или куратору.</div>
+                </div>
+                <div style="display:flex; gap:15px;">
+                  <div style="width:24px; height:24px; border-radius:50%; background:var(--blue); color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;">3</div>
+                  <div style="font-size:13px;"><b style="display:block; margin-bottom:4px;">Решение</b>Среднее время ответа — 4 рабочих часа. Ответ придет на ваш Email.</div>
+                </div>
+              </div>
             </div>
-            <div class="list" id="tickets"></div>
-          </div>
         </aside>
       </div>
 
@@ -3746,6 +3649,107 @@ const routes = {
 };
 
 
+/* ===== ЛОГИКА СОЗДАНИЯ НОВОСТЕЙ С ФОТО ===== */
+
+function handleNewsFileSelect(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        // Проверка размера (2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            alert("Файл слишком большой! Максимум 2МБ.");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentNewsImage = e.target.result; // Сохраняем Base64
+
+            // Показываем превью
+            const preview = document.getElementById('newsPreviewImg');
+            const placeholder = document.getElementById('newsPlaceholder');
+            if (preview && placeholder) {
+                preview.src = currentNewsImage;
+                preview.style.display = 'block';
+                placeholder.style.display = 'none';
+            }
+        }
+        reader.readAsDataURL(file);
+    }
+}
+
+window.openCreateNewsModal = function() {
+    currentNewsImage = ""; // Сброс картинки при открытии
+    const html = `
+        <div style="padding: 24px;">
+            <h3 style="margin-bottom: 20px;">Новая публикация</h3>
+
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px; display:block;">Обложка новости</label>
+                <div onclick="document.getElementById('newsFileInput').click()"
+                     style="width: 100%; height: 180px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative;">
+
+                    <div id="newsPlaceholder" style="text-align:center;">
+                        <div style="font-size: 24px;">📷</div>
+                        <div style="font-size: 13px; color: var(--blue); margin-top: 5px;">Загрузить фото</div>
+                    </div>
+                    <img id="newsPreviewImg" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                </div>
+                <input type="file" id="newsFileInput" accept="image/*" style="display:none" onchange="handleNewsFileSelect(this)">
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label class="muted" style="font-size:12px;">Заголовок</label>
+                <input type="text" id="newsInpTitle" class="inp-modern" style="width:100%;" placeholder="Введите название...">
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label class="muted" style="font-size:12px;">Текст новости</label>
+                <textarea id="newsInpText" class="inp-modern" style="width:100%; height:150px; resize:none; padding:12px;" placeholder="Напишите содержание..."></textarea>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" style="flex:1" onclick="saveAdminNews()">Опубликовать</button>
+                <button class="btn secondary" onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    `;
+    showModal(html);
+};
+
+window.saveAdminNews = function() {
+    const u = currentUser();
+    if (!u) return toast("error", "Ошибка", "Нужно войти в аккаунт");
+
+    const title = $('#newsInpTitle').value.trim();
+    const text = $('#newsInpText').value.trim();
+
+    if (!title || !text) {
+        toast("error", "Ошибка", "Заполните заголовок и текст");
+        return;
+    }
+
+    // Если фото не выбрали, ставим заглушку
+    const finalImage = currentNewsImage || 'images/news.avif';
+
+    if (!state.news) state.news = [];
+
+    state.news.unshift({
+        id: 'n-' + Date.now(),
+        title: title,
+        image: finalImage,
+        text: text,
+        excerpt: text.substring(0, 100) + '...', // Создаем короткое описание
+        date: new Date().toISOString(),
+        authorName: u.name,
+        authorId: u.id,
+        likes: 0,
+        comments: []
+    });
+
+    saveState();
+    closeModal();
+    renderNews();
+    toast("ok", "Готово", "Новость опубликована!");
+};
 
 function renderApp(){
   setActiveNav();
@@ -4168,6 +4172,7 @@ window.applyCommunityFilters = function() {
 
 window.closePostModal = () => { const m = $('#postModal'); if(m) m.remove(); };
 
+// ОСНОВНОЙ РЕНДЕР СТРАНИЦЫ НОВОСТЕЙ
 function renderNews() {
     const u = currentUser();
     const news = state.news || [];
@@ -4177,41 +4182,41 @@ function renderNews() {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
             <div>
                 <h1 style="font-size: 28px; margin:0">Новости</h1>
-                <p class="muted">Делитесь важными событиями сообщества</p>
+                <p class="muted">Важные события нашего сообщества</p>
             </div>
             ${u ? `<button class="btn" onclick="openCreateNewsModal()">+ Создать новость</button>` : ''}
         </div>
 
-        <div class="news-grid">
+        <div class="news-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
             ${news.length > 0 ? news.map(n => {
-                // Проверка: является ли текущий пользователь автором
-                const isAuthor = u && u.id === n.authorId;
-
-                return `
-                <div class="news-card" style="position: relative;">
+        const isAuthor = u && (u.id === n.authorId || u.role === 'ADMIN');
+        return `
+                <div class="news-card" style="position: relative; background: white; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); height: 100%; display: flex; flex-direction: column;">
                     ${isAuthor ? `
-                        <button onclick="deleteNews(event, '${n.id}')"
-                            style="position: absolute; top: 15px; right: 15px; z-index: 10; background: rgba(239, 68, 68, 0.9); color: white; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;"
-                            onmouseover="this.style.transform='scale(1.1)'"
-                            onmouseout="this.style.transform='scale(1)'"
-                            title="Удалить новость">
+                        <button onclick="deleteNewsItem(event, '${n.id}')"
+                            style="position: absolute; top: 15px; right: 15px; z-index: 10; background: #ef4444; color: white; border: none; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
                             ✕
                         </button>
                     ` : ''}
 
-                    <div onclick="openFullNews('${n.id}')" style="height: 100%;">
-                        <img src="${n.image}" alt="news">
-                        <div class="news-overlay">
-                            <div style="font-size: 11px; opacity: 0.8; margin-bottom: 8px;">
+                    <div onclick="openFullNewsModal('${n.id}')" style="cursor: pointer; flex-grow: 1;">
+                        <div style="height: 200px; overflow: hidden;">
+                            <img src="${n.image}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='images/img1.png'">
+                        </div>
+                        <div style="padding: 20px;">
+                            <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
                                 📅 ${n.date} • ${esc(n.authorName || 'Автор')}
                             </div>
-                            <h3 class="news-card-title">${esc(n.title)}</h3>
+                            <h3 style="font-size: 18px; font-weight: 800; line-height: 1.3; color: var(--text); margin-bottom: 10px;">${esc(n.title)}</h3>
+                            <p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${esc(n.text)}
+                            </p>
                         </div>
                     </div>
                 </div>
                 `;
-            }).join('') : `
-                <div style="grid-column: 1/-1; text-align: center; padding: 100px 20px; background: var(--surface); border-radius: 20px; border: 2px dashed var(--border);">
+    }).join('') : `
+                <div style="grid-column: 1/-1; text-align: center; padding: 80px 20px; background: var(--surface2); border-radius: 20px; border: 2px dashed var(--border);">
                     <h3>Новостей пока нет</h3>
                 </div>
             `}
@@ -4219,102 +4224,97 @@ function renderNews() {
     </div>`;
 }
 
-window.deleteNews = function(event, newsId) {
-    // Останавливаем всплытие, чтобы не сработал onclick основной карточки
-    if (event) event.stopPropagation();
-
-    if (!confirm("Вы уверены, что хотите удалить эту новость?")) return;
-
-    // Фильтруем массив, удаляя новость с нужным ID
-    state.news = (state.news || []).filter(n => n.id !== newsId);
-
-    saveState();   // Сохраняем в localStorage
-    renderNews();  // Перерисовываем экран
-    toast("ok", "Удалено", "Новость успешно удалена");
-};
-
-// Открытие полной новости в модальном окне
-window.openFullNews = function(id) {
+// ОТКРЫТИЕ МОДАЛЬНОГО ОКНА (ИСПРАВЛЕНО)
+window.openFullNewsModal = function(id) {
     const n = (state.news || []).find(item => item.id === id);
-
-    if (!n) {
-        toast("error", "Ошибка", "Не удалось загрузить содержание новости");
-        return;
-    }
+    if (!n) return toast("error", "Ошибка", "Новость не найдена");
 
     const html = `
-        <div style="max-height: 90vh; overflow-y: auto;">
-            <img src="${n.image}" style="width:100%; height:350px; object-fit:cover; border-radius: 18px 18px 0 0;">
+        <div style="max-height: 90vh; overflow-y: auto; background: white; border-radius: 20px;">
+            <img src="${n.image}" style="width:100%; height:350px; object-fit:cover;" onerror="this.src='images/img1.png'">
             <div style="padding: 30px;">
                 <div style="display:flex; justify-content:space-between; color:var(--muted); font-size:13px; margin-bottom:15px;">
                     <span>📅 ${n.date}</span>
                     <span>✍️ ${esc(n.authorName || 'Автор')}</span>
                 </div>
-                <h2 style="margin-bottom:20px; line-height:1.4; font-size:24px;">${esc(n.title)}</h2>
-                <div style="line-height:1.8; font-size:16px; color:var(--text); white-space: pre-wrap;">
-                    ${esc(n.text)}
-                </div>
-                <button class="btn secondary" style="width:100%; margin-top:30px; padding:12px;" onclick="closeModal()">Закрыть</button>
+                <h2 style="margin-bottom:20px; line-height:1.4; font-size:26px; font-weight:900;">${esc(n.title)}</h2>
+                <div style="line-height:1.8; font-size:16px; color:#334155; white-space: pre-wrap;">${esc(n.text)}</div>
+                <button class="btn secondary" style="width:100%; margin-top:30px;" onclick="closeModal()">Закрыть</button>
             </div>
         </div>
     `;
     showModal(html);
 };
 
-// Окно создания новости (только для ADMIN)
+// УДАЛЕНИЕ НОВОСТИ (ИСПРАВЛЕНО)
+window.deleteNewsItem = function(event, newsId) {
+    if (event) event.stopPropagation();
+    if (!confirm("Удалить эту новость?")) return;
+
+    state.news = (state.news || []).filter(n => n.id !== newsId);
+    saveState();
+    renderNews();
+    toast("ok", "Удалено", "Новость удалена успешно");
+};
+
+// СОЗДАНИЕ НОВОСТИ С ЗАГРУЗКОЙ ПК
 window.openCreateNewsModal = function() {
+    tempNewsImagePC = "";
     const html = `
         <div style="padding: 24px;">
-            <h3>Новая публикация</h3>
-            <div style="margin-top:20px;">
-                <label class="muted" style="font-size:12px;">Заголовок</label>
-                <input type="text" id="newsInpTitle" class="inp-modern" style="width:100%; margin-bottom:15px;" placeholder="Введите название...">
-
-                <label class="muted" style="font-size:12px;">Ссылка на обложку (URL)</label>
-                <input type="text" id="newsInpImg" class="inp-modern" style="width:100%; margin-bottom:15px;" placeholder="https://...">
-
-                <label class="muted" style="font-size:12px;">Текст новости</label>
-                <textarea id="newsInpText" class="inp-modern" style="width:100%; height:200px; resize:none; padding:12px;" placeholder="Напишите содержание..."></textarea>
+            <h3 style="font-weight: 850; margin-bottom: 20px;">Новая публикация</h3>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 12px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 8px;">Обложка с ПК</label>
+                <div onclick="document.getElementById('news-pc-input').click()"
+                     style="width: 100%; height: 180px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative;">
+                    <div id="news-pc-placeholder">📷 Выбрать фото</div>
+                    <img id="news-pc-preview" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                </div>
+                <input type="file" id="news-pc-input" accept="image/*" style="display: none;" onchange="handleNewsFileLoad(this)">
             </div>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button class="btn" style="flex:1" onclick="saveAdminNews()">Опубликовать</button>
-                <button class="btn secondary" onclick="closeModal()">Отмена</button>
-            </div>
+            <input type="text" id="newsInpTitle" class="inp-modern" style="width: 100%; margin-bottom: 15px;" placeholder="Заголовок">
+            <textarea id="newsInpText" class="inp-modern" style="width: 100%; height: 150px; resize: none; margin-bottom: 20px;" placeholder="Текст..."></textarea>
+            <button class="btn" style="width: 100%;" onclick="saveAdminNews()">Опубликовать</button>
         </div>
     `;
     showModal(html);
+};
+
+window.handleNewsFileLoad = function(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            tempNewsImagePC = e.target.result;
+            document.getElementById('news-pc-preview').src = tempNewsImagePC;
+            document.getElementById('news-pc-preview').style.display = 'block';
+            document.getElementById('news-pc-placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
 };
 
 window.saveAdminNews = function() {
     const u = currentUser();
-    if (!u) return toast("error", "Ошибка", "Нужно войти в аккаунт");
-
     const title = $('#newsInpTitle').value.trim();
-    const img = $('#newsInpImg').value.trim() || 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=1000';
     const text = $('#newsInpText').value.trim();
 
-    if (!title || !text) {
-        toast("error", "Ошибка", "Заполните заголовок и текст новости");
-        return;
-    }
+    if (!title || !text) return toast("error", "Ошибка", "Заполните все поля");
 
     if (!state.news) state.news = [];
-
-    // Добавляем новость в начало списка
     state.news.unshift({
         id: 'n-' + Date.now(),
         title: title,
-        image: img,
+        image: tempNewsImagePC || 'images/img1.png',
         text: text,
         date: new Date().toLocaleDateString('ru-RU'),
-        authorName: u.name,
-        authorId: u.id
+        authorName: u ? u.name : 'Админ',
+        authorId: u ? u.id : 'admin'
     });
 
     saveState();
     closeModal();
-    renderNews(); // Перерисовываем страницу новостей
-    toast("ok", "Готово", "Ваша новость опубликована!");
+    renderNews();
+    toast("ok", "Успех", "Новость опубликована");
 };
 
 function renderAbout() {
@@ -4323,7 +4323,7 @@ function renderAbout() {
 
         <header style="max-width: 900px; margin-bottom: 80px;">
             <div style="display: inline-block; background: var(--blueSoft); color: var(--blue); padding: 6px 16px; border-radius: 50px; font-size: 13px; font-weight: 700; margin-bottom: 24px; text-transform: uppercase;">
-                Социально-образовательная инициатива
+
             </div>
             <h1 style="font-size: clamp(34px, 5vw, 68px); line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 30px; font-weight: 800;">
                 Платформа для тех, кто <br><span style="color: var(--blue)">не привык оставаться в стороне.</span>
