@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Доброе_дело.by — Blue UI</title>
+  <title>Доброе_дело.by</title>
 <!--марк сучка соснула ручку бем-->
   <style>
     :root{
@@ -2999,28 +2999,8 @@ function openBadgeDetails(badgeId) {
 /* 1. Исправленная карточка проекта для кабинета */
 function cabinetProjectCard(p) {
   if (!p) return "";
-  const cat = (state.categories || []).find(c => c.id === p.categoryId);
-  const imgUrl = p.image ? (p.image.startsWith('http') ? p.image : 'img/' + p.image) : projectPhoto(p.categoryId);
-
-  return `
-    <div class="project-card-cab">
-      <div class="card-img-wrapper">
-        <img src="${imgUrl}" alt="Project" onerror="this.src='img/social.jpg'">
-        <div class="cab-cat-badge">${esc(cat?.name || "Проект")}</div>
-      </div>
-      <div class="card-content">
-        <h4>${esc(p.title)}</h4>
-        <div class="btn-group">
-          <button class="btn secondary" onclick="openProjectModal('${p.id}')">Инфо</button>
-
-          <button class="btn" onclick="directApply('${p.id}')">Откликнуться</button>
-        </div>
-        <button class="btn-remove-fav" onclick="toggleFavorite('${p.id}'); renderCabinet();">
-          Удалить из избранного
-        </button>
-      </div>
-    </div>
-  `;
+  const baseCard = projectCard(p);
+  return baseCard;
 }
 
 /* 2. Глобальная функция отмены заявки */
@@ -3172,7 +3152,7 @@ async function renderCabinet() {
         </aside>
 
         <main>
-          <details class="card" style="margin-bottom:24px; border:none; overflow:hidden;" open>
+          <details class="card" style="margin-bottom:24px; border:none; overflow:hidden;">
             <summary style="padding:20px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border)">
               <h2 style="margin:0; font-size:20px;">⚙️ Настройки профиля</h2>
               <span style="color:var(--blue); font-size:14px;">нажмите, чтобы скрыть/показать</span>
@@ -3212,20 +3192,29 @@ async function renderCabinet() {
 
           <div class="card" style="margin-bottom:24px">
             <div class="section-title"><h2>Мои отклики</h2></div>
-            <div class="card-inner" style="padding:15px">
+            <div class="card-inner" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding:15px">
               ${myApps.length ? myApps.map(a => {
                 const p = projectsById[a.projectId];
+                if (!p) return '';
+                const statusLabel = a.status === 'ACTIVE' || a.status === 'PENDING'
+                  ? 'В ожидании'
+                  : a.status === 'APPROVED'
+                    ? 'Подтверждено'
+                    : a.status === 'CANCELLED'
+                      ? 'Отменено'
+                      : a.status;
+                const baseCard = projectCard(p);
                 return `
-                  <div class="card" style="box-shadow:none; border:1px solid var(--border); background:var(--surface2); margin-bottom:12px; padding:16px">
-                    <div class="row">
-                      <span style="font-weight:600">${esc(p?.title || "Проект удален")}</span>
-                      <span class="catbadge">${esc(a.status)}</span>
+                  <div>
+                    ${baseCard}
+                    <div class="row" style="margin-top:8px; align-items:center;">
+                      <span class="catbadge">${esc(statusLabel)}</span>
+                      <span class="right">
+                        <button class="btn secondary danger" onclick="window.cancelAppFromCabinet('${a.id}')">Отменить</button>
+                      </span>
                     </div>
-                    <div class="row" style="margin-top:10px">
-                      <button class="btn secondary" onclick="openProjectModal('${a.projectId}')">Открыть</button>
-                      <button class="btn secondary danger" onclick="window.cancelAppFromCabinet('${a.id}')">Отменить</button>
-                    </div>
-                  </div>`;
+                  </div>
+                `;
               }).join("") : `<div class="muted">У вас пока нет активных откликов.</div>`}
             </div>
           </div>
