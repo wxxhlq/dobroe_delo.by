@@ -310,6 +310,7 @@ function mapProjectForClient(doc) {
         descriptionFull: doc.description || '',
         city: doc.city || '',
         region: doc.region || '',
+        address: doc.address || '',
         categoryId: doc.categoryId || '',
         format: doc.format || '',
         capacity: doc.capacity || doc.volunteersNeeded || 0,
@@ -350,10 +351,10 @@ app.post(
     requireOrganizer,
     projectImageUpload.single('image'),
     async (req, res) => {
-        const { title, description, city, region, categoryId, format, capacity } = req.body;
+        const { title, description, city, region, categoryId, format, capacity, address } = req.body;
 
-        if (!title || !description || !capacity || !categoryId || !region || !format) {
-            return res.status(400).json({ message: 'Название, описание, категория, регион, формат и количество волонтёров обязательны' });
+        if (!title || !description || !capacity || !categoryId || !region || !format || !address) {
+            return res.status(400).json({ message: 'Название, описание, категория, область, формат, адрес и количество волонтёров обязательны' });
         }
 
         const numericCapacity = Number(capacity);
@@ -380,6 +381,7 @@ app.post(
                 descriptionShort: '',
                 city: String(city || '').trim(),
                 region: String(region || '').trim(),
+                address: String(address || '').trim(),
                 categoryId: String(categoryId || '').trim(),
                 format: String(format || '').trim(),
                 capacity: numericCapacity,
@@ -561,7 +563,7 @@ app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
 // Обновить проект (редактирование полей организатором или админом)
 app.put('/api/projects/:id', authMiddleware, async (req, res) => {
     const projectId = req.params.id;
-    const { title, description, city, region, categoryId, format, capacity } = req.body;
+    const { title, description, city, region, address, categoryId, format, capacity } = req.body;
 
     try {
         const db = getDB();
@@ -584,6 +586,7 @@ app.put('/api/projects/:id', authMiddleware, async (req, res) => {
         if (description !== undefined) update.description = String(description).trim();
         if (city !== undefined) update.city = String(city).trim();
         if (region !== undefined) update.region = String(region).trim();
+        if (address !== undefined) update.address = String(address).trim();
         if (categoryId !== undefined) update.categoryId = String(categoryId).trim();
         if (format !== undefined) update.format = String(format).trim();
         if (capacity !== undefined) {

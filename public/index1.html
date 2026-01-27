@@ -1427,6 +1427,17 @@ const FORMATS = ["Разовое","Регулярное","Удалённое"];
 const HELP_TYPES = ["Бытовая помощь","Доставка","Сопровождение","Консультация","Другое"];
 const REGIONS = ["Минск","Минская","Брестская","Витебская","Гомельская","Гродненская","Могилёвская"];
 
+// Города по областям Беларуси
+const CITIES_BY_REGION = {
+  "Минск": ["Минск"],
+  "Минская": ["Борисов", "Жодино", "Солигорск", "Молодечно", "Слуцк", "Несвиж", "Логойск", "Смолевичи", "Червень", "Вилейка", "Старые Дороги", "Березино", "Копыль", "Клецк", "Столбцы", "Узда", "Любань", "Марина Горка", "Крупки", "Воложин", "Мядель"].sort(),
+  "Брестская": ["Брест", "Брестский район", "Барановичи", "Береза", "Белоозёрск", "Высокое", "Ганцевичи", "Городище", "Давид-Городок", "Дрогичин", "Жабинка", "Иваново", "Ивацевичи", "Каменец", "Кобрин", "Лунинец", "Ляховичи", "Малорита", "Микашевичи", "Пинск", "Пружаны", "Ружаны", "Слоним", "Телеханы", "Другие города"].sort(),
+  "Витебская": ["Барань", "Браслав", "Верхнедвинск", "Витебск", "Глубокое", "Городок", "Дисна", "Докшицы", "Дубровно", "Лепель", "Миоры", "Новолукомль", "Новополоцк", "Орша", "Полоцк", "Поставы", "Сенно", "Новополоцк"].sort(),
+  "Гомельская": ["Брагин", "Буда-Кошелёво", "Василевичи", "Ветка", "Гомель", "Добруш", "Ельск", "Житковичи", "Жлобин", "Калинковичи", "Корма", "Лельчицы", "Лоев", "Мозырь", "Наровля", "Октябрьский", "Петриков", "Речица", "Рогачёв", "Светлогорск", "Хойники", "Чечерск"].sort(),
+  "Гродненская": ["Берёзовка", "Волковыск", "Вороново", "Гродно", "Дятлово", "Ивье", "Кореличи", "Лида", "Мосты", "Новогрудок", "Островец", "Ошмяны", "Свислочь", "Скидель", "Слоним", "Сморгонь", "Щучин"].sort(),
+  "Могилёвская": ["Белыничи", "Бобруйск", "Быхов", "Горки", "Дрибин", "Кировск", "Климовичи", "Кличев", "Костюковичи", "Краснополье", "Кричев", "Круглое", "Могилёв", "Мстиславль", "Осиповичи", "Славгород", "Хотимск", "Чаусы", "Чериков", "Шклов"].sort()
+};
+
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const uid = (p="id") => `${p}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
@@ -1505,15 +1516,21 @@ window.openProjectEditModal = function(projectId) {
           </div>
           <div class="two">
             <div class="field">
-              <label>Регион</label>
-              <select name="region" required>
+              <label>Область</label>
+              <select name="region" id="editRegionSelect" required>
                 ${REGIONS.map(r => `<option value="${esc(r)}" ${p.region === r ? 'selected' : ''}>${esc(r)}</option>`).join("")}
               </select>
             </div>
             <div class="field">
               <label>Город</label>
-              <input name="city" value="${esc(p.city || '')}" required />
+              <select name="city" id="editCitySelect" required>
+                <option value="" disabled>Сначала выберите область</option>
+              </select>
             </div>
+          </div>
+          <div class="field">
+            <label>Адрес</label>
+            <input name="address" value="${esc(p.address || '')}" required placeholder="Например, ул. Ленина, д. 10" />
           </div>
           <div class="field">
             <label>Название проекта</label>
@@ -1549,6 +1566,70 @@ window.openProjectEditModal = function(projectId) {
   const form = document.getElementById('editProjectForm');
   if (!form) return;
 
+  // Логика выбора области и города для редактирования
+  const editRegionSelect = document.getElementById('editRegionSelect');
+  const editCitySelect = document.getElementById('editCitySelect');
+  const currentRegion = p.region || '';
+  const currentCity = p.city || '';
+
+  // Инициализация списка городов при открытии формы
+  function initEditCitySelect() {
+    if (!currentRegion) {
+      editCitySelect.disabled = true;
+      editCitySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      return;
+    }
+
+    const cities = CITIES_BY_REGION[currentRegion] || [];
+    
+    if (currentRegion === "Минск") {
+      editCitySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
+      editCitySelect.disabled = true;
+    } else {
+      editCitySelect.disabled = false;
+      editCitySelect.innerHTML = '<option value="" disabled>Выберите город…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        if (city === currentCity) {
+          option.selected = true;
+        }
+        editCitySelect.appendChild(option);
+      });
+    }
+  }
+
+  initEditCitySelect();
+
+  editRegionSelect.onchange = function() {
+    const selectedRegion = this.value;
+    const cityOptions = editCitySelect.querySelectorAll("option");
+    cityOptions.forEach(opt => opt.remove());
+
+    if (!selectedRegion) {
+      editCitySelect.disabled = true;
+      editCitySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      return;
+    }
+
+    const cities = CITIES_BY_REGION[selectedRegion] || [];
+    
+    if (selectedRegion === "Минск") {
+      editCitySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
+      editCitySelect.disabled = true;
+    } else {
+      editCitySelect.disabled = false;
+      editCitySelect.innerHTML = '<option value="" selected disabled>Выберите город…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        editCitySelect.appendChild(option);
+      });
+    }
+  };
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -1557,6 +1638,7 @@ window.openProjectEditModal = function(projectId) {
       description: fd.get('description'),
       city: fd.get('city'),
       region: fd.get('region'),
+      address: fd.get('address'),
       categoryId: fd.get('categoryId'),
       format: fd.get('format'),
       capacity: Number(fd.get('capacity'))
@@ -2770,16 +2852,22 @@ function openCreateProjectModal() {
           </div>
           <div class="two">
             <div class="field">
-              <label>Регион</label>
-              <select name="region" required>
-                <option value="" selected disabled>Выберите регион…</option>
+              <label>Область</label>
+              <select name="region" id="regionSelect" required>
+                <option value="" selected disabled>Выберите область…</option>
                 ${REGIONS.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")}
               </select>
             </div>
             <div class="field">
               <label>Город</label>
-              <input name="city" placeholder="Например, Минск" required />
+              <select name="city" id="citySelect" required disabled>
+                <option value="" selected disabled>Сначала выберите область</option>
+              </select>
             </div>
+          </div>
+          <div class="field">
+            <label>Адрес</label>
+            <input name="address" placeholder="Например, ул. Ленина, д. 10" required />
           </div>
           <div class="field">
             <label>Название проекта</label>
@@ -2811,6 +2899,40 @@ function openCreateProjectModal() {
 
   const form = document.getElementById("createProjectForm");
   if (!form) return;
+
+  // Логика выбора области и города
+  const regionSelect = document.getElementById("regionSelect");
+  const citySelect = document.getElementById("citySelect");
+
+  regionSelect.onchange = function() {
+    const selectedRegion = this.value;
+    const cityOptions = citySelect.querySelectorAll("option");
+    cityOptions.forEach(opt => opt.remove());
+
+    if (!selectedRegion) {
+      citySelect.disabled = true;
+      citySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      return;
+    }
+
+    const cities = CITIES_BY_REGION[selectedRegion] || [];
+    
+    if (selectedRegion === "Минск") {
+      // Для Минска автоматически ставим город и блокируем
+      citySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
+      citySelect.disabled = true;
+    } else {
+      // Для других областей открываем список городов
+      citySelect.disabled = false;
+      citySelect.innerHTML = '<option value="" selected disabled>Выберите город…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        citySelect.appendChild(option);
+      });
+    }
+  };
 
   form.onsubmit = async (e) => {
     e.preventDefault();
