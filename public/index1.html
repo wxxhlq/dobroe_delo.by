@@ -1429,13 +1429,13 @@ const REGIONS = ["Минск","Минская","Брестская","Витеб�
 
 // Города по областям Беларуси
 const CITIES_BY_REGION = {
-  "Минск": ["Минск"],
-  "Минская": ["Борисов", "Жодино", "Солигорск", "Молодечно", "Слуцк", "Несвиж", "Логойск", "Смолевичи", "Червень", "Вилейка", "Старые Дороги", "Березино", "Копыль", "Клецк", "Столбцы", "Узда", "Любань", "Марина Горка", "Крупки", "Воложин", "Мядель"].sort(),
-  "Брестская": ["Брест", "Брестский район", "Барановичи", "Береза", "Белоозёрск", "Высокое", "Ганцевичи", "Городище", "Давид-Городок", "Дрогичин", "Жабинка", "Иваново", "Ивацевичи", "Каменец", "Кобрин", "Лунинец", "Ляховичи", "Малорита", "Микашевичи", "Пинск", "Пружаны", "Ружаны", "Слоним", "Телеханы", "Другие города"].sort(),
+  "Минск": ["Центральный", "Советский", "Первомайский", "Партизанский", "Заводской", "Ленинский", "Октябрьский", "Московский", "Фрунзенский"],
+  "Минская": ["Березино", "Борисов", "Боровляны", "Вилейка", "Воложин", "Городея", "Дзержинск", "Ждановичи", "Жодино", "Заславль", "Зеленый Бор", "Ивенец", "Клецк", "Копыль", "Крупки", "Логойск", "Любань", "Марьина Горка", "Мачулищи", "Молодечно", "Мядель", "Несвиж", "Плещеницы", "Радошковичи", "Руденск", "Слуцк", "Смолевичи", "Смиловичи", "Солигорск", "Старобин", "Старые Дороги", "Столбцы", "Узда", "Фаниполь", "Червень"].sort(),
+  "Брестская": ["Брест", "Брестский район", "Барановичи", "Береза", "Белоозёрск", "Высокое", "Ганцевичи", "Городище", "Давид-Городок", "Дрогичин", "Жабинка", "Иваново", "Ивацевичи", "Каменец", "Кобрин", "Лунинец", "Ляховичи", "Малорита", "Микашевичи", "Пинск", "Пружаны", "Ружаны", "Слоним", "Телеханы"].sort(),
   "Витебская": ["Барань", "Браслав", "Верхнедвинск", "Витебск", "Глубокое", "Городок", "Дисна", "Докшицы", "Дубровно", "Лепель", "Миоры", "Новолукомль", "Новополоцк", "Орша", "Полоцк", "Поставы", "Сенно", "Новополоцк"].sort(),
-  "Гомельская": ["Брагин", "Буда-Кошелёво", "Василевичи", "Ветка", "Гомель", "Добруш", "Ельск", "Житковичи", "Жлобин", "Калинковичи", "Корма", "Лельчицы", "Лоев", "Мозырь", "Наровля", "Октябрьский", "Петриков", "Речица", "Рогачёв", "Светлогорск", "Хойники", "Чечерск"].sort(),
-  "Гродненская": ["Берёзовка", "Волковыск", "Вороново", "Гродно", "Дятлово", "Ивье", "Кореличи", "Лида", "Мосты", "Новогрудок", "Островец", "Ошмяны", "Свислочь", "Скидель", "Слоним", "Сморгонь", "Щучин"].sort(),
-  "Могилёвская": ["Белыничи", "Бобруйск", "Быхов", "Горки", "Дрибин", "Кировск", "Климовичи", "Кличев", "Костюковичи", "Краснополье", "Кричев", "Круглое", "Могилёв", "Мстиславль", "Осиповичи", "Славгород", "Хотимск", "Чаусы", "Чериков", "Шклов"].sort()
+  "Гомельская": ["Гомель", "Большевик", "Брагин", "Буда-Кошелево", "Василевичи", "Ветка", "Добруш", "Ельск", "Житковичи", "Жлобин", "Калинковичи", "Корма", "Костюковка", "Лельчицы", "Лоев", "Мозырь", "Октябрьский", "Наровля", "Паричи", "Петриков", "Речица", "Рогачев", "Светлогорск", "Тереховка", "Туров", "Уваровичи", "Хойники", "Чечерск"].sort(),
+  "Гродненская": ["Гродно", "Большая Берестовица", "Березовка", "Берестовица", "Волковыск", "Вороново", "Дятлово", "Зельва", "Ивье", "Кореличи", "Красносельский", "Лида", "Мосты", "Мир", "Новогрудок", "Островец", "Ошмяны", "Радунь", "Россь", "Свислочь", "Скидель", "Слоним", "Сморгонь", "Щучин"].sort(),
+  "Могилёвская": ["Могилев", "Белыничи", "Бобруйск", "Быхов", "Глуск", "Горки", "Дрибин", "Елизово", "Кировск", "Климовичи", "Кличев", "Краснополье", "Круглое", "Костюковичи", "Кричев", "Мстиславль", "Осиповичи", "Славгород", "Чаусы", "Чериков", "Шклов", "Хотимск"].sort()
 };
 
 const $ = (s,r=document)=>r.querySelector(s);
@@ -1522,7 +1522,7 @@ window.openProjectEditModal = function(projectId) {
               </select>
             </div>
             <div class="field">
-              <label>Город</label>
+              <label id="editCityLabel">Город</label>
               <select name="city" id="editCitySelect" required>
                 <option value="" disabled>Сначала выберите область</option>
               </select>
@@ -1569,6 +1569,7 @@ window.openProjectEditModal = function(projectId) {
   // Логика выбора области и города для редактирования
   const editRegionSelect = document.getElementById('editRegionSelect');
   const editCitySelect = document.getElementById('editCitySelect');
+  const editCityLabel = document.getElementById('editCityLabel');
   const currentRegion = p.region || '';
   const currentCity = p.city || '';
 
@@ -1577,16 +1578,28 @@ window.openProjectEditModal = function(projectId) {
     if (!currentRegion) {
       editCitySelect.disabled = true;
       editCitySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      editCityLabel.textContent = "Город";
       return;
     }
 
     const cities = CITIES_BY_REGION[currentRegion] || [];
     
     if (currentRegion === "Минск") {
-      editCitySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
-      editCitySelect.disabled = true;
+      editCitySelect.disabled = false;
+      editCityLabel.textContent = "Регион";
+      editCitySelect.innerHTML = '<option value="" disabled>Выберите регион…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        if (city === currentCity) {
+          option.selected = true;
+        }
+        editCitySelect.appendChild(option);
+      });
     } else {
       editCitySelect.disabled = false;
+      editCityLabel.textContent = "Город";
       editCitySelect.innerHTML = '<option value="" disabled>Выберите город…</option>';
       cities.forEach(city => {
         const option = document.createElement("option");
@@ -1610,16 +1623,25 @@ window.openProjectEditModal = function(projectId) {
     if (!selectedRegion) {
       editCitySelect.disabled = true;
       editCitySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      editCityLabel.textContent = "Город";
       return;
     }
 
     const cities = CITIES_BY_REGION[selectedRegion] || [];
     
     if (selectedRegion === "Минск") {
-      editCitySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
-      editCitySelect.disabled = true;
+      editCitySelect.disabled = false;
+      editCityLabel.textContent = "Регион";
+      editCitySelect.innerHTML = '<option value="" selected disabled>Выберите регион…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        editCitySelect.appendChild(option);
+      });
     } else {
       editCitySelect.disabled = false;
+      editCityLabel.textContent = "Город";
       editCitySelect.innerHTML = '<option value="" selected disabled>Выберите город…</option>';
       cities.forEach(city => {
         const option = document.createElement("option");
@@ -2847,7 +2869,7 @@ function openCreateProjectModal() {
               </select>
             </div>
             <div class="field">
-              <label>Город</label>
+              <label id="cityLabel">Город</label>
               <select name="city" id="citySelect" required disabled>
                 <option value="" selected disabled>Сначала выберите область</option>
               </select>
@@ -2891,6 +2913,7 @@ function openCreateProjectModal() {
   // Логика выбора области и города
   const regionSelect = document.getElementById("regionSelect");
   const citySelect = document.getElementById("citySelect");
+  const cityLabel = document.getElementById("cityLabel");
 
   regionSelect.onchange = function() {
     const selectedRegion = this.value;
@@ -2900,18 +2923,27 @@ function openCreateProjectModal() {
     if (!selectedRegion) {
       citySelect.disabled = true;
       citySelect.innerHTML = '<option value="" selected disabled>Сначала выберите область</option>';
+      cityLabel.textContent = "Город";
       return;
     }
 
     const cities = CITIES_BY_REGION[selectedRegion] || [];
     
     if (selectedRegion === "Минск") {
-      // Для Минска автоматически ставим город и блокируем
-      citySelect.innerHTML = '<option value="Минск" selected>Минск</option>';
-      citySelect.disabled = true;
+      // Для Минска разблокируем поле и меняем label на "Регион"
+      citySelect.disabled = false;
+      cityLabel.textContent = "Регион";
+      citySelect.innerHTML = '<option value="" selected disabled>Выберите регион…</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        citySelect.appendChild(option);
+      });
     } else {
       // Для других областей открываем список городов
       citySelect.disabled = false;
+      cityLabel.textContent = "Город";
       citySelect.innerHTML = '<option value="" selected disabled>Выберите город…</option>';
       cities.forEach(city => {
         const option = document.createElement("option");
@@ -3577,12 +3609,29 @@ async function renderCabinet() {
       }
     };
   }
+
+  // Восстанавливаем состояние открытости настроек после сохранения
+  if (window._keepSettingsOpen) {
+    const settingsDetails = document.querySelector('details.card');
+    if (settingsDetails) {
+      settingsDetails.open = true;
+    }
+    // Сбрасываем флаг после использования
+    window._keepSettingsOpen = false;
+  }
 }
 
 // Глобальная функция сохранения профиля
 window.handleUpdateProfile = async function(form) {
     const u = currentUser();
     if (!u) return;
+
+    // Проверяем, открыт ли details элемент с настройками
+    const settingsDetails = form.closest('details');
+    const wasOpen = settingsDetails && settingsDetails.open;
+    
+    // Устанавливаем флаг, чтобы после перерисовки открыть details обратно
+    window._keepSettingsOpen = wasOpen;
 
     const fd = new FormData(form);
     const updateData = {
@@ -3610,6 +3659,7 @@ window.handleUpdateProfile = async function(form) {
         if (!res.ok) {
             if (!handleAuthResponse(res, data)) return;
             toast('danger', 'Ошибка', data.message || 'Не удалось обновить');
+            window._keepSettingsOpen = false;
             return;
         }
 
