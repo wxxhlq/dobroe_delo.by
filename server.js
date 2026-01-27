@@ -302,6 +302,9 @@ function mapProjectForClient(doc) {
         descriptionShort: doc.descriptionShort || (doc.description ? (doc.description.length > 160 ? doc.description.slice(0, 160) + '…' : doc.description) : ''),
         descriptionFull: doc.description || '',
         city: doc.city || '',
+        region: doc.region || '',
+        categoryId: doc.categoryId || '',
+        format: doc.format || '',
         capacity: doc.capacity || doc.volunteersNeeded || 0,
         approved: doc.responsesCount || 0,
         image: doc.imageUrl || '',
@@ -340,10 +343,10 @@ app.post(
     requireOrganizer,
     projectImageUpload.single('image'),
     async (req, res) => {
-        const { title, description, city, capacity } = req.body;
+        const { title, description, city, region, categoryId, format, capacity } = req.body;
 
-        if (!title || !description || !capacity) {
-            return res.status(400).json({ message: 'Название, описание и количество волонтёров обязательны' });
+        if (!title || !description || !capacity || !categoryId || !region || !format) {
+            return res.status(400).json({ message: 'Название, описание, категория, регион, формат и количество волонтёров обязательны' });
         }
 
         const numericCapacity = Number(capacity);
@@ -369,6 +372,9 @@ app.post(
                 description: String(description).trim(),
                 descriptionShort: '',
                 city: String(city || '').trim(),
+                region: String(region || '').trim(),
+                categoryId: String(categoryId || '').trim(),
+                format: String(format || '').trim(),
                 capacity: numericCapacity,
                 responsesCount: 0,
                 imageUrl,

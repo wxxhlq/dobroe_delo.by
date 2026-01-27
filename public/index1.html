@@ -1424,6 +1424,42 @@ function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString("ru-RU
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
 function nowISO(){ return new Date().toISOString(); }
 
+function categoryLabel(catId) {
+  const c = CATEGORIES.find(c => c.id === catId);
+  return c ? c.name : 'Проект';
+}
+
+function roleLabel(role) {
+  if (role === 'VOLUNTEER') return 'Волонтёр';
+  if (role === 'ORGANIZER') return 'Организатор';
+  if (role === 'ADMIN') return 'Администратор';
+  return role || '';
+}
+
+function performLogout(message) {
+  try {
+    localStorage.removeItem('authToken');
+  } catch (e) {}
+  authToken = null;
+  if (state && state.session) {
+    state.session.userId = null;
+    saveState();
+  }
+  toast('warn', 'Сессия завершена', message || 'Пожалуйста, войдите снова');
+  navigate('/');
+  renderApp();
+}
+
+function handleAuthResponse(res, data) {
+  if (res.status === 401 || res.status === 403) {
+    const msg = (data && data.message) || '';
+    // Любая ошибка авторизации/истечения токена ведёт к выходу
+    performLogout(msg || 'Авторизация недействительна или истекла');
+    return false;
+  }
+  return true;
+}
+
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY); // [file:87]
@@ -1819,7 +1855,7 @@ function openProjectModal(id) {
 
       <div class="modal-body-content" style="padding: 40px; background: #fff;">
         <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-           <span class="tag">#${p.categoryId || 'Общее'}</span>
+           <span class="tag">${esc(categoryLabel(p.categoryId))}</span>
            <span class="tag" style="background: #fef3c7; color: #92400e;">📍 ${p.city || 'Минск'}</span>
         </div>
 
@@ -2433,7 +2469,7 @@ function renderProjects(){
         <div class="section-title">
           <h2>Каталог проектов</h2>
           <div style="display:flex; gap:12px; align-items:center;">
-            <small>${u ? `Вы: ${esc(u.name)} (${esc(u.role)})` : "Гость"}</small>
+            <small>${u ? `Вы: ${esc(u.name)} (${esc(roleLabel(u.role))})` : "Гость"}</small>
             ${u && u.role === "ORGANIZER" ? `<button class="btn secondary" id="btnCreateProject">Создать новый проект</button>` : ""}
           </div>
         </div>
@@ -2470,7 +2506,6 @@ function renderProjects(){
             </div>
 
             <div class="hr"></div>
-            <div class="hint">Демо‑данные сохраняются в localStorage.</div>
           </aside>
 
           <section>
@@ -2524,13 +2559,38 @@ function openCreateProjectModal() {
       <div class="modal-body-content" style="padding: 32px; background: #fff;">
         <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--text);">Создать новый проект</h2>
         <form id="createProjectForm">
+          <div class="two">
+            <div class="field">
+              <label>Категория</label>
+              <select name="categoryId" required>
+                <option value="" selected disabled>Выберите категорию…</option>
+                ${CATEGORIES.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Формат</label>
+              <select name="format" required>
+                <option value="" selected disabled>Выберите формат…</option>
+                ${FORMATS.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="two">
+            <div class="field">
+              <label>Регион</label>
+              <select name="region" required>
+                <option value="" selected disabled>Выберите регион…</option>
+                ${REGIONS.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Город</label>
+              <input name="city" placeholder="Например, Минск" required />
+            </div>
+          </div>
           <div class="field">
             <label>Название проекта</label>
             <input name="title" required placeholder="Например, Сбор вещей для приюта" />
-          </div>
-          <div class="field">
-            <label>Город (необязательно)</label>
-            <input name="city" placeholder="Например, Минск" />
           </div>
           <div class="field">
             <label>Описание</label>
@@ -2575,6 +2635,7 @@ function openCreateProjectModal() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
+        if (!handleAuthResponse(res, data)) return;
         toast("danger", "Ошибка", data.message || "Не удалось создать проект");
         return;
       }
@@ -3203,6 +3264,7 @@ async function renderCabinet() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          if (!handleAuthResponse(res, data)) return;
           toast('danger', 'Ошибка', data.message || 'Не удалось загрузить аватар');
           return;
         }
@@ -3253,6 +3315,7 @@ window.handleUpdateProfile = async function(form) {
         console.log('📥 Ответ сервера:', data);
 
         if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
             toast('danger', 'Ошибка', data.message || 'Не удалось обновить');
             return;
         }
@@ -3356,8 +3419,8 @@ async function loadServerSession() {
             state.session.userId = data.user.id;
             saveState();
         } else {
-            localStorage.removeItem('authToken');
-            authToken = null;
+            const data = await res.json().catch(() => ({}));
+            handleAuthResponse(res, data);
         }
     } catch (err) {
         console.error('Ошибка загрузки сессии:', err);
@@ -3395,7 +3458,10 @@ async function loadApplicationsFromServer() {
             }
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) return;
+        if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
+            return;
+        }
 
         state.applications = data.applications || state.applications || [];
 
