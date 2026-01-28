@@ -27,8 +27,9 @@ const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
     : ['*']; // По умолчанию разрешаем все (для разработки)
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Увеличиваем лимит тела запроса, чтобы поддерживать небольшие base64‑картинки
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: false, limit: '5mb' }));
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin))) {
@@ -293,6 +294,14 @@ function requireOrganizer(req, res, next) {
     next();
 }
 
+// Хелпер для проверки роли администратора
+function requireAdmin(req, res, next) {
+    if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Доступ только для администраторов' });
+    }
+    next();
+}
+
 function canManageProject(user, project) {
     if (!user || !project) return false;
     if (user.role === 'ADMIN') return true;
@@ -331,6 +340,7 @@ app.get('/api/projects', async (req, res) => {
         }
 
         const projectsCollection = db.collection('projects');
+        const usersCollection = db.collection('users');
         const docs = await projectsCollection
             .find({ status: { $ne: 'DELETED' } })
             .sort({ createdAt: -1 })
@@ -369,6 +379,7 @@ app.post(
             }
 
             const projectsCollection = db.collection('projects');
+            const usersCollection = db.collection('users');
 
             const imageUrl = req.file
                 ? `/uploads/projects/${req.file.filename}`
@@ -394,6 +405,12 @@ app.post(
             const result = await projectsCollection.insertOne(doc);
             const created = await projectsCollection.findOne({ _id: result.insertedId });
 
+            // XP за создание проекта (только организатор/админ, но значение считаем одинаковым)
+            await usersCollection.updateOne(
+                { _id: new ObjectId(req.user.userId) },
+                { $inc: { points: 25 } }
+            );
+
             res.status(201).json({
                 message: 'Проект создан',
                 project: mapProjectForClient(created)
@@ -416,6 +433,7 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
         }
 
         const projectsCollection = db.collection('projects');
+        const usersCollection = db.collection('users');
         const applicationsCollection = db.collection('project_applications');
 
         const project = await projectsCollection.findOne({ _id: new ObjectId(projectId), status: { $ne: 'DELETED' } });
@@ -429,9 +447,10 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
         }
 
         // Проверка на уникальность отклика
+        const userObjectId = new ObjectId(req.user.userId);
         const existing = await applicationsCollection.findOne({
             projectId: project._id,
-            userId: new ObjectId(req.user.userId),
+            userId: { $in: [userObjectId, req.user.userId] },
             status: { $ne: 'CANCELLED' }
         });
 
@@ -455,9 +474,17 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
 
         const insertResult = await applicationsCollection.insertOne(appDoc);
 
+        // увеличиваем счётчик откликов
         await projectsCollection.updateOne(
             { _id: project._id },
             { $inc: { responsesCount: 1 } }
+        );
+
+        // XP за отклик
+        const xpDelta = req.user.role === 'ORGANIZER' ? 15 : 10; // организатор чуть больше
+        await usersCollection.updateOne(
+            { _id: new ObjectId(req.user.userId) },
+            { $inc: { points: xpDelta } }
         );
 
         res.status(201).json({
@@ -487,9 +514,12 @@ app.get('/api/my/applications', authMiddleware, async (req, res) => {
         const applicationsCollection = db.collection('project_applications');
         const projectsCollection = db.collection('projects');
 
+        const userObjectId = new ObjectId(req.user.userId);
+
+        // Поддерживаем как старые записи с userId-строкой, так и новые с ObjectId
         const apps = await applicationsCollection
             .find({
-                userId: new ObjectId(req.user.userId),
+                userId: { $in: [userObjectId, req.user.userId] },
                 status: { $ne: 'CANCELLED' }
             })
             .sort({ createdAt: -1 })
@@ -533,10 +563,17 @@ app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
 
         const applicationsCollection = db.collection('project_applications');
         const projectsCollection = db.collection('projects');
+        const usersCollection = db.collection('users');
 
+        const userObjectId = new ObjectId(req.user.userId);
+
+        // Ищем отклик, учитывая как ObjectId, так и строковый userId из старых записей
         const appDoc = await applicationsCollection.findOne({
             _id: new ObjectId(appId),
-            userId: new ObjectId(req.user.userId)
+            $or: [
+                { userId: userObjectId },
+                { userId: req.user.userId }
+            ]
         });
 
         if (!appDoc) {
@@ -556,6 +593,13 @@ app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
         await projectsCollection.updateOne(
             { _id: appDoc.projectId },
             { $inc: { responsesCount: -1 } }
+        );
+
+        // Снимаем XP за отменённый отклик
+        const xpDelta = appDoc.userRole === 'ORGANIZER' ? -15 : -10;
+        await usersCollection.updateOne(
+            { _id: new ObjectId(req.user.userId) },
+            { $inc: { points: xpDelta } }
         );
 
         res.json({ message: 'Отклик отменён' });
@@ -729,12 +773,24 @@ app.post('/api/projects/:id/delete', authMiddleware, async (req, res) => {
             return res.status(403).json({ message: 'Нет прав для удаления этого проекта' });
         }
 
+        // Определяем, кто инициатор
+        const isAdmin = req.user.role === 'ADMIN';
+        const ownerId = project.ownerUserId ? project.ownerUserId.toString() : null;
+
         // Физически удаляем проект из базы данных
         await projectsCollection.deleteOne({ _id: project._id });
         
         // Также удаляем все связанные отклики на этот проект
         const applicationsCollection = db.collection('project_applications');
         await applicationsCollection.deleteMany({ projectId: project._id });
+
+        // Если проект удалил сам организатор (не админ) — штрафуем его по XP
+        if (!isAdmin && ownerId) {
+            await usersCollection.updateOne(
+                { _id: new ObjectId(ownerId) },
+                { $inc: { points: -25 } }
+            );
+        }
 
         res.json({ message: 'Проект удалён' });
     } catch (err) {
@@ -978,6 +1034,334 @@ app.post('/refresh', async (req, res) => {
             return res.status(401).json({ message: 'Refresh token истёк' });
         }
         return res.status(401).json({ message: 'Неверный refresh token' });
+    }
+});
+
+// === НОВОСТИ (API) ===
+
+function mapNewsForClient(doc) {
+    return {
+        id: doc._id.toString(),
+        title: doc.title,
+        text: doc.text,
+        image: doc.imageUrl || '',
+        date: doc.createdAt
+            ? new Date(doc.createdAt).toLocaleDateString('ru-RU')
+            : new Date().toLocaleDateString('ru-RU'),
+        authorId: doc.authorId ? doc.authorId.toString() : null,
+        authorName: doc.authorName || 'Автор'
+    };
+}
+
+app.get('/api/news', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const newsCollection = db.collection('news');
+        const docs = await newsCollection
+            .find({})
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.json({ news: docs.map(mapNewsForClient) });
+    } catch (err) {
+        console.error('❌ Ошибка получения новостей:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.post('/api/news', authMiddleware, requireAdmin, async (req, res) => {
+    const { title, text, image } = req.body || {};
+
+    if (!title || !text) {
+        return res.status(400).json({ message: 'Заголовок и текст новости обязательны' });
+    }
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const usersCollection = db.collection('users');
+        const newsCollection = db.collection('news');
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user.userId) });
+        if (!user) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+
+        const doc = {
+            title: String(title).trim(),
+            text: String(text).trim(),
+            imageUrl: typeof image === 'string' ? image : '',
+            authorId: user._id,
+            authorName: user.name || user.email || 'Автор',
+            createdAt: new Date()
+        };
+
+        const result = await newsCollection.insertOne(doc);
+        const created = await newsCollection.findOne({ _id: result.insertedId });
+
+        res.status(201).json({
+            message: 'Новость создана',
+            news: mapNewsForClient(created)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка создания новости:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.delete('/api/news/:id', authMiddleware, async (req, res) => {
+    const newsId = req.params.id;
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const newsCollection = db.collection('news');
+        const doc = await newsCollection.findOne({ _id: new ObjectId(newsId) });
+        if (!doc) {
+            return res.status(404).json({ message: 'Новость не найдена' });
+        }
+
+        // Удалять может автор или администратор
+        if (
+            req.user.role !== 'ADMIN' &&
+            (!doc.authorId || doc.authorId.toString() !== req.user.userId)
+        ) {
+            return res.status(403).json({ message: 'Нет прав для удаления этой новости' });
+        }
+
+        await newsCollection.deleteOne({ _id: doc._id });
+        res.json({ message: 'Новость удалена' });
+    } catch (err) {
+        console.error('❌ Ошибка удаления новости:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// === СООБЩЕСТВО (API) ===
+
+function mapCommunityPostForClient(doc) {
+    return {
+        id: doc._id.toString(),
+        userId: doc.userId ? doc.userId.toString() : null,
+        userName: doc.userName || 'Пользователь',
+        userAvatar: doc.userAvatar || '',
+        text: doc.text || '',
+        media: doc.media || null,
+        date:
+            doc.createdAt &&
+            new Date(doc.createdAt).toLocaleString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: 'numeric',
+                month: 'short'
+            }),
+        likes: doc.likes || [],
+        comments: (doc.comments || []).map(c => ({
+            userId: c.userId ? c.userId.toString() : null,
+            userName: c.userName || 'Пользователь',
+            userAvatar: c.userAvatar || '',
+            text: c.text || '',
+            date: c.createdAt ? new Date(c.createdAt).getTime() : Date.now()
+        }))
+    };
+}
+
+app.get('/api/community/posts', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const postsCollection = db.collection('community_posts');
+        const docs = await postsCollection
+            .find({})
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        res.json({ posts: docs.map(mapCommunityPostForClient) });
+    } catch (err) {
+        console.error('❌ Ошибка получения постов сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.post('/api/community/posts', authMiddleware, async (req, res) => {
+    const { text, media } = req.body || {};
+
+    if (!text && (!media || !media.src)) {
+        return res.status(400).json({ message: 'Пост не может быть пустым' });
+    }
+
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const usersCollection = db.collection('users');
+        const postsCollection = db.collection('community_posts');
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user.userId) });
+        if (!user) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+
+        const doc = {
+            userId: user._id,
+            userName: user.name || user.email || 'Пользователь',
+            userAvatar: user.avatarUrl || '',
+            text: String(text || '').trim(),
+            media: media || null,
+            createdAt: new Date(),
+            likes: [],
+            comments: []
+        };
+
+        const result = await postsCollection.insertOne(doc);
+        const created = await postsCollection.findOne({ _id: result.insertedId });
+
+        res.status(201).json({
+            message: 'Пост создан',
+            post: mapCommunityPostForClient(created)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка создания поста сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.post('/api/community/posts/:id/like', authMiddleware, async (req, res) => {
+    const postId = req.params.id;
+
+    try {
+        if (!ObjectId.isValid(postId)) {
+            return res.status(400).json({ message: 'Некорректный идентификатор поста' });
+        }
+
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const postsCollection = db.collection('community_posts');
+        const post = await postsCollection.findOne({ _id: new ObjectId(postId) });
+        if (!post) {
+            return res.status(404).json({ message: 'Пост не найден' });
+        }
+
+        const userId = req.user.userId;
+        const hasLike = (post.likes || []).some(id => id.toString() === userId);
+
+        await postsCollection.updateOne(
+            { _id: post._id },
+            hasLike
+                ? { $pull: { likes: new ObjectId(userId) } }
+                : { $addToSet: { likes: new ObjectId(userId) } }
+        );
+
+        const updated = await postsCollection.findOne({ _id: post._id });
+        res.json({
+            message: hasLike ? 'Лайк удалён' : 'Лайк добавлен',
+            post: mapCommunityPostForClient(updated)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка лайка поста сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.post('/api/community/posts/:id/comment', authMiddleware, async (req, res) => {
+    const postId = req.params.id;
+    const { text } = req.body || {};
+
+    if (!text) {
+        return res.status(400).json({ message: 'Текст комментария обязателен' });
+    }
+
+    try {
+        if (!ObjectId.isValid(postId)) {
+            return res.status(400).json({ message: 'Некорректный идентификатор поста' });
+        }
+
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const usersCollection = db.collection('users');
+        const postsCollection = db.collection('community_posts');
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(req.user.userId) });
+        if (!user) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+
+        const comment = {
+            userId: user._id,
+            userName: user.name || user.email || 'Пользователь',
+            userAvatar: user.avatarUrl || '',
+            text: String(text).trim(),
+            createdAt: new Date()
+        };
+
+        await postsCollection.updateOne(
+            { _id: new ObjectId(postId) },
+            { $push: { comments: comment } }
+        );
+
+        const updated = await postsCollection.findOne({ _id: new ObjectId(postId) });
+        res.status(201).json({
+            message: 'Комментарий добавлен',
+            post: mapCommunityPostForClient(updated)
+        });
+    } catch (err) {
+        console.error('❌ Ошибка добавления комментария к посту сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+app.delete('/api/community/posts/:id', authMiddleware, async (req, res) => {
+    const postId = req.params.id;
+
+    try {
+        if (!ObjectId.isValid(postId)) {
+            return res.status(400).json({ message: 'Некорректный идентификатор поста' });
+        }
+
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const postsCollection = db.collection('community_posts');
+        const post = await postsCollection.findOne({ _id: new ObjectId(postId) });
+        if (!post) {
+            return res.status(404).json({ message: 'Пост не найден' });
+        }
+
+        if (
+            req.user.role !== 'ADMIN' &&
+            (!post.userId || post.userId.toString() !== req.user.userId)
+        ) {
+            return res.status(403).json({ message: 'Нет прав для удаления этого поста' });
+        }
+
+        await postsCollection.deleteOne({ _id: post._id });
+        res.json({ message: 'Пост удалён' });
+    } catch (err) {
+        console.error('❌ Ошибка удаления поста сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
     }
 });
 

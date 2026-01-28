@@ -1563,7 +1563,7 @@ window.openProjectEditModal = function(projectId) {
 
   const html = `
     <div class="modal-modern">
-      <div class="modal-body-content" style="padding: 32px; background: #fff; max-width: 720px;">
+      <div class="modal-body-content" style="padding: 32px; background: #fff; max-width: 720px; margin: 0 auto;">
         <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 20px; color: var(--text);">Редактирование проекта</h2>
         <form id="editProjectForm">
           <div class="two">
@@ -2024,6 +2024,14 @@ function seed(){
 let state = loadState();
 if(!state){ state = seed(); saveState(); }
 
+// Миграция: вычищаем старые локальные посты сообщества и новости,
+// чтобы не конфликтовать с данными из базы
+if (!state) {
+  state = { users: [], projects: [], news: [], stories: [], applications: [], messages: [], session: { userId: null } };
+}
+state.posts = [];
+
+
 function currentUser(){ return state.users.find(u=>u.id===state.session.userId) || null; }
 function requireAuth(){ if(!currentUser()){ openAuthModal(); return false; } return true; }
 
@@ -2085,6 +2093,20 @@ function projectCard(p, context = 'default', statusText = '') {
     const total = p.capacity || 1;
     const current = p.approved || 0;
     const progress = Math.min(Math.round((current / total) * 100), 100);
+
+    // 3.1 Человекочитаемый статус
+    let statusLabel = '';
+    if (typeof statusText === 'string' && statusText.trim()) {
+        statusLabel = statusText;
+    } else if (p.status === 'CLOSED') {
+        statusLabel = 'Набор завершён';
+    } else if (p.status === 'PUBLISHED' || !p.status) {
+        statusLabel = 'Открыт';
+    } else if (p.status === 'DELETED') {
+        statusLabel = 'Удалён';
+    } else if (p.status) {
+        statusLabel = String(p.status);
+    }
 
     // Категория
     const catName = (state.categories || []).find(c => c.id === p.categoryId)?.name || "Проект";
@@ -2196,7 +2218,7 @@ function projectCard(p, context = 'default', statusText = '') {
           <span style="color: var(--text);">👥 ${current} / ${total}</span>
           <span style="color: var(--blue);">${progress}%</span>
         </div>
-        ${statusText ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); overflow: hidden;"><span class="catbadge" style="display: inline-block; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; white-space: normal;">${esc(statusText)}</span></div>` : ''}
+        ${statusLabel ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); overflow: hidden;"><span class="catbadge" style="display: inline-block; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; white-space: normal;">${esc(statusLabel)}</span></div>` : ''}
       </div>
     </div>`;
 }
@@ -2721,7 +2743,7 @@ function renderHome(){
   const kpiStories = state.stories ? state.stories.length : 0;
 
   const preview = published.slice(0, 6);
-  const latestNews = state.news ? [...state.news].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 3) : [];
+  const latestNews = state.news ? [...state.news].slice(0, 3) : [];
 
   const catDesc = {
     elderly: "Помощь пожилым: доставка продуктов, общение и бытовая поддержка.",
@@ -2866,7 +2888,7 @@ function renderHome(){
         <section style="margin-bottom: 100px;">
           <h2 style="font-size: 32px; font-weight: 850; margin-bottom: 30px;">Новости и события</h2>
           <div id="homeNews" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
-            ${(state.news || []).slice(0, 3).map(n => `
+            ${(latestNews || []).map(n => `
               <div class="news-card" onclick="openFullNewsModal('${n.id}')" style="background: #fff; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: 0.3s; position: relative;">
                 <div style="height: 180px; overflow: hidden;">
                   <img src="${n.image || 'images/img1.png'}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='images/img1.png'">
@@ -2998,7 +3020,7 @@ function renderProjects(){
               </select>
             </div>
             <div class="field">
-              <label>Регион</label>
+              <label>Область</label>
               <select id="fRegion">
                 <option value="">Любой</option>
                 ${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}
@@ -3433,17 +3455,37 @@ function renderTickets(){
 /* === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ГЕЙМИФИКАЦИИ === */
 
 function calcLevel(points) {
-  const step = 100;
-  const lvl = Math.floor((points || 0) / step) + 1;
-  const currentLvlPoints = (points || 0) % step;
-  const percent = (currentLvlPoints / step) * 100;
+  const pts = Math.max(0, points || 0);
 
-  let name = "Новичок";
-  if (lvl >= 5) name = "Активист";
-  if (lvl >= 10) name = "Герой";
-  if (lvl >= 20) name = "Мастер добра";
+  // 10 чётких ступеней
+  const LEVELS = [
+    { min:   0, name: "Новичок" },
+    { min:  50, name: "Помощник" },
+    { min: 100, name: "Участник" },
+    { min: 200, name: "Соратник" },
+    { min: 300, name: "Активист" },
+    { min: 450, name: "Надёжное плечо" },
+    { min: 650, name: "Сердце команды" },
+    { min: 900, name: "Герой города" },
+    { min:1200, name: "Мастер добра" },
+    { min:1600, name: "Легенда сообщества" }
+  ];
 
-  return { name, level: lvl, next: lvl * step, percent };
+  let current = LEVELS[0];
+  for (const lvl of LEVELS) {
+    if (pts >= lvl.min) current = lvl;
+  }
+
+  const currentIndex = LEVELS.indexOf(current);
+  const next = LEVELS[currentIndex + 1] || null;
+
+  const from = current.min;
+  const to = next ? next.min : from + 400; // бесконечный последний уровень
+  const span = to - from;
+  const inside = Math.min(Math.max(pts - from, 0), span);
+  const percent = span > 0 ? (inside / span) * 100 : 100;
+
+  return { name: current.name, level: currentIndex + 1, next: to, percent };
 }
 
 function getUserBadges(user) {
@@ -3736,7 +3778,14 @@ async function renderCabinet() {
           <div class="stats-grid" style="margin-bottom:24px">
             <div class="stat-card"><div class="stat-val">${u.points || 0}</div><div class="stat-lbl">Опыт</div></div>
             <div class="stat-card"><div class="stat-val">${myApps.length}</div><div class="stat-lbl">Заявки</div></div>
-            <div class="stat-card"><div class="stat-val">${finishedCount}</div><div class="stat-lbl">Проекты</div></div>
+            <div class="stat-card">
+              <div class="stat-val">
+                ${(u.role === 'ORGANIZER' || u.role === 'ADMIN') ? myManagedProjects.length : finishedCount}
+              </div>
+              <div class="stat-lbl">
+                ${(u.role === 'ORGANIZER' || u.role === 'ADMIN') ? 'Создано проектов' : 'Проекты'}
+              </div>
+            </div>
           </div>
 
           <div class="card" style="margin-bottom:24px">
@@ -3751,7 +3800,7 @@ async function renderCabinet() {
                     ${projectCard(p, 'cabinet', status)}
                   </div>
                 `;
-              }).join("") : `<div class="muted">У вас пока нет активных откликов.</div>`}
+              }).join("") : `<div class="muted">У вас пока нет откликов на проекты.</div>`}
             </div>
           </div>
 
@@ -3983,38 +4032,46 @@ window.openCreateNewsModal = function() {
 
 window.saveAdminNews = function() {
     const u = currentUser();
-    if (!u) return toast("error", "Ошибка", "Нужно войти в аккаунт");
-
     const title = $('#newsInpTitle').value.trim();
     const text = $('#newsInpText').value.trim();
 
-    if (!title || !text) {
-        toast("error", "Ошибка", "Заполните заголовок и текст");
-        return;
-    }
+    if (!title || !text) return toast("error", "Ошибка", "Заполните все поля");
+    if (!authToken) return toast("error", "Ошибка", "Нужно войти в аккаунт");
 
-    // Если фото не выбрали, ставим заглушку
-    const finalImage = currentNewsImage || 'images/news.avif';
+    (async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/news`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    title,
+                    text,
+                    image: currentNewsImage || 'images/news.avif'
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                if (!handleAuthResponse(res, data)) return;
+                toast("danger", "Ошибка", data.message || "Не удалось создать новость");
+                return;
+            }
 
-    if (!state.news) state.news = [];
+            if (!state.news) state.news = [];
+            if (data.news) {
+                state.news.unshift(data.news);
+            }
 
-    state.news.unshift({
-        id: 'n-' + Date.now(),
-        title: title,
-        image: finalImage,
-        text: text,
-        excerpt: text.substring(0, 100) + '...', // Создаем короткое описание
-        date: new Date().toISOString(),
-        authorName: u.name,
-        authorId: u.id,
-        likes: 0,
-        comments: []
-    });
-
-    saveState();
-    closeModal();
-    renderNews();
-    toast("ok", "Готово", "Новость опубликована!");
+            closeModal();
+            renderNews();
+            toast("ok", "Успех", "Новость опубликована");
+        } catch (err) {
+            console.error("❌ Ошибка создания новости:", err);
+            toast("danger", "Ошибка", "Сервер недоступен");
+        }
+    })();
 };
 
 function renderApp(){
@@ -4022,7 +4079,15 @@ function renderApp(){
   const rawPath = location.pathname || "/";
   const path = rawPath === "/" ? "/" : rawPath.replace(/\/+$/,""); // срежем лишний /
   const fn = routes[path] || renderHome;
-  fn();
+
+  // При переходе на страницы, завязанные на бэкенд, заранее подгружаем данные
+  if (path === "/news" && typeof loadNewsFromServer === "function") {
+    loadNewsFromServer().then(() => fn()).catch(() => fn());
+  } else if (path === "/community" && typeof loadCommunityFromServer === "function") {
+    loadCommunityFromServer().then(() => fn()).catch(() => fn());
+  } else {
+    fn();
+  }
   updateScrollBar();
 }
 
@@ -4106,6 +4171,28 @@ async function loadProjectsFromServer() {
         state.projects = data.projects.filter(p => p.status !== 'DELETED');
     } catch (err) {
         console.error('❌ Ошибка загрузки проектов с сервера:', err);
+    }
+}
+
+async function loadNewsFromServer() {
+    try {
+        const res = await fetch(`${API_URL}/api/news`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.news)) return;
+        state.news = data.news;
+    } catch (err) {
+        console.error('❌ Ошибка загрузки новостей с сервера:', err);
+    }
+}
+
+async function loadCommunityFromServer() {
+    try {
+        const res = await fetch(`${API_URL}/api/community/posts`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.posts)) return;
+        state.posts = data.posts;
+    } catch (err) {
+        console.error('❌ Ошибка загрузки постов сообщества с сервера:', err);
     }
 }
 
@@ -4229,67 +4316,152 @@ window.createPost = function() {
     document.getElementById('postText').focus();
 };
 
-window.submitPost = function() {
+window.submitPost = async function() {
     const u = currentUser();
     const text = $('#postText').value.trim();
     if (!text && !tempPostMedia.src) return;
-    if (!state.posts) state.posts = [];
-    state.posts.unshift({
-        id: "post-" + Date.now(),
-        userId: u.id,
-        userName: u.name,
-        userAvatar: u.avatar,
-        text: text,
-        media: tempPostMedia.src ? { ...tempPostMedia } : null,
-        date: new Date().toLocaleString('ru-RU', {hour:'2-digit', minute:'2-digit', day:'numeric', month:'short'}),
-        likes: [],
-        comments: []
-    });
-    saveState();
-    closePostModal();
-    renderCommunity();
+
+    if (!authToken) {
+        toast("error", "Ошибка", "Нужно войти в аккаунт");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/api/community/posts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                text,
+                media: tempPostMedia.src ? { ...tempPostMedia } : null
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
+            toast("danger", "Ошибка", data.message || "Не удалось создать пост");
+            return;
+        }
+
+        if (!state.posts) state.posts = [];
+        if (data.post) {
+            state.posts.unshift(data.post);
+        }
+
+        closePostModal();
+        renderCommunity();
+    } catch (err) {
+        console.error("❌ Ошибка создания поста:", err);
+        toast("danger", "Ошибка", "Сервер недоступен");
+    }
 };
 
-window.deletePost = function(id) {
-    if(confirm("Удалить этот пост?")) {
-        state.posts = state.posts.filter(p => p.id !== id);
-        saveState();
+window.deletePost = async function(id) {
+    if (!confirm("Удалить этот пост?")) return;
+    if (!authToken) {
+        toast("error", "Ошибка", "Нужно войти в аккаунт");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/api/community/posts/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
+            toast("danger", "Ошибка", data.message || "Не удалось удалить пост");
+            return;
+        }
+
+        if (state.posts) {
+            state.posts = state.posts.filter(p => p.id !== id);
+        }
         renderCommunity();
+    } catch (err) {
+        console.error("❌ Ошибка удаления поста:", err);
+        toast("danger", "Ошибка", "Сервер недоступен");
     }
 };
 
 /* === КОММЕНТАРИИ (VK STYLE) === */
-window.vkComment = function(e, postId) {
+window.vkComment = async function(e, postId) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         const text = e.target.value.trim();
         const u = currentUser();
         if (!text || !u) return;
+        if (!authToken) {
+            toast("error", "Ошибка", "Нужно войти в аккаунт");
+            return;
+        }
 
-        const post = state.posts.find(p => p.id === postId);
-        if (!post.comments) post.comments = [];
-        post.comments.push({
-            userId: u.id,
-            userName: u.name,
-            userAvatar: u.avatar,
-            text: text,
-            date: Date.now()
-        });
-        e.target.value = "";
-        saveState();
-        renderCommunity();
+        try {
+            const res = await fetch(`${API_URL}/api/community/posts/${postId}/comment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                if (!handleAuthResponse(res, data)) return;
+                toast("danger", "Ошибка", data.message || "Не удалось добавить комментарий");
+                return;
+            }
+
+            e.target.value = "";
+            // Обновляем локальный стейт постов
+            if (data.post && state.posts) {
+                const idx = state.posts.findIndex(p => p.id === data.post.id);
+                if (idx >= 0) state.posts[idx] = data.post;
+            }
+            renderCommunity();
+        } catch (err) {
+            console.error("❌ Ошибка комментария:", err);
+            toast("danger", "Ошибка", "Сервер недоступен");
+        }
     }
 };
 
-window.toggleLike = function(postId) {
+window.toggleLike = async function(postId) {
     const u = currentUser();
     if (!u) return toast("error", "Ошибка", "Нужна авторизация");
-    const post = state.posts.find(p => p.id === postId);
-    const idx = (post.likes || []).indexOf(u.id);
-    if (idx === -1) post.likes.push(u.id);
-    else post.likes.splice(idx, 1);
-    saveState();
-    renderCommunity();
+    if (!authToken) {
+        toast("error", "Ошибка", "Нужно войти в аккаунт");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/api/community/posts/${postId}/like`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
+            toast("danger", "Ошибка", data.message || "Не удалось изменить лайк");
+            return;
+        }
+
+        if (data.post && state.posts) {
+            const idx = state.posts.findIndex(p => p.id === data.post.id);
+            if (idx >= 0) state.posts[idx] = data.post;
+        }
+        renderCommunity();
+    } catch (err) {
+        console.error("❌ Ошибка лайка:", err);
+        toast("danger", "Ошибка", "Сервер недоступен");
+    }
 };
 
 // Базовая функция для модальных окон
@@ -4316,9 +4488,21 @@ window.closeModal = function() {
 /* === ОСНОВНОЙ РЕНДЕР === */
 function renderCommunity() {
     const u = currentUser();
+
+    // При первом открытии раздела подтягиваем посты сообщества с сервера
+    if (!state._communityLoaded && typeof loadCommunityFromServer === "function") {
+        state._communityLoaded = true;
+        loadCommunityFromServer().then(() => {
+            const path = (location.pathname || "/").replace(/\/+$/,"") || "/";
+            if (path === "/community") {
+                renderCommunity();
+            }
+        }).catch(() => {});
+    }
+
     const allVolunteers = (state.users || []).filter(u => u.role === "VOLUNTEER");
     const top20 = [...allVolunteers].sort((a,b) => (b.points||0) - (a.points||0)).slice(0, 20);
-    const posts = state.posts || [];
+    const posts = Array.isArray(state.posts) ? state.posts : [];
 
     $("#app").innerHTML = `
     <div class="container" style="padding-top: 30px; padding-bottom: 60px;">
@@ -4451,7 +4635,7 @@ function renderNews() {
                 <h1 style="font-size: 28px; margin:0">Новости</h1>
                 <p class="muted">Важные события нашего сообщества</p>
             </div>
-            ${u ? `<button class="btn" onclick="openCreateNewsModal()">+ Создать новость</button>` : ''}
+            ${(u && u.role === 'ADMIN') ? `<button class="btn" onclick="openCreateNewsModal()">+ Создать новость</button>` : ''}
         </div>
 
         <div class="news-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
@@ -4514,14 +4698,30 @@ window.openFullNewsModal = function(id) {
 };
 
 // УДАЛЕНИЕ НОВОСТИ (ИСПРАВЛЕНО)
-window.deleteNewsItem = function(event, newsId) {
+window.deleteNewsItem = async function(event, newsId) {
     if (event) event.stopPropagation();
     if (!confirm("Удалить эту новость?")) return;
+    if (!authToken) return toast("error", "Ошибка", "Нужно войти в аккаунт");
 
-    state.news = (state.news || []).filter(n => n.id !== newsId);
-    saveState();
-    renderNews();
-    toast("ok", "Удалено", "Новость удалена успешно");
+    try {
+        const res = await fetch(`${API_URL}/api/news/${newsId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            if (!handleAuthResponse(res, data)) return;
+            toast("danger", "Ошибка", data.message || "Не удалось удалить новость");
+            return;
+        }
+
+        state.news = (state.news || []).filter(n => n.id !== newsId);
+        renderNews();
+        toast("ok", "Удалено", "Новость удалена успешно");
+    } catch (err) {
+        console.error("❌ Ошибка удаления новости:", err);
+        toast("danger", "Ошибка", "Сервер недоступен");
+    }
 };
 
 // СОЗДАНИЕ НОВОСТИ С ЗАГРУЗКОЙ ПК
@@ -4566,22 +4766,42 @@ window.saveAdminNews = function() {
     const text = $('#newsInpText').value.trim();
 
     if (!title || !text) return toast("error", "Ошибка", "Заполните все поля");
+    if (!authToken) return toast("error", "Ошибка", "Нужно войти в аккаунт");
 
-    if (!state.news) state.news = [];
-    state.news.unshift({
-        id: 'n-' + Date.now(),
-        title: title,
-        image: tempNewsImagePC || 'images/img1.png',
-        text: text,
-        date: new Date().toLocaleDateString('ru-RU'),
-        authorName: u ? u.name : 'Админ',
-        authorId: u ? u.id : 'admin'
-    });
+    (async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/news`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    title,
+                    text,
+                    image: tempNewsImagePC || 'images/img1.png'
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                if (!handleAuthResponse(res, data)) return;
+                toast("danger", "Ошибка", data.message || "Не удалось создать новость");
+                return;
+            }
 
-    saveState();
-    closeModal();
-    renderNews();
-    toast("ok", "Успех", "Новость опубликована");
+            if (!state.news) state.news = [];
+            if (data.news) {
+                state.news.unshift(data.news);
+            }
+
+            closeModal();
+            renderNews();
+            toast("ok", "Успех", "Новость опубликована");
+        } catch (err) {
+            console.error("❌ Ошибка создания новости:", err);
+            toast("danger", "Ошибка", "Сервер недоступен");
+        }
+    })();
 };
 
 function renderAbout() {
