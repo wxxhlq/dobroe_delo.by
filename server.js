@@ -23,7 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Настройка CORS (можно настроить через переменную окружения)
-const allowedOrigins = process.env.CORS_ORIGINS 
+const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
     : ['*']; // По умолчанию разрешаем все (для разработки)
 
@@ -181,12 +181,16 @@ app.post('/register', async (req, res) => {
             points: 0,
             avatarUrl: '',
             privacy: 'public',
+            achievements: [], // Инициализируем пустой массив достижений
             created_at: new Date()
         };
 
         const result = await usersCollection.insertOne(newUser);
 
         console.log('✓ Создан пользователь ID:', result.insertedId);
+
+        // Проверяем достижения для нового пользователя
+        await checkAchievements(result.insertedId.toString());
 
         const token = generateAccessToken({ _id: result.insertedId, email: newUser.email, role: newUser.role });
         const refreshToken = generateRefreshToken({ userId: result.insertedId });
@@ -487,6 +491,9 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
             { $inc: { points: xpDelta } }
         );
 
+        // Проверяем достижения после получения XP
+        await checkAchievements(req.user.userId);
+
         res.status(201).json({
             message: 'Отклик сохранён',
             application: {
@@ -529,8 +536,8 @@ app.get('/api/my/applications', authMiddleware, async (req, res) => {
 
         const projects = projectIds.length
             ? await projectsCollection
-                  .find({ _id: { $in: projectIds }, status: { $ne: 'DELETED' } })
-                  .toArray()
+                .find({ _id: { $in: projectIds }, status: { $ne: 'DELETED' } })
+                .toArray()
             : [];
 
         const projectsMap = new Map(projects.map(p => [p._id.toString(), mapProjectForClient(p)]));
@@ -779,7 +786,7 @@ app.post('/api/projects/:id/delete', authMiddleware, async (req, res) => {
 
         // Физически удаляем проект из базы данных
         await projectsCollection.deleteOne({ _id: project._id });
-        
+
         // Также удаляем все связанные отклики на этот проект
         const applicationsCollection = db.collection('project_applications');
         await applicationsCollection.deleteMany({ projectId: project._id });
@@ -1361,6 +1368,285 @@ app.delete('/api/community/posts/:id', authMiddleware, async (req, res) => {
         res.json({ message: 'Пост удалён' });
     } catch (err) {
         console.error('❌ Ошибка удаления поста сообщества:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// === СИСТЕМА ДОСТИЖЕНИЙ ===
+
+// Определение всех доступных достижений
+const ACHIEVEMENTS = [
+    {
+        id: 'reg',
+        name: 'Первый шаг',
+        icon: '🌱',
+        desc: 'Выдаётся каждому участнику за присоединение к сообществу Доброе_дело.by.',
+        xpReward: 10,
+        condition: (user, stats) => true // Всегда разблокировано
+    },
+    {
+        id: 'profile',
+        name: 'В деталях',
+        icon: '📝',
+        desc: 'Заполните город и телефон в профиле, чтобы организаторы могли быстрее связаться с вами.',
+        xpReward: 20,
+        condition: (user, stats) => !!(user.city && user.phone)
+    },
+    {
+        id: 'avatar',
+        name: 'Узнаваемый',
+        icon: '📸',
+        desc: 'Загрузите свой аватар, чтобы другие участники могли вас узнать.',
+        xpReward: 15,
+        condition: (user, stats) => !!(user.avatarUrl && user.avatarUrl.length > 0)
+    },
+    {
+        id: 'first_project',
+        name: 'Новичок',
+        icon: '🎯',
+        desc: 'Откликнитесь на свой первый волонтёрский проект.',
+        xpReward: 25,
+        condition: (user, stats) => stats.completedProjects >= 1
+    },
+    {
+        id: 'hero',
+        name: 'Герой города',
+        icon: '🏙️',
+        desc: 'Успешно завершите 5 волонтерских проектов.',
+        xpReward: 50,
+        condition: (user, stats) => stats.completedProjects >= 5
+    },
+    {
+        id: 'veteran',
+        name: 'Ветеран добра',
+        icon: '🎖️',
+        desc: 'Примите участие в 10 волонтёрских проектах.',
+        xpReward: 100,
+        condition: (user, stats) => stats.completedProjects >= 10
+    },
+    {
+        id: 'legend',
+        name: 'Легенда',
+        icon: '👑',
+        desc: 'Невероятно! Вы участвовали в 25 проектах!',
+        xpReward: 250,
+        condition: (user, stats) => stats.completedProjects >= 25
+    },
+    {
+        id: 'xp_100',
+        name: 'Начинающий',
+        icon: '💫',
+        desc: 'Наберите 100 баллов опыта.',
+        xpReward: 30,
+        condition: (user, stats) => user.points >= 100
+    },
+    {
+        id: 'xp_500',
+        name: 'Звезда добра',
+        icon: '⭐',
+        desc: 'Наберите 500 баллов опыта, помогая другим.',
+        xpReward: 100,
+        condition: (user, stats) => user.points >= 500
+    },
+    {
+        id: 'xp_1000',
+        name: 'Мастер добра',
+        icon: '🌟',
+        desc: 'Достигните 1000 баллов опыта!',
+        xpReward: 200,
+        condition: (user, stats) => user.points >= 1000
+    },
+    {
+        id: 'social',
+        name: 'Общительный',
+        icon: '💬',
+        desc: 'Создайте свой первый пост в сообществе.',
+        xpReward: 20,
+        condition: (user, stats) => stats.postsCreated >= 1
+    },
+    {
+        id: 'influencer',
+        name: 'Лидер мнений',
+        icon: '📢',
+        desc: 'Создайте 5 постов в сообществе.',
+        xpReward: 75,
+        condition: (user, stats) => stats.postsCreated >= 5
+    }
+];
+
+// Функция проверки и разблокировки достижений
+async function checkAchievements(userId) {
+    try {
+        const db = getDB();
+        if (!db) return;
+
+        const usersCollection = db.collection('users');
+        const applicationsCollection = db.collection('project_applications');
+        const postsCollection = db.collection('community_posts');
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (!user) return;
+
+        // Инициализируем массив достижений, если его нет
+        if (!user.achievements) {
+            user.achievements = [];
+        }
+
+        // Получаем статистику пользователя
+        const completedProjects = await applicationsCollection.countDocuments({
+            userId: new ObjectId(userId),
+            status: 'ACTIVE'
+        });
+
+        const postsCreated = await postsCollection.countDocuments({
+            userId: new ObjectId(userId)
+        });
+
+        const stats = { completedProjects, postsCreated };
+
+        let totalXpEarned = 0;
+        const newAchievements = [];
+
+        // Проверяем каждое достижение
+        for (const achievement of ACHIEVEMENTS) {
+            const alreadyUnlocked = user.achievements.some(a => a.id === achievement.id);
+
+            if (!alreadyUnlocked && achievement.condition(user, stats)) {
+                // Разблокируем достижение
+                newAchievements.push({
+                    id: achievement.id,
+                    unlockedAt: new Date()
+                });
+                totalXpEarned += achievement.xpReward;
+                console.log(`✨ Пользователь ${user.name} разблокировал достижение: ${achievement.name}`);
+            }
+        }
+
+        // Обновляем пользователя, если есть новые достижения
+        if (newAchievements.length > 0) {
+            await usersCollection.updateOne(
+                { _id: user._id },
+                {
+                    $push: { achievements: { $each: newAchievements } },
+                    $inc: { points: totalXpEarned }
+                }
+            );
+        }
+
+        return newAchievements;
+    } catch (err) {
+        console.error('❌ Ошибка проверки достижений:', err);
+        return [];
+    }
+}
+
+// === ЭНДПОИНТ ЛИДЕРБОРДА ===
+app.get('/api/community/leaderboard', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const usersCollection = db.collection('users');
+
+        // Получаем топ-20 пользователей по очкам опыта
+        const topUsers = await usersCollection
+            .find({})
+            .sort({ points: -1 })
+            .limit(20)
+            .project({
+                _id: 1,
+                name: 1,
+                avatarUrl: 1,
+                points: 1
+            })
+            .toArray();
+
+        const leaderboard = topUsers.map(user => ({
+            id: user._id.toString(),
+            name: user.name || 'Пользователь',
+            avatarUrl: user.avatarUrl || '',
+            points: user.points || 0
+        }));
+
+        res.json({ leaderboard });
+    } catch (err) {
+        console.error('❌ Ошибка получения лидерборда:', err);
+        res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// === ЭНДПОИНТ ДОСТИЖЕНИЙ ПОЛЬЗОВАТЕЛЯ ===
+app.get('/api/achievements/:userId', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            return res.status(503).json({ message: 'База данных недоступна' });
+        }
+
+        const userId = req.params.userId;
+        if (!ObjectId.isValid(userId)) {
+            return res.status(400).json({ message: 'Некорректный ID пользователя' });
+        }
+
+        const usersCollection = db.collection('users');
+        const applicationsCollection = db.collection('project_applications');
+        const postsCollection = db.collection('community_posts');
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (!user) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+
+        // Получаем статистику
+        const completedProjects = await applicationsCollection.countDocuments({
+            userId: new ObjectId(userId),
+            status: 'ACTIVE'
+        });
+
+        const postsCreated = await postsCollection.countDocuments({
+            userId: new ObjectId(userId)
+        });
+
+        const stats = { completedProjects, postsCreated };
+        const userAchievements = user.achievements || [];
+
+        // Формируем список всех достижений с их статусом
+        const achievementsWithStatus = ACHIEVEMENTS.map(achievement => {
+            const unlocked = userAchievements.some(a => a.id === achievement.id);
+            const unlockedData = userAchievements.find(a => a.id === achievement.id);
+
+            // Вычисляем прогресс
+            let progress = 0;
+            if (achievement.id === 'first_project' || achievement.id === 'hero' || achievement.id === 'veteran' || achievement.id === 'legend') {
+                const targets = { first_project: 1, hero: 5, veteran: 10, legend: 25 };
+                progress = Math.min((stats.completedProjects / (targets[achievement.id] || 1)) * 100, 100);
+            } else if (achievement.id === 'xp_100' || achievement.id === 'xp_500' || achievement.id === 'xp_1000') {
+                const targets = { xp_100: 100, xp_500: 500, xp_1000: 1000 };
+                progress = Math.min(((user.points || 0) / (targets[achievement.id] || 1)) * 100, 100);
+            } else if (achievement.id === 'social' || achievement.id === 'influencer') {
+                const targets = { social: 1, influencer: 5 };
+                progress = Math.min((stats.postsCreated / (targets[achievement.id] || 1)) * 100, 100);
+            } else if (unlocked) {
+                progress = 100;
+            }
+
+            return {
+                id: achievement.id,
+                name: achievement.name,
+                icon: achievement.icon,
+                desc: achievement.desc,
+                xpReward: achievement.xpReward,
+                unlocked,
+                unlockedAt: unlockedData?.unlockedAt || null,
+                progress: Math.round(progress)
+            };
+        });
+
+        res.json({ achievements: achievementsWithStatus });
+    } catch (err) {
+        console.error('❌ Ошибка получения достижений:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
     }
 });
