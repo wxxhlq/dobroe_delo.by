@@ -1310,46 +1310,68 @@
     /* === СТИЛИ ДОСТИЖЕНИЙ === */
     .badges-container {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
       margin-top: 15px;
     }
 
     .badge-item {
       background: var(--surface2);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px 8px;
-      text-align: center;
-      transition: all 0.3s ease;
-      filter: grayscale(1);
-      /* По умолчанию серые */
-      opacity: 0.6;
+      border-radius: 14px;
+      padding: 10px;
+      text-align: left;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
       cursor: pointer;
     }
 
-    .badge-item.unlocked {
-      filter: grayscale(0);
-      /* Цветные, если разблокированы */
-      opacity: 1;
-      background: #fff;
-      border-color: var(--blueSoft);
-      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.08);
+    .badge-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border-color: var(--blue);
+    }
+
+    .badge-item.locked {
+      filter: grayscale(1);
+      opacity: 0.6;
     }
 
     .badge-icon {
-      font-size: 28px;
-      margin-bottom: 6px;
-      display: block;
-      cursor: pointer;
+      font-size: 24px;
+      line-height: 1;
     }
 
     .badge-name {
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--text);
       line-height: 1.2;
-      cursor: pointer;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .badge-item.unlocked::after {
+      content: '✓';
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--blue);
+      color: white;
+      font-size: 8px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      border: 2px solid white;
     }
 
     .badge-modal-overlay {
@@ -3609,13 +3631,15 @@
     /* ===== Pages ===== */
     function renderHome() {
       const u = currentUser();
-      const published = state.projects ? state.projects.filter(p => p.status === "PUBLISHED" && p.status !== "DELETED") : [];
+      // Фильтруем проекты: показываем только PUBLISHED и не DELETED
+      const published = (state.projects || []).filter(p => p.status === "PUBLISHED" && p.status !== "DELETED");
       const kpiProjects = published.length;
       const kpiVols = state.users ? state.users.filter(x => x.role === "VOLUNTEER").length : 0;
       const kpiStories = state.stories ? state.stories.length : 0;
 
       const preview = published.slice(0, 6);
-      const latestNews = state.news ? [...state.news].slice(0, 3) : [];
+      // Фильтруем новости: исключаем удаленные (если у них есть статус)
+      const latestNews = (state.news || []).filter(n => n.status !== "DELETED").slice(0, 3);
 
       const catDesc = {
         elderly: "Помощь пожилым: доставка продуктов, общение и бытовая поддержка.",
@@ -4391,14 +4415,20 @@
     }
 
     function getUserBadges(user) {
+      if (state.serverAchievements && Array.isArray(state.serverAchievements)) {
+        // Если есть данные с сервера, возвращаем их
+        return state.serverAchievements;
+      }
+
       const myApps = state.applications.filter(a => a.userId === user.id && a.status === "APPROVED");
       const points = user.points || 0;
 
+      // Заглушка, если серверные данные еще не подгружены
       return [
-        { id: 'reg', name: 'Первый шаг', icon: '🌱', desc: 'Выдаётся каждому участнику за присоединение к сообществу Доброе_дело.by.', unlocked: true, progress: 100 },
-        { id: 'profile', name: 'В деталях', icon: '📝', desc: 'Заполните город и телефон в профиле, чтобы организаторы могли быстрее связаться с вами.', unlocked: !!(user.city && user.phone), progress: (user.city && user.phone) ? 100 : 50 },
-        { id: 'hero', name: 'Герой города', icon: '🏙️', desc: 'Нужно успешно завершить 5 волонтерских проектов.', unlocked: myApps.length >= 5, progress: Math.min((myApps.length / 5) * 100, 100) },
-        { id: 'star', name: 'Звезда добра', icon: '⭐', desc: 'Наберите 500 баллов опыта (XP), помогая другим.', unlocked: points >= 500, progress: Math.min((points / 500) * 100, 100) }
+        { id: 'reg', name: 'Первый шаг', icon: '🌱', desc: 'За присоединение к нашему сообществу.', unlocked: true, progress: 100 },
+        { id: 'profile', name: 'В деталях', icon: '📝', desc: 'За заполнение профиля.', unlocked: !!(user.city && user.phone), progress: (user.city && user.phone) ? 100 : 50 },
+        { id: 'hero', name: 'Герой города', icon: '🏙️', desc: '5 завершенных проектов.', unlocked: myApps.length >= 5, progress: Math.min((myApps.length / 5) * 100, 100) },
+        { id: 'star', name: 'Звезда добра', icon: '⭐', desc: '500 баллов опыта.', unlocked: points >= 500, progress: Math.min((points / 500) * 100, 100) }
       ];
     }
 
@@ -4593,9 +4623,30 @@
               <div class="progress-container"><div class="progress-fill" style="width:${lvl.percent}%"></div></div>
             </div>
             <div style="margin-top: 24px;">
-              <h4 style="margin-bottom:12px; font-size:14px; color: var(--muted)">Достижения</h4>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h4 style="margin:0; font-size:13px; color: var(--muted);">Достижения</h4>
+                <a href="javascript:void(0)" onclick="window.openAchievementsModal('${u.id}')" style="font-size:12px; color:var(--blue); font-weight:700;">Все →</a>
+              </div>
               <div class="badges-container">
-                ${badges.map(b => `<div class="badge-item ${b.unlocked ? 'unlocked' : ''}" onclick="openBadgeDetails('${b.id}')"><span class="badge-icon">${b.icon}</span><span class="badge-name">${b.name}</span></div>`).join('')}
+                ${(() => {
+          const all = getUserBadges(u);
+          // Сортируем: сначала разблокированные по дате (если есть), потом остальные
+          const sorted = [...all].sort((a, b) => {
+            if (a.unlocked && !b.unlocked) return -1;
+            if (!a.unlocked && b.unlocked) return 1;
+            if (a.unlocked && b.unlocked) {
+              return new Date(b.unlockedAt || 0) - new Date(a.unlockedAt || 0);
+            }
+            return b.progress - a.progress;
+          });
+          // Берем последние 4 (наиболее актуальные)
+          return sorted.slice(0, 4).map(b => `
+                    <div class="badge-item ${b.unlocked ? 'unlocked' : 'locked'}" onclick="openBadgeDetails('${b.id}')" title="${esc(b.desc)}">
+                      <span class="badge-icon">${b.icon}</span>
+                      <span class="badge-name">${b.name}</span>
+                    </div>
+                  `).join('');
+        })()}
               </div>
             </div>
             <div class="hr"></div>
@@ -4664,15 +4715,15 @@
             <div class="section-title"><h2>Мои отклики</h2></div>
             <div class="card-inner" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding:15px">
               ${myApps.length ? myApps.map(a => {
-        const p = projectsById[a.projectId];
-        if (!p) return '';
-        const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
-        return `
+          const p = projectsById[a.projectId];
+          if (!p) return '';
+          const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
+          return `
                   <div>
                     ${projectCard(p, 'cabinet', status)}
                   </div>
                 `;
-      }).join("") : `<div class="muted">У вас пока нет откликов на проекты.</div>`}
+        }).join("") : `<div class="muted">У вас пока нет откликов на проекты.</div>`}
             </div>
           </div>
 
@@ -4681,13 +4732,13 @@
             <div class="section-title"><h2>Мои проекты</h2></div>
             <div class="card-inner" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; padding:15px">
               ${myManagedProjects.length ? myManagedProjects.map(p => {
-        const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
-        return `
+          const status = p.status === 'CLOSED' ? 'Набор завершён' : p.status === 'PUBLISHED' ? 'Открыт' : p.status || '';
+          return `
                   <div>
                     ${projectCard(p, 'cabinet', status)}
                   </div>
                 `;
-      }).join("") : `<div class="muted">У вас пока нет собственных проектов.</div>`}
+        }).join("") : `<div class="muted">У вас пока нет собственных проектов.</div>`}
             </div>
           </div>
           ` : ''}
@@ -4952,7 +5003,16 @@
       const path = rawPath === "/" ? "/" : rawPath.replace(/\/+$/, ""); // срежем лишний /
       const fn = routes[path] || renderHome;
 
-      // При переходе на страницы, завязанные на бэкенд, заранее подгружаем данные
+      // При переходе на любые главные страницы (Главная, Проекты, Новости) подгружаем свежие данные
+      if (path === "/" || path === "") {
+        Promise.all([
+          typeof loadProjectsFromServer === "function" ? loadProjectsFromServer() : Promise.resolve(),
+          typeof loadNewsFromServer === "function" ? loadNewsFromServer() : Promise.resolve()
+        ]).finally(() => fn());
+        return;
+      }
+
+      // При переходе на другие страницы, завязанные на бэкенд, заранее подгружаем данные
       if (path === "/news" && typeof loadNewsFromServer === "function") {
         loadNewsFromServer().then(() => fn()).catch(() => fn());
       } else if (path === "/community" && typeof loadCommunityFromServer === "function") {
@@ -5041,6 +5101,7 @@
         // Если с сервера пришли проекты — подменяем демо-проекты
         // Фильтруем удаленные проекты на клиенте для дополнительной безопасности
         state.projects = data.projects.filter(p => p.status !== 'DELETED');
+        saveState();
       } catch (err) {
         console.error('❌ Ошибка загрузки проектов с сервера:', err);
       }
@@ -5051,7 +5112,8 @@
         const res = await fetch(`${API_URL}/api/news`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !Array.isArray(data.news)) return;
-        state.news = data.news;
+        state.news = data.news.filter(n => n.status !== 'DELETED');
+        saveState();
       } catch (err) {
         console.error('❌ Ошибка загрузки новостей с сервера:', err);
       }
@@ -5092,19 +5154,26 @@
           data.projects.forEach(p => {
             merged[p.id] = { ...(merged[p.id] || {}), ...p };
           });
-          state.projects = Object.values(merged);
+          state.projects = Object.values(merged).filter(p => p.status !== 'DELETED');
         }
+        saveState();
       } catch (err) {
         console.error('❌ Ошибка загрузки откликов из БД:', err);
       }
     }
 
     async function loadLeaderboardFromServer() {
+      console.log("📡 Загрузка лидерборда...");
       try {
         const res = await fetch(`${API_URL}/api/community/leaderboard`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !Array.isArray(data.leaderboard)) return;
+        console.log("📥 Данные лидерборда получены:", data);
+        if (!res.ok || !Array.isArray(data.leaderboard)) {
+          console.error("❌ Некорректный ответ лидерборда", res.status);
+          return;
+        }
         state.leaderboard = data.leaderboard;
+        console.log(`✅ Лидерборд загружен: ${state.leaderboard.length} чел.`);
       } catch (err) {
         console.error('❌ Ошибка загрузки лидерборда с сервера:', err);
       }
@@ -5395,7 +5464,8 @@
         return; // Показываем загрузку
       }
 
-      const top20 = state.leaderboard || [];
+      // Загружаем только топ-20 для отображения в сайдбаре, но оставляем всех в state
+      const top20 = (state.leaderboard || []).slice(0, 20);
       const posts = Array.isArray(state.posts) ? state.posts : [];
 
       $("#app").innerHTML = `
@@ -5412,7 +5482,7 @@
                             <div style="flex:1; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${esc(v.name)}</div>
                             <div style="font-size:11px; color:var(--blue)">${v.points || 0}</div>
                         </div>
-                    `).join('') : '<div class="muted" style="text-align:center; padding:20px;">Загрузка...</div>'}
+                    `).join('') : '<div class="muted" style="text-align:center; padding:20px; font-size: 13px;">В списке пока никого нет.<br>Станьте первым!</div>'}
                 </div>
             </aside>
 
@@ -5507,7 +5577,17 @@
       const q = $("#commSearch").value.toLowerCase();
       const grid = $("#miniSearchGrid");
       if (!q) { grid.innerHTML = ""; return; }
-      const filtered = state.users.filter(u => u.role === "VOLUNTEER" && u.name.toLowerCase().includes(q)).slice(0, 5);
+
+      const allUsers = [...(state.users || [])];
+      if (state.leaderboard) {
+        state.leaderboard.forEach(lu => {
+          if (!allUsers.find(u => u.id === lu.id)) {
+            allUsers.push({ ...lu, role: 'VOLUNTEER' });
+          }
+        });
+      }
+
+      const filtered = allUsers.filter(u => (u.role === "VOLUNTEER" || !u.role) && u.name.toLowerCase().includes(q)).slice(0, 8);
       grid.innerHTML = filtered.map(u => `
         <div class="rank-item" onclick="window.openPublicProfile('${u.id}')" style="display:flex; align-items:center; gap:8px; padding:8px; cursor:pointer; background:var(--bg); border-radius:10px; margin-bottom:5px">
             <img src="${u.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" style="width:24px; height:24px; border-radius:50%">
@@ -5815,11 +5895,168 @@
             });
             // НЕ сохраняем в localStorage!
           }
+
+          // Загружаем достижения при каждом обновлении профиля
+          if (u.id) {
+            try {
+              const achRes = await fetch(`${API_URL}/api/achievements/${u.id}`);
+              const achData = await achRes.json();
+              if (achRes.ok && Array.isArray(achData.achievements)) {
+                state.serverAchievements = achData.achievements;
+              }
+            } catch (achErr) {
+              console.warn('⚠️ Ошибка загрузки достижений для кэша:', achErr);
+            }
+          }
         }
       } catch (err) {
         console.error('❌ Ошибка загрузки из БД:', err);
       }
     }
+
+    // === Просмотр всех достижений ===
+    window.openAchievementsModal = async function (userId) {
+      try {
+        const res = await fetch(`${API_URL}/api/achievements/${userId}`);
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          toast('danger', 'Ошибка', data.message || 'Не удалось загрузить достижения');
+          return;
+        }
+
+        const achievements = data.achievements || [];
+        const unlocked = achievements.filter(a => a.unlocked);
+        const locked = achievements.filter(a => !a.unlocked);
+
+        const html = `
+          <div style="padding: 24px; max-height: 80vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 24px; font-size: 28px; text-align: center;">🏆 Достижения</h2>
+            
+            <div style="margin-bottom: 12px; padding: 12px; background: var(--blueSoft); border-radius: 12px; text-align: center;">
+              <div style="font-size: 14px; color: var(--blue); font-weight: 600;">Разблокировано: ${unlocked.length} из ${achievements.length}</div>
+            </div>
+
+            ${unlocked.length > 0 ? `
+              <h3 style="margin: 20px 0 12px; font-size: 18px; color: var(--blue);">✨ Разблокированные</h3>
+              <div style="display: grid; gap: 12px;">
+                ${unlocked.map(a => `
+                  <div class="achievement-card unlocked" style="padding: 16px; background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%); border-radius: 16px; border: 2px solid #86efac; display: flex; gap: 16px; align-items: start;">
+                    <div style="font-size: 48px; line-height: 1;">${a.icon}</div>
+                    <div style="flex: 1;">
+                      <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #166534;">${esc(a.name)}</div>
+                      <div style="font-size: 13px; color: #15803d; margin-bottom: 8px;">${esc(a.desc)}</div>
+                      <div style="display: flex; gap: 12px; align-items: center;">
+                        <span style="font-size: 12px; background: #86efac; color: #166534; padding: 4px 10px; border-radius: 8px; font-weight: 600;">+${a.xpReward} XP</span>
+                        ${a.unlockedAt ? `<span style="font-size: 11px; color: #15803d;">${new Date(a.unlockedAt).toLocaleDateString('ru-RU')}</span>` : ''}
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            ${locked.length > 0 ? `
+              <h3 style="margin: 24px 0 12px; font-size: 18px; color: var(--muted);">🔒 Заблокированные</h3>
+              <div style="display: grid; gap: 12px;">
+                ${locked.map(a => `
+                  <div class="achievement-card locked" style="padding: 16px; background: var(--surface2); border-radius: 16px; border: 2px solid var(--border); display: flex; gap: 16px; align-items: start; opacity: 0.7;">
+                    <div style="font-size: 48px; line-height: 1; filter: grayscale(1);">${a.icon}</div>
+                    <div style="flex: 1;">
+                      <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">${esc(a.name)}</div>
+                      <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">${esc(a.desc)}</div>
+                      <div style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                          <span style="font-size: 11px; color: var(--muted);">Прогресс</span>
+                          <span style="font-size: 11px; font-weight: 600; color: var(--blue);">${a.progress}%</span>
+                        </div>
+                        <div style="height: 6px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
+                          <div style="width: ${a.progress}%; height: 100%; background: var(--blue); transition: width 0.3s;"></div>
+                        </div>
+                      </div>
+                      <span style="font-size: 12px; background: var(--border); color: var(--muted); padding: 4px 10px; border-radius: 8px; font-weight: 600;">+${a.xpReward} XP</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <button class="btn" style="width: 100%; margin-top: 24px;" onclick="closeModal()">Закрыть</button>
+          </div>
+        `;
+
+        showModal(html);
+      } catch (err) {
+        console.error('❌ Ошибка загрузки достижений:', err);
+        toast('danger', 'Ошибка', 'Не удалось загрузить достижения');
+      }
+    };
+
+    // === Просмотр публичного профиля ===
+    window.openPublicProfile = async function (userId) {
+      try {
+        // Загружаем достижения пользователя
+        const achRes = await fetch(`${API_URL}/api/achievements/${userId}`);
+        const achData = await achRes.json().catch(() => ({}));
+        const achievements = achData.achievements || [];
+        const unlockedAchievements = achievements.filter(a => a.unlocked);
+
+        // Находим пользователя в state (для базовой информации)
+        let user = state.users?.find(u => u.id === userId);
+
+        // Если пользователя нет в state, попробуем найти в лидерборде
+        if (!user && state.leaderboard) {
+          user = state.leaderboard.find(u => u.id === userId);
+        }
+
+        // Если все еще не нашли, пробуем создать минимальный объект из того что есть
+        if (!user) {
+          const lbUser = state.leaderboard?.find(u => u.id === userId);
+          if (lbUser) {
+            user = lbUser;
+          } else {
+            user = { id: userId, name: 'Пользователь', points: 0, avatarUrl: '' };
+          }
+        }
+
+        const html = `
+          <div style="max-height: 80vh; overflow-y: auto;">
+            <div style="background: linear-gradient(135deg, var(--blue), var(--blue2)); padding: 40px 20px; border-radius: 18px 18px 0 0; text-align: center; color: white;">
+              <img src="${user.avatarUrl || user.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" 
+                   style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.3); object-fit: cover; margin-bottom: 15px;">
+              <h2 style="margin:0; font-size: 28px;">${esc(user.name || 'Пользователь')}</h2>
+              <div style="opacity:0.9; font-size:16px; margin-top: 8px;">${user.points || 0} XP</div>
+            </div>
+            
+            <div style="padding: 24px;">
+              <h3 style="margin-bottom: 16px; font-size: 20px;">🏆 Достижения (${unlockedAchievements.length}/${achievements.length})</h3>
+              
+              ${unlockedAchievements.length > 0 ? `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                  ${unlockedAchievements.map(a => `
+                    <div title="${esc(a.name)}: ${esc(a.desc)}" 
+                         style="text-align: center; padding: 12px; background: var(--surface2); border-radius: 12px; cursor: help; transition: transform 0.2s;"
+                         onmouseover="this.style.transform='scale(1.1)'" 
+                         onmouseout="this.style.transform='scale(1)'">
+                      <div style="font-size: 36px;">${a.icon}</div>
+                      <div style="font-size: 10px; margin-top: 4px; font-weight: 600; color: var(--muted);">${esc(a.name)}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : '<div class="muted" style="text-align: center; padding: 20px;">Пока нет разблокированных достижений</div>'}
+
+              <button class="btn secondary" style="width: 100%; margin-bottom: 12px;" onclick="window.openAchievementsModal('${userId}')">Посмотреть все достижения</button>
+              <button class="btn" style="width: 100%;" onclick="closeModal()">Закрыть</button>
+            </div>
+          </div>
+        `;
+
+        showModal(html);
+      } catch (err) {
+        console.error('❌ Ошибка загрузки профиля:', err);
+        toast('danger', 'Ошибка', 'Не удалось загрузить профиль');
+      }
+    };
 
   </script>
 </body>

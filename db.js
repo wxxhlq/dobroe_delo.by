@@ -33,6 +33,12 @@ async function connectDB() {
                     await db.collection('users').createIndex({ username: 1 }, { unique: true });
                     console.log('  ✓ Индекс на username создан');
                 }
+
+                const hasPointsIndex = indexes.some(idx => idx.key.points);
+                if (!hasPointsIndex) {
+                    await db.collection('users').createIndex({ points: -1 });
+                    console.log('  ✓ Индекс на points создан');
+                }
             } catch (indexErr) {
                 // Индексы уже существуют - это нормально
                 console.log('  → Индексы уже существуют');

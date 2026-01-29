@@ -201,6 +201,8 @@ app.post('/register', async (req, res) => {
             userId: result.insertedId,
             token,
             refreshToken,
+            // Проверка достижений (регистрация)
+            achievementCheck: await checkAchievements(result.insertedId),
             user: {
                 id: result.insertedId,
                 username: newUser.username,
@@ -882,6 +884,9 @@ app.put('/me', authMiddleware, async (req, res) => {
             { $set: updateData }
         );
 
+        // Проверяем достижения (например, за заполнение профиля)
+        await checkAchievements(req.user.userId);
+
         const updatedUser = await usersCollection.findOne(
             { _id: new ObjectId(req.user.userId) },
             { projection: { password_hash: 0 } }
@@ -927,6 +932,9 @@ app.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), async (req
             { _id: new ObjectId(req.user.userId) },
             { $set: { avatarUrl } }
         );
+
+        // Проверяем достижения (теперь достижение за аватар засчитается)
+        await checkAchievements(req.user.userId);
 
         return res.json({ avatarUrl });
     } catch (err) {
@@ -1069,7 +1077,7 @@ app.get('/api/news', async (req, res) => {
 
         const newsCollection = db.collection('news');
         const docs = await newsCollection
-            .find({})
+            .find({ status: { $ne: 'DELETED' } })
             .sort({ createdAt: -1 })
             .toArray();
 
@@ -1238,6 +1246,9 @@ app.post('/api/community/posts', authMiddleware, async (req, res) => {
         const result = await postsCollection.insertOne(doc);
         const created = await postsCollection.findOne({ _id: result.insertedId });
 
+        // Проверяем достижения
+        await checkAchievements(req.user.userId);
+
         res.status(201).json({
             message: 'Пост создан',
             post: mapCommunityPostForClient(created)
@@ -1381,7 +1392,7 @@ const ACHIEVEMENTS = [
         name: 'Первый шаг',
         icon: '🌱',
         desc: 'Выдаётся каждому участнику за присоединение к сообществу Доброе_дело.by.',
-        xpReward: 10,
+        xpReward: 0,
         condition: (user, stats) => true // Всегда разблокировано
     },
     {
@@ -1550,25 +1561,22 @@ app.get('/api/community/leaderboard', async (req, res) => {
 
         const usersCollection = db.collection('users');
 
-        // Получаем топ-20 пользователей по очкам опыта
+        // Получаем всех пользователей, сортируем по очкам (те, у кого нет поля, будут внизу)
         const topUsers = await usersCollection
             .find({})
-            .sort({ points: -1 })
-            .limit(20)
-            .project({
-                _id: 1,
-                name: 1,
-                avatarUrl: 1,
-                points: 1
-            })
+            .sort({ points: -1, _id: 1 })
+            .limit(100)
             .toArray();
 
         const leaderboard = topUsers.map(user => ({
             id: user._id.toString(),
-            name: user.name || 'Пользователь',
+            name: user.name || user.username || 'Пользователь',
             avatarUrl: user.avatarUrl || '',
-            points: user.points || 0
+            points: Number(user.points) || 0
         }));
+
+        const totalInDb = await usersCollection.countDocuments();
+        console.log(`📊 Лидерборд: отправлено ${leaderboard.length} пользователей (всего в базе: ${totalInDb})`);
 
         res.json({ leaderboard });
     } catch (err) {
@@ -1658,6 +1666,19 @@ async function startServer() {
         console.log('⏳ Ожидание подключения к MongoDB...');
         await connectDB();
         console.log('✓ База данных готова');
+
+        // Миграция: Проверяем, что у всех пользователей есть поле points
+        const db = getDB();
+        if (db) {
+            const usersCollection = db.collection('users');
+            const result = await usersCollection.updateMany(
+                { points: { $exists: false } },
+                { $set: { points: 0 } }
+            );
+            if (result.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей (добавлено поле points: 0)`);
+            }
+        }
 
         app.listen(PORT, () => {
             console.log(`✓ Server running on http://localhost:${PORT}`);
