@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { getDB, connectDB } = require('./db');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const { ObjectId } = require('mongodb');
 
 // Проверка обязательных переменных окружения
@@ -28,8 +30,12 @@ const allowedOrigins = process.env.CORS_ORIGINS
     : ['*']; // По умолчанию разрешаем все (для разработки)
 
 // Увеличиваем лимит тела запроса, чтобы поддерживать небольшие base64‑картинки
+// 1. Увеличиваем лимит тела запроса, чтобы поддерживать небольшие base64‑картинки и тяжелые логи
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: false, limit: '5mb' }));
+app.use(cors());
+
+// 2. Настройка CORS (разрешаем запросы с других доменов, если нужно)
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin))) {
@@ -43,6 +49,13 @@ app.use((req, res, next) => {
     next();
 });
 
+/** * МОДУЛЬ 2: ИНТЕГРАЦИЯ МАРКЕТИНГОВОГО ТРЕКЕРА
+ * Мы подключаем роуты именно здесь, чтобы они имели доступ к обработанному JSON в req.body
+ */
+const trackingRoutes = require('./routes/tracking');
+app.use('/api/v1/analytics', trackingRoutes);
+
+// 3. Раздача статических файлов (теперь трекер доступен по пути /js/tracker.js)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // === ЗАГРУЗКА ФАЙЛОВ (АВАТАРЫ, ОБЛОЖКИ ПРОЕКТОВ) ===
@@ -1659,15 +1672,22 @@ app.get('/api/achievements/:userId', async (req, res) => {
     }
 });
 
-// === ЗАПУСК СЕРВЕРА ===
+// === ЗАПУСК СЕРВЕРА (ГИБРИДНЫЙ: NATIVE + MONGOOSE) ===
 async function startServer() {
     try {
-        // Ждём подключения к базе данных перед запуском сервера
-        console.log('⏳ Ожидание подключения к MongoDB...');
-        await connectDB();
-        console.log('✓ База данных готова');
+        console.log('⏳ Запуск систем Dobroe Delo...');
 
-        // Миграция: Проверяем, что у всех пользователей есть поле points
+        // 1. Подключаем старый Native Driver (через твой db.js)
+        await connectDB();
+        console.log('✓ База данных (Native Driver) готова');
+
+        // 2. Подключаем Mongoose (специально для маркетинга и аналитики)
+        // Используем MONGODB_URI из твоего .env
+        const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/auth_system';
+        await mongoose.connect(dbUri);
+        console.log('✓ Система аналитики (Mongoose) подключена');
+
+        // 3. Миграция: Проверяем, что у всех пользователей есть поле points
         const db = getDB();
         if (db) {
             const usersCollection = db.collection('users');
@@ -1676,15 +1696,16 @@ async function startServer() {
                 { $set: { points: 0 } }
             );
             if (result.modifiedCount > 0) {
-                console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей (добавлено поле points: 0)`);
+                console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей`);
             }
         }
 
+        // 4. Запуск прослушивания порта
         app.listen(PORT, () => {
-            console.log(`✓ Server running on http://localhost:${PORT}`);
+            console.log(`🚀 Server running on http://localhost:${PORT}`);
         });
     } catch (err) {
-        console.error('❌ Ошибка запуска сервера:', err);
+        console.error('❌ Критическая ошибка при запуске сервера:', err);
         process.exit(1);
     }
 }
