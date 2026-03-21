@@ -3,223 +3,701 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dobroe Delo | Pro-Admin Panel</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Маркетинговый Хаб | Доброе_дело.by</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #4F46E5; --bg: #F3F4F6; --text: #1F2937; --card: #FFFFFF; --sidebar: #111827; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; }
-
-        /* Sidebar */
-        .sidebar { width: 280px; background: var(--sidebar); color: white; height: 100vh; position: fixed; padding: 30px 20px; box-sizing: border-box; display: flex; flex-direction: column; }
-        .sidebar h2 { color: #818CF8; margin-bottom: 5px; font-size: 22px; }
-        .sidebar p { font-size: 12px; color: #9CA3AF; margin-bottom: 30px; }
-        .nav-link { color: #D1D5DB; text-decoration: none; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; display: block; transition: 0.3s; }
-        .nav-link:hover, .nav-link.active { background: #374151; color: white; }
-        .logout-btn { margin-top: auto; width: 100%; padding: 12px; background: #EF4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .logout-btn:hover { background: #DC2626; }
-
-        /* Main Content */
-        .main-content { margin-left: 280px; padding: 40px; width: 100%; box-sizing: border-box; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-        h1 { font-size: 28px; color: #111827; margin: 0; }
-
-        /* KPI Widgets */
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px; }
-        .kpi-card { background: var(--card); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid var(--primary); }
-        .kpi-title { font-size: 13px; color: #6B7280; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
-        .kpi-value { font-size: 32px; font-weight: 800; margin: 10px 0 5px; color: #111827; }
-        .kpi-desc { font-size: 12px; color: #9CA3AF; }
-
-        /* Charts & Tables */
-        .charts-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; }
-        .card-container { background: var(--card); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .card-container h2 { font-size: 18px; margin-top: 0; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
-
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; font-size: 12px; color: #6B7280; text-transform: uppercase; border-bottom: 1px solid #E5E7EB; }
-        td { padding: 15px 12px; border-bottom: 1px solid #F3F4F6; font-size: 14px; }
-        .source-name { font-weight: 600; color: #374151; }
-        .badge { background: #DCFCE7; color: #166534; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0f0f12;
+            color: #e1e4e8;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            background: #1a1a1f;
+            border-right: 1px solid #2a2a30;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .logo {
+            padding: 24px 20px;
+            font-size: 20px;
+            font-weight: 800;
+            border-bottom: 1px solid #2a2a30;
+        }
+        .logo span { color: #4f46e5; }
+        .nav-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #9ca3af;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: #2a2a30;
+            color: #fff;
+            border-left: 3px solid #4f46e5;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .top-bar {
+            padding: 16px 24px;
+            background: #1a1a1f;
+            border-bottom: 1px solid #2a2a30;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .card {
+            background: #1a1a1f;
+            border: 1px solid #2a2a30;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: #1a1a1f;
+            border: 1px solid #2a2a30;
+            border-radius: 20px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+        .kpi-card:hover {
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+        }
+        .kpi-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #9ca3af;
+            letter-spacing: 1px;
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+            margin: 8px 0;
+        }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 24px;
+        }
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 1px solid #2a2a30;
+            font-size: 13px;
+        }
+        th {
+            color: #9ca3af;
+            font-weight: 500;
+        }
+        .badge {
+            background: #4f46e5;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-success { background: #10b981; }
+        .badge-warning { background: #f59e0b; }
+        .badge-danger { background: #ef4444; }
+        .btn {
+            background: #4f46e5;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        .btn:hover { background: #6366f1; }
+        .btn-secondary {
+            background: #2a2a30;
+            border: 1px solid #3a3a42;
+        }
+        .btn-secondary:hover { background: #3a3a42; }
+        .live-feed {
+            height: 500px;
+            overflow-y: auto;
+        }
+        .feed-item {
+            padding: 10px 12px;
+            border-left: 3px solid #4f46e5;
+            background: rgba(79,70,229,0.05);
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 12px;
+        }
+        .feed-item:hover { background: rgba(79,70,229,0.1); }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #1a1a1f;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow: auto;
+            padding: 24px;
+        }
+        select, input, textarea {
+            background: #0f0f12;
+            border: 1px solid #2a2a30;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            width: 100%;
+        }
+        .field { margin-bottom: 16px; }
+        .field label { display: block; margin-bottom: 6px; font-size: 12px; color: #9ca3af; }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .two-columns { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-
 <div class="sidebar">
-    <h2>Dobroe Delo</h2>
-    <p>Метрики эффективности</p>
-
-    <nav>
-        <a href="#" class="nav-link active"><i class="fas fa-chart-line"></i> &nbsp; Дашборд</a>
-        <a href="/index1.html" class="nav-link"><i class="fas fa-home"></i> &nbsp; На главную</a>
-    </nav>
-
-    <button onclick="logout()" class="logout-btn">
-        <i class="fas fa-sign-out-alt"></i> Выйти из системы
-    </button>
+    <div class="logo">Доброе_дело<span>.by</span></div>
+    <div class="nav-item active" data-tab="dashboard">📊 Пульс системы</div>
+    <div class="nav-item" data-tab="userMetrics">🧑‍🤝‍🧑 Пользователи</div>
+    <div class="nav-item" data-tab="projectMetrics">🗂 Проекты</div>
+    <div class="nav-item" data-tab="participationMetrics">🕒 Участие</div>
+    <div class="nav-item" data-tab="qualityMetrics">⭐ Качество</div>
+    <div class="nav-item" data-tab="activityMetrics">📈 Активность</div>
+    <div class="nav-item" data-tab="communicationsMetrics">💬 Коммуникации</div>
+    <div class="nav-item" data-tab="operationalMetrics">🔧 Операционные</div>
+    <div class="nav-item" data-tab="efficiencyMetrics">🎯 Эффективность</div>
+    <div class="nav-item" data-tab="analytics">📈 Аналитика каналов</div>
+    <div class="nav-item" data-tab="segments">🎯 Сегментация</div>
+    <div class="nav-item" data-tab="communications">✉️ Рассылки</div>
+    <div class="nav-item" data-tab="landings">🌐 Лендинги</div>
+    <div class="nav-item" data-tab="abtests">🧪 А/Б тесты</div>
+    <div class="nav-item" data-tab="monitoring">🔧 Мониторинг</div>
+    <div style="flex:1"></div>
+    <div class="nav-item" id="goToMainBtn" style="color:#4f46e5;">🏠 На главную</div>
+    <div class="nav-item" id="logoutBtn" style="color:#ef4444;">🚪 Выйти</div>
 </div>
-
-<div class="main-content">
-    <header>
-        <h1>Центр управления полетами 🚀</h1>
-        <div id="admin-info" style="font-size: 14px; color: #6B7280;"></div>
-    </header>
-
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-title">Волонтеры</div>
-            <div class="kpi-value" id="kpi-volunteers">0</div>
-            <div class="kpi-desc">Всего зарегистрировано</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Конверсия</div>
-            <div class="kpi-value" id="kpi-conversion">0%</div>
-            <div class="kpi-desc">Визит → Регистрация</div>
-        </div>
-        <div class="kpi-card" style="border-left-color: #10B981;">
-            <div class="kpi-title">LTV Индекс</div>
-            <div class="kpi-value" id="kpi-ltv">0</div>
-            <div class="kpi-desc">Ср. задач на волонтера</div>
-        </div>
+<div class="main">
+    <div class="top-bar">
+        <h2 id="pageTitle">Пульс системы</h2>
+        <div>⚡ Маркетинговый хаб</div>
     </div>
-
-    <div class="charts-grid">
-        <div class="card-container">
-            <h2><i class="fas fa-filter" style="color: #6366F1;"></i> Воронка вовлеченности</h2>
-            <div style="height: 300px;">
-                <canvas id="funnelChart"></canvas>
-            </div>
-        </div>
-
-        <div class="card-container">
-            <h2><i class="fas fa-share-nodes" style="color: #EC4899;"></i> Источники трафика</h2>
-            <table>
-                <thead>
-                <tr>
-                    <th>Источник</th>
-                    <th>Визиты</th>
-                    <th>Конверсия</th>
-                </tr>
-                </thead>
-                <tbody id="traffic-body">
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <div class="content" id="content"></div>
 </div>
 
 <script>
-    // 1. JWT Парсер
-    function parseJwt(token) {
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            return JSON.parse(window.atob(base64));
-        } catch (e) { return null; }
-    }
+    const API_BASE = '';
+    let currentTab = 'dashboard';
+    let liveFeedInterval = null;
+    let regChart = null;
 
-    // 2. УСИЛЕННАЯ ПРОВЕРКА ДОСТУПА
-    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-    const localUser = JSON.parse(localStorage.getItem('user') || 'null');
-    const userPayload = token ? parseJwt(token) : null;
-
-    // Проверяем либо через токен, либо через наш "бронебойный" localStorage
-    const isAdmin = (userPayload && userPayload.role === 'ADMIN') || (localUser && localUser.role === 'ADMIN');
-
-    if (!isAdmin) {
-        console.error('Доступ отклонен. Токен роль:', userPayload?.role, 'Local роль:', localUser?.role);
-        alert('Ошибка доступа! У вас нет прав администратора.');
-        window.location.href = '/index1.html';
-    } else {
-        document.getElementById('admin-info').innerText = `Администратор: ${localUser?.email || userPayload?.email || 'System'}`;
-    }
-
-    // 3. Загрузка данных
-    async function initDashboard() {
-        try {
-            const response = await fetch('/api/v1/admin/dashboard-data', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) throw new Error('Ошибка сервера (статус ' + response.status + ')');
-
-            const data = await response.json();
-
-            document.getElementById('kpi-volunteers').innerText = data.kpi.totalVolunteers || 0;
-            document.getElementById('kpi-conversion').innerText = (data.kpi.conversionRate || 0) + '%';
-            document.getElementById('kpi-ltv').innerText = data.kpi.ltv || 0;
-
-            renderFunnel(data.funnel || { visitors: 0, registrations: 0, applications: 0, tasks: 0 });
-            renderTrafficTable(data.trafficSources || []);
-
-        } catch (error) {
-            console.error('Ошибка дашборда:', error);
-            // Если сервер не пускает (403), но мы очень хотим потестить интерфейс -
-            // можно подставить фейковые данные (раскомментируй для демо):
-            /*
-            renderFunnel({ visitors: 1000, registrations: 300, applications: 50, tasks: 20 });
-            renderTrafficTable([{source: 'Direct', views: 500, conversion: 10}]);
-            */
-        }
-    }
-
-    function renderFunnel(funnelData) {
-        const ctx = document.getElementById('funnelChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Посетители', 'Регистрации', 'Отклики', 'Задачи'],
-                datasets: [{
-                    data: [funnelData.visitors, funnelData.registrations, funnelData.applications, funnelData.tasks],
-                    backgroundColor: ['#C7D2FE', '#818CF8', '#4F46E5', '#3730A3'],
-                    borderRadius: 10,
-                    barThickness: 50
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { display: false } },
-                    x: { grid: { display: false } }
-                }
-            }
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
         });
     }
 
-    function renderTrafficTable(sources) {
-        const tbody = document.getElementById('traffic-body');
-        tbody.innerHTML = '';
-
-        if (!sources || sources.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3">Нет данных по трафику</td></tr>';
-            return;
+    async function apiFetch(url, options = {}) {
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        };
+        const res = await fetch(url, { ...options, headers });
+        if (res.status === 401) {
+            logout();
+            throw new Error('Сессия истекла');
         }
-
-        sources.forEach(src => {
-            tbody.innerHTML += `
-                <tr>
-                    <td><span class="source-name">${src.source}</span></td>
-                    <td>${src.views}</td>
-                    <td><span class="badge">${src.conversion}%</span></td>
-                </tr>
-            `;
-        });
+        return res.json();
     }
 
     function logout() {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('authToken');
-        window.location.href = '/index1.html';
+        localStorage.clear();
+        window.location.href = '/';
     }
 
-    initDashboard();
-</script>
+    function goToMain() {
+        window.location.href = '/';
+    }
 
+    function showModal(title, html) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3 style="margin-bottom: 20px;">${title}</h3>
+                ${html}
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn-secondary" onclick="this.closest('.modal').remove()">Закрыть</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    window.openPublicProfile = async function(userId) {
+        try {
+            const data = await apiFetch(`/api/admin/user/${userId}`);
+            if (data.success && data.user) {
+                const u = data.user;
+                showModal('Профиль пользователя', `
+                    <div style="text-align: center;">
+                        <div style="font-size: 64px; margin-bottom: 16px;">👤</div>
+                        <h3>${escapeHtml(u.name || u.email)}</h3>
+                        <p style="color: #9ca3af;">${u.role === 'VOLUNTEER' ? 'Волонтёр' : u.role === 'ORGANIZER' ? 'Организатор' : 'Администратор'}</p>
+                        <div style="text-align: left; margin-top: 20px;">
+                            <p><strong>📧 Email:</strong> ${escapeHtml(u.email || '—')}</p>
+                            <p><strong>📍 Город:</strong> ${escapeHtml(u.city || '—')}</p>
+                            <p><strong>📱 Телефон:</strong> ${escapeHtml(u.phone || '—')}</p>
+                            <p><strong>⭐ Опыт (XP):</strong> ${u.points || 0}</p>
+                            <p><strong>📅 Регистрация:</strong> ${new Date(u.createdAt).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `);
+            } else alert('Не удалось загрузить профиль');
+        } catch (err) { alert('Ошибка загрузки профиля'); }
+    };
+
+    // ===================== ДАШБОРД =====================
+    async function renderDashboard() {
+        document.getElementById('pageTitle').innerText = 'Пульс системы';
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid" id="kpiGrid"></div>
+            <div class="card">
+                <h3>Динамика регистраций</h3>
+                <div style="display: flex; gap: 12px; margin: 16px 0;">
+                    <button class="btn btn-secondary period-btn" data-period="week">Неделя</button>
+                    <button class="btn btn-secondary period-btn" data-period="month">Месяц</button>
+                </div>
+                <div class="chart-container"><canvas id="regChart"></canvas></div>
+            </div>
+            <div class="two-columns">
+                <div class="card"><h3>🔥 Живая активность</h3><div id="liveFeed" class="live-feed">Загрузка...</div></div>
+                <div class="card"><h3>📊 Воронка вовлечения</h3><div id="funnelContainer"></div></div>
+            </div>
+        `;
+
+        const kpi = await apiFetch('/api/admin/dashboard/kpi');
+        if (kpi.success) {
+            document.getElementById('kpiGrid').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Всего волонтёров</div><div class="kpi-value">${kpi.totalVolunteers}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Новые 24ч / 7д</div><div class="kpi-value">${kpi.new24h} / ${kpi.new7d}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Конверсия</div><div class="kpi-value">${kpi.conversion}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">LTV</div><div class="kpi-value">${kpi.ltv}</div></div>
+                <div class="kpi-card"><div class="kpi-title">DAU / WAU / MAU</div><div class="kpi-value">${kpi.dau} / ${kpi.wau} / ${kpi.mau}</div></div>
+            `;
+        }
+
+        async function loadRegistrations(period) {
+            const data = await apiFetch(`/api/admin/dashboard/registrations-timeline?period=${period}`);
+            if (data.success && document.getElementById('regChart')) {
+                const ctx = document.getElementById('regChart').getContext('2d');
+                if (regChart) regChart.destroy();
+                regChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: data.data.map(d => d._id), datasets: [{ label: 'Регистрации', data: data.data.map(d => d.count), borderColor: '#4f46e5', tension: 0.3, fill: true, backgroundColor: 'rgba(79,70,229,0.1)' }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        }
+        loadRegistrations('week');
+        document.querySelectorAll('.period-btn').forEach(btn => btn.addEventListener('click', () => loadRegistrations(btn.dataset.period)));
+
+        async function loadLiveFeed() {
+            const feed = await apiFetch('/api/admin/dashboard/live-feed');
+            if (feed.success) {
+                const container = document.getElementById('liveFeed');
+                if (!container) return;
+                if (!feed.events || feed.events.length === 0) {
+                    container.innerHTML = '<div class="feed-item">Нет событий</div>';
+                    return;
+                }
+                container.innerHTML = feed.events.map(ev => {
+                    const userName = ev.user?.name || ev.user?.email || 'Пользователь';
+                    const userId = ev.user?._id;
+                    const userLink = userId ? `<a href="#" onclick="window.openPublicProfile('${userId}'); return false;" style="color:#4f46e5; font-weight:600;">${escapeHtml(userName)}</a>` : escapeHtml(userName);
+
+                    // Безопасное форматирование даты
+                    let eventDate = 'Дата неизвестна';
+                    if (ev.createdAt) {
+                        try {
+                            const date = new Date(ev.createdAt);
+                            if (!isNaN(date.getTime())) {
+                                eventDate = date.toLocaleString();
+                            } else {
+                                console.warn('Невалидная дата в объекте:', ev.createdAt);
+                            }
+                        } catch (e) {
+                            console.error('Ошибка парсинга даты:', e);
+                        }
+                    } else {
+                        console.warn('Отсутствует createdAt у события:', ev);
+                    }
+
+                    let message = '';
+                    let icon = '🔔';
+                    switch (ev.eventType) {
+                        case 'registration':
+                            icon = '🎉';
+                            message = `${userLink} зарегистрировался`;
+                            break;
+                        case 'project_apply':
+                            icon = '🤝';
+                            message = `${userLink} откликнулся на "${ev.eventData?.projectTitle || 'проект'}"`;
+                            break;
+                        case 'project_apply_cancel':
+                            icon = '🚫';
+                            message = `${userLink} отменил отклик`;
+                            break;
+                        case 'post_created':
+                            icon = '📝';
+                            message = `${userLink} создал пост`;
+                            break;
+                        case 'post_deleted':
+                            icon = '🗑️';
+                            message = `${userLink} удалил пост`;
+                            break;
+                        case 'comment_created':
+                            icon = '💬';
+                            message = `${userLink} оставил комментарий`;
+                            break;
+                        case 'news_created':
+                            icon = '📢';
+                            message = `${userLink} создал новость "${ev.eventData?.newsTitle || ''}"`;
+                            break;
+                        case 'news_deleted':
+                            icon = '⚠️';
+                            message = `${userLink} удалил новость`;
+                            break;
+                        default:
+                            icon = '🔔';
+                            message = `${userLink} ${ev.eventType}`;
+                    }
+                    return `<div class="feed-item">${icon} ${message}<div style="font-size:11px;color:#6b7280;margin-top:4px;">${eventDate}</div></div>`;
+                }).join('');
+            } else {
+                console.error('Failed to load feed', feed.error);
+                document.getElementById('liveFeed').innerHTML = '<div class="feed-item">Ошибка загрузки ленты</div>';
+            }
+        }
+        loadLiveFeed();
+        if (liveFeedInterval) clearInterval(liveFeedInterval);
+        liveFeedInterval = setInterval(loadLiveFeed, 5000);
+
+        const funnel = await apiFetch('/api/admin/analytics/funnel');
+        if (funnel.success) {
+            const max = Math.max(...funnel.funnel.map(s => s.count));
+            document.getElementById('funnelContainer').innerHTML = funnel.funnel.map(step => `
+                <div style="margin-bottom: 16px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${step.name}</span><span style="color:#4f46e5;">${step.count}</span></div>
+                    <div style="background:#2a2a30; border-radius:8px; overflow:hidden;"><div style="width:${max ? (step.count/max*100) : 0}%; background:#4f46e5; height:8px;"></div></div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // ===================== МЕТРИКИ ПОЛЬЗОВАТЕЛЕЙ =====================
+    async function renderUserMetrics() {
+        document.getElementById('pageTitle').innerText = 'Метрики пользователей';
+        const data = await apiFetch('/api/admin/metrics/users');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Всего волонтёров</div><div class="kpi-value">${data.volunteers.total}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Активные (д/н/м)</div><div class="kpi-value">${data.volunteers.activeDay} / ${data.volunteers.activeWeek} / ${data.volunteers.activeMonth}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Новые (д/н/м)</div><div class="kpi-value">${data.volunteers.newDay} / ${data.volunteers.newWeek} / ${data.volunteers.newMonth}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Удержание</div><div class="kpi-value">${data.volunteers.retention}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. участий</div><div class="kpi-value">${data.volunteers.avgTasks}</div></div>
+            </div>
+            <div class="two-columns">
+                <div class="card"><h3>География волонтёров</h3><div id="geoChart" style="height:300px;"></div></div>
+                <div class="card"><h3>Топ организаторов</h3><table><thead><tr><th>Организатор</th><th>Проектов</th></tr></thead><tbody>${data.organizations.topByProjects.map(o => `<tr><td>${o.name}</td><td>${o.projectsCount}</td></tr>`).join('')}</tbody></table></div>
+            </div>
+        `;
+        const geo = echarts.init(document.getElementById('geoChart'));
+        geo.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data: data.geography.map(c => ({ name: c._id, value: c.count })), radius: '60%' }] });
+    }
+
+    // ===================== МЕТРИКИ ПРОЕКТОВ =====================
+    async function renderProjectMetrics() {
+        document.getElementById('pageTitle').innerText = 'Метрики проектов';
+        const data = await apiFetch('/api/admin/metrics/projects');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Всего проектов</div><div class="kpi-value">${data.total}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Активные</div><div class="kpi-value">${data.active}</div></div>
+                <div class="kpi-card"><div class="kpi-title">В ожидании</div><div class="kpi-value">${data.pending}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Закрыто (всего/неделя)</div><div class="kpi-value">${data.closed.total} / ${data.closed.week}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. время набора</div><div class="kpi-value">${data.avgRecruitmentDays} дн.</div></div>
+                <div class="kpi-card"><div class="kpi-title">Недобор участников</div><div class="kpi-value">${data.underfilled}</div></div>
+            </div>
+            <div class="card"><h3>Категории проектов</h3><div id="catsChart" style="height:300px;"></div></div>
+        `;
+        const cats = echarts.init(document.getElementById('catsChart'));
+        cats.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data: data.categories.map(c => ({ name: c._id, value: c.count })), radius: '55%' }] });
+    }
+
+    // ===================== МЕТРИКИ УЧАСТИЯ =====================
+    async function renderParticipationMetrics() {
+        document.getElementById('pageTitle').innerText = 'Участие волонтёров';
+        const data = await apiFetch('/api/admin/metrics/participation');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Всего откликов</div><div class="kpi-value">${data.applications}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Подтверждённых</div><div class="kpi-value">${data.confirmed}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Завершённых</div><div class="kpi-value">${data.completed}</div></div>
+                <div class="kpi-card"><div class="kpi-title">% завершённых</div><div class="kpi-value">${data.completionRate}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Дней до первого участия</div><div class="kpi-value">${data.avgDaysToFirst}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Повторные участия</div><div class="kpi-value">${data.repeatVolunteers}</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== МЕТРИКИ КАЧЕСТВА =====================
+    async function renderQualityMetrics() {
+        document.getElementById('pageTitle').innerText = 'Качество и обратная связь';
+        const data = await apiFetch('/api/admin/metrics/quality');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Ср. оценка проектам</div><div class="kpi-value">${data.avgProjectRating}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. оценка координаторам</div><div class="kpi-value">${data.avgCoordinatorRating}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Жалобы</div><div class="kpi-value">${data.complaints}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. время реакции</div><div class="kpi-value">${data.avgReactionTime || '—'}</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== МЕТРИКИ АКТИВНОСТИ =====================
+    async function renderActivityMetrics() {
+        document.getElementById('pageTitle').innerText = 'Активность платформы';
+        const data = await apiFetch('/api/admin/metrics/activity');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">DAU / WAU / MAU</div><div class="kpi-value">${data.dau} / ${data.wau} / ${data.mau}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Просмотры проектов</div><div class="kpi-value">${data.projectPageViews}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Конверсия просмотр→клик</div><div class="kpi-value">${data.conversion.viewToClick}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Конверсия клик→участие</div><div class="kpi-value">${data.conversion.clickToParticipation}%</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== МЕТРИКИ КОММУНИКАЦИЙ =====================
+    async function renderCommunicationsMetrics() {
+        document.getElementById('pageTitle').innerText = 'Коммуникации';
+        const data = await apiFetch('/api/admin/metrics/communications');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Отправлено</div><div class="kpi-value">${data.sent}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Открыто</div><div class="kpi-value">${data.opened}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Кликов</div><div class="kpi-value">${data.clicked}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Open Rate</div><div class="kpi-value">${data.openRate}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Click Rate</div><div class="kpi-value">${data.clickRate}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Сообщений</div><div class="kpi-value">${data.messages}</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== ОПЕРАЦИОННЫЕ МЕТРИКИ =====================
+    async function renderOperationalMetrics() {
+        document.getElementById('pageTitle').innerText = 'Операционные метрики';
+        const data = await apiFetch('/api/admin/metrics/operational');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Ср. время модерации (ч)</div><div class="kpi-value">${data.avgModerationHours}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. время верификации (ч)</div><div class="kpi-value">${data.avgVerificationHours}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Заблокировано</div><div class="kpi-value">${data.banned}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ошибок за неделю</div><div class="kpi-value">${data.errorsLastWeek}</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== МЕТРИКИ ЭФФЕКТИВНОСТИ =====================
+    async function renderEfficiencyMetrics() {
+        document.getElementById('pageTitle').innerText = 'Эффективность платформы';
+        const data = await apiFetch('/api/admin/metrics/efficiency');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="kpi-title">Успешно набравшие</div><div class="kpi-value">${data.successfulProjects}</div></div>
+                <div class="kpi-card"><div class="kpi-title">% успешных</div><div class="kpi-value">${data.successRate}%</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. волонтёров/проект</div><div class="kpi-value">${data.avgVolunteersPerProject}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Всего часов работы</div><div class="kpi-value">${data.totalHours}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ср. часов/задачу</div><div class="kpi-value">${data.avgHours}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Социальный эффект</div><div class="kpi-value">${data.socialImpact}</div></div>
+            </div>
+        `;
+    }
+
+    // ===================== АНАЛИТИКА КАНАЛОВ =====================
+    async function renderAnalytics() {
+        document.getElementById('pageTitle').innerText = 'Аналитика каналов';
+        const data = await apiFetch('/api/admin/analytics/sources');
+        if (!data.success) return;
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>📈 Источники трафика</h3><table><thead><tr><th>Источник</th><th>Визиты</th><th>Сессии</th><th>Регистрации</th><th>Конверсия</th></tr></thead><tbody>${data.sources.map(s => `<tr><td>${s.source}</td><td>${s.visits}</td><td>${s.uniqueSessions}</td><td>${s.registrations}</td><td>${s.conversion}%</td></tr>`).join('')}</tbody></table></div>
+            <div class="two-columns"><div class="card"><h3>🥧 Распределение трафика</h3><div id="pieChart" style="height:300px;"></div></div><div class="card"><h3>📊 Воронка конверсии</h3><div id="funnelChart" style="height:300px;"></div></div></div>
+        `;
+        const pie = echarts.init(document.getElementById('pieChart'));
+        pie.setOption({ series: [{ type: 'pie', data: data.pieData.map(d => ({ name: d.name, value: d.value })), radius: '60%' }] });
+        const funnelData = await apiFetch('/api/admin/analytics/funnel');
+        if (funnelData.success) {
+            const funnel = echarts.init(document.getElementById('funnelChart'));
+            funnel.setOption({ series: [{ type: 'funnel', data: funnelData.funnel.map(s => ({ name: s.name, value: s.count })), gap: 2 }] });
+        }
+    }
+
+    // ===================== СЕГМЕНТАЦИЯ =====================
+    async function renderSegments() {
+        document.getElementById('pageTitle').innerText = 'Сегментация';
+        const segments = await apiFetch('/api/admin/segments');
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>📋 Сохранённые сегменты</h3><button class="btn" id="createSegmentBtn" style="margin-bottom:16px;">+ Создать</button><table><thead><tr><th>Название</th><th>Критерии</th><th>Пользователей</th><th>Динамический</th></tr></thead><tbody>${segments.segments.map(s => `<tr><td>${s.name}</td><td>${JSON.stringify(s.criteria)}</td><td>${s.count || '—'}</td><td>${s.isDynamic ? 'Да' : 'Нет'}</td></tr>`).join('')}</tbody></table></div>
+            <div class="card"><h3>⚙️ Конструктор правил</h3><div class="two-columns"><div><select id="fieldSelect"><option value="city">Город</option><option value="minEvents">Мин. событий</option><option value="isActive">Активен</option><option value="source">Источник</option><option value="role">Роль</option></select><input id="fieldValue" placeholder="Значение" /><button class="btn" id="addRuleBtn">+ Добавить</button></div><div><div id="ruleList"></div><button class="btn" id="calcSegmentCount">Посчитать</button><span id="segmentCountResult" class="badge" style="margin-left:12px;"></span></div></div></div>
+        `;
+        let rules = [];
+        const renderRules = () => { document.getElementById('ruleList').innerHTML = rules.map((r,i) => `<div>${r.field}=${r.value} <button class="btn-secondary btn-sm" data-idx="${i}">✖</button></div>`).join(''); };
+        document.getElementById('addRuleBtn').onclick = () => { rules.push({ field: document.getElementById('fieldSelect').value, value: document.getElementById('fieldValue').value }); renderRules(); };
+        document.getElementById('calcSegmentCount').onclick = async () => {
+            const criteria = {};
+            rules.forEach(r => { if (r.field === 'city') criteria.city = r.value; if (r.field === 'minEvents') criteria.minEvents = parseInt(r.value); if (r.field === 'isActive') criteria.isActive = r.value === 'true'; if (r.field === 'source') criteria.source = r.value; if (r.field === 'role') criteria.role = r.value; });
+            const res = await apiFetch('/api/admin/segments/count', { method: 'POST', body: JSON.stringify({ criteria }) });
+            if (res.success) document.getElementById('segmentCountResult').innerText = `Найдено: ${res.count}`;
+        };
+        document.getElementById('createSegmentBtn').onclick = () => showModal('Создать сегмент', `<div class="field"><label>Название</label><input id="segName" /></div><div class="field"><label>Критерии (JSON)</label><textarea id="segCriteria" rows="3"></textarea></div><button class="btn" id="saveSegBtn">Сохранить</button>`);
+    }
+
+    // ===================== РАССЫЛКИ =====================
+    async function renderCommunications() {
+        document.getElementById('pageTitle').innerText = 'Рассылки и триггеры';
+        const campaigns = await apiFetch('/api/admin/communications/campaigns');
+        const triggers = await apiFetch('/api/admin/communications/triggers');
+        const referrals = await apiFetch('/api/admin/communications/referrals');
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>📧 Статистика рассылок</h3><button class="btn" id="createCampaignBtn" style="margin-bottom:16px;">+ Создать</button><table><thead><tr><th>Название</th><th>Отправлено</th><th>Открыто</th><th>Open Rate</th></tr></thead><tbody>${campaigns.campaigns.map(c => `<tr><td>${c.name}</td><td>${c.stats.sent}</td><td>${c.stats.opened}</td><td>${c.stats.openRate}%</td></tr>`).join('')}</tbody></table></div>
+            <div class="card"><h3>⚙️ Триггеры</h3>${triggers.triggers.map(t => `<div style="margin-bottom:12px;"><b>${t.name}</b> <span class="badge">${t.enabled ? 'Вкл' : 'Выкл'}</span><div>${t.steps.map(s => `${s.delay}ч`).join(' → ')}</div></div>`).join('')}</div>
+            <div class="card"><h3>🏆 Топ рефералов</h3><table><thead><tr><th>Волонтёр</th><th>Приглашено</th></tr></thead><tbody>${referrals.topReferrers.map(r => `<tr><td>${r.name}</td><td>${r.invitedCount}</td></tr>`).join('')}</tbody></table></div>
+        `;
+    }
+
+    // ===================== ЛЕНДИНГИ =====================
+    async function renderLandings() {
+        document.getElementById('pageTitle').innerText = 'Лендинги';
+        const landings = await apiFetch('/api/admin/landings');
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>📄 Список лендингов</h3><button class="btn" id="createLandingBtn" style="margin-bottom:16px;">+ Создать</button><table><thead><tr><th>Название</th><th>Slug</th><th>Статус</th></tr></thead><tbody>${landings.landings.map(l => `<tr><td>${l.name}</td><td>${l.slug}</td><td>${l.status}</td></tr>`).join('')}</tbody></table></div>
+        `;
+    }
+
+    // ===================== А/Б ТЕСТЫ =====================
+    async function renderABTests() {
+        document.getElementById('pageTitle').innerText = 'А/Б тесты';
+        const tests = await apiFetch('/api/admin/abtests');
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>🧪 Список тестов</h3><button class="btn" id="createTestBtn" style="margin-bottom:16px;">+ Создать</button><table><thead><tr><th>Название</th><th>Статус</th><th>Дата старта</th></tr></thead><tbody>${tests.tests.map(t => `<tr><td>${t.name}</td><td>${t.status}</td><td>${new Date(t.startDate).toLocaleDateString()}</td></tr>`).join('')}</tbody></table></div>
+        `;
+    }
+
+    // ===================== МОНИТОРИНГ =====================
+    async function renderMonitoring() {
+        document.getElementById('pageTitle').innerText = 'Технический мониторинг';
+        const errors = await apiFetch('/api/admin/monitoring/errors');
+        document.getElementById('content').innerHTML = `
+            <div class="card"><h3>⚠️ Лог ошибок</h3><table><thead><tr><th>Дата</th><th>Сообщение</th><th>URL</th></tr></thead><tbody>${errors.errors.map(e => `<tr><td>${new Date(e.createdAt).toLocaleString()}</td><td>${e.message}</td><td>${e.url || '-'}</td></tr>`).join('')}</tbody></table></div>
+        `;
+    }
+
+    // ===================== НАВИГАЦИЯ =====================
+    const tabs = {
+        dashboard: renderDashboard,
+        userMetrics: renderUserMetrics,
+        projectMetrics: renderProjectMetrics,
+        participationMetrics: renderParticipationMetrics,
+        qualityMetrics: renderQualityMetrics,
+        activityMetrics: renderActivityMetrics,
+        communicationsMetrics: renderCommunicationsMetrics,
+        operationalMetrics: renderOperationalMetrics,
+        efficiencyMetrics: renderEfficiencyMetrics,
+        analytics: renderAnalytics,
+        segments: renderSegments,
+        communications: renderCommunications,
+        landings: renderLandings,
+        abtests: renderABTests,
+        monitoring: renderMonitoring
+    };
+
+    function switchTab(tab) {
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('active');
+        if (tabs[tab]) tabs[tab]();
+    }
+
+    document.querySelectorAll('.nav-item[data-tab]').forEach(el => {
+        el.addEventListener('click', () => switchTab(el.dataset.tab));
+    });
+    document.getElementById('goToMainBtn').addEventListener('click', goToMain);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    switchTab('dashboard');
+</script>
 </body>
 </html>

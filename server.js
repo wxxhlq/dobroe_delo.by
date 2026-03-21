@@ -9,6 +9,9 @@ const { getDB, connectDB } = require('./db');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { ObjectId } = require('mongodb');
+const adminRoutes = require('./routes/admin');
+const UserEvent = require('./models/UserEvent');
+const User = require('./models/User');
 
 // Проверка обязательных переменных окружения
 if (!process.env.JWT_SECRET) {
@@ -29,24 +32,117 @@ const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
     : ['*']; // По умолчанию разрешаем все (для разработки)
 
-// Увеличиваем лимит тела запроса, чтобы поддерживать небольшие base64‑картинки
-// 1. Увеличиваем лимит тела запроса, чтобы поддерживать небольшие base64‑картинки и тяжелые логи
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: false, limit: '5mb' }));
+// 1. ПАРСИНГ И CORS (В самом начале, чтобы запросы читались)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors());
 
-// 2. Настройка CORS (разрешаем запросы с других доменов, если нужно)
-app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin))) {
-        res.header('Access-Control-Allow-Origin', origin || '*');
+// 2. ПРИЕМ ДАННЫХ АНАЛИТИКИ (УБИРАЕТ ОШИБКУ 404)
+app.post('/api/v1/analytics/collect', async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) return res.status(500).json({ success: false });
+
+        const { eventType, path, email, userAgent } = req.body;
+
+        const event = {
+            userId: req.body.userId || 'guest',
+            email: email || 'Анонимный гость',
+            eventType: eventType || 'click',
+            path: path || '/',
+            userAgent: userAgent || 'Unknown',
+            ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            createdAt: new Date()
+        };
+
+        await db.collection('userevents').insertOne(event);
+        console.log(`[COLLECTOR] Данные получены: ${event.email} -> ${event.path}`);
+        res.status(200).json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false });
     }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
+});
+
+// 3. ЖЕЛЕЗОБЕТОННЫЙ ЛОГГЕР ПЕРЕХОДОВ (Для автоматического трекинга)
+app.use(async (req, res, next) => {
+    try {
+        const db = getDB();
+        if (!db || req.method !== 'GET') return next();
+
+        // Игнорируем статику и системные пути
+        const ignored = ['.js', '.css', '.png', '.jpg', '.ico', '/api/admin', '/api/v1/analytics'];
+        if (ignored.some(ext => req.path.includes(ext))) return next();
+
+        await db.collection('userevents').insertOne({
+            email: 'Посетитель',
+            eventType: 'navigation',
+            path: req.path,
+            ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            createdAt: new Date()
+        });
+        console.log(`[METRIKA] Авто-запись: ${req.path}`);
+    } catch (e) {}
     next();
+});
+
+// 4. РОУТЫ АДМИНКИ
+app.use('/api/admin', adminRoutes);
+
+// 5. ГЛАВНЫЙ API ДЛЯ ВЫДАЧИ ВСЕХ МЕТРИК В АДМИНКУ
+app.get('/api/admin/dashboard-data', authMiddleware, requireAdmin, async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) return res.status(500).json({ success: false, error: "DB Error" });
+
+        // Агрегация: Популярные страницы
+        const pathStats = await db.collection('userevents').aggregate([
+            { $match: { eventType: 'navigation' } },
+            { $group: { _id: "$path", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ]).toArray();
+
+        // Агрегация: Топ активных юзеров
+        const userActivity = await db.collection('userevents').aggregate([
+            { $group: {
+                    _id: { $ifNull: ["$email", "Anonymous"] },
+                    totalActions: { $sum: 1 }
+                }},
+            { $sort: { totalActions: -1 } },
+            { $limit: 10 }
+        ]).toArray();
+
+        // Последние 50 событий для Вебвизора
+        const recentEvents = await db.collection('userevents')
+            .find({})
+            .sort({ timestamp: -1 })
+            .limit(50)
+            .toArray();
+
+        // Счетчики из основных коллекций
+        const [volunteers, projects, news] = await Promise.all([
+            db.collection('users').countDocuments({ role: 'VOLUNTEER' }),
+            db.collection('projects').countDocuments({ status: { $ne: 'DELETED' } }),
+            db.collection('news').countDocuments()
+        ]);
+
+        const totalViews = await db.collection('userevents').countDocuments();
+
+        res.json({
+            success: true,
+            counts: { volunteers, projects, news },
+            realtime: {
+                totalViews,
+                online: Math.max(1, userActivity.length)
+            },
+            pathStats,
+            userActivity,
+            recentEvents
+        });
+    } catch (err) {
+        console.error("❌ Dash error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 /** * МОДУЛЬ 2: ИНТЕГРАЦИЯ МАРКЕТИНГОВОГО ТРЕКЕРА
@@ -112,6 +208,8 @@ function generateAccessToken(user) {
     );
 }
 
+
+
 function generateRefreshToken(user) {
     return jwt.sign(
         { userId: user._id ? user._id.toString() : user.userId },
@@ -146,6 +244,22 @@ async function findMatchingRefreshToken(user, refreshToken) {
     return null;
 }
 
+async function trackEvent(userId, sessionId, eventType, eventData = {}, sourceData = {}, deviceData = {}) {
+    try {
+        const UserEvent = require('./models/UserEvent');
+        await UserEvent.create({
+            userId: userId || null,
+            sessionId: sessionId || 'system',
+            eventType,
+            eventData,
+            sourceData,
+            deviceData
+        });
+    } catch (err) {R
+        console.error('Failed to track event:', err);
+    }
+}
+
 // === ГЛАВНЫЕ FRONTEND-МАРШРУТЫ (SPA без #) ===
 const FRONTEND_ROUTES = ['/', '/projects', '/community', '/news', '/about', '/contacts', '/cabinet'];
 
@@ -155,7 +269,10 @@ FRONTEND_ROUTES.forEach(route => {
     });
 });
 
+
+
 // === РЕГИСТРАЦИЯ ===
+// === РЕГИСТРАЦИЯ (ОБНОВЛЕННАЯ ДЛЯ АДМИНКИ) ===
 app.post('/register', async (req, res) => {
     const { username, password, email, role, name, city, phone } = req.body;
 
@@ -194,16 +311,28 @@ app.post('/register', async (req, res) => {
             points: 0,
             avatarUrl: '',
             privacy: 'public',
-            achievements: [], // Инициализируем пустой массив достижений
+            achievements: [],
             created_at: new Date()
         };
 
         const result = await usersCollection.insertOne(newUser);
 
+        // --- ВОТ ЭТИ 6 СТРОК МЫ ДОБАВИЛИ ДЛЯ РЕАЛЬНОЙ СТАТИСТИКИ ---
+        await db.collection('userevents').insertOne({
+            userId: result.insertedId,
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'registration',
+            eventData: {},
+            createdAt: new Date()
+        });
+        // -------------------------------------------------------
+
         console.log('✓ Создан пользователь ID:', result.insertedId);
 
         // Проверяем достижения для нового пользователя
-        await checkAchievements(result.insertedId.toString());
+        if (typeof checkAchievements === 'function') {
+            await checkAchievements(result.insertedId.toString());
+        }
 
         const token = generateAccessToken({ _id: result.insertedId, email: newUser.email, role: newUser.role });
         const refreshToken = generateRefreshToken({ userId: result.insertedId });
@@ -214,8 +343,6 @@ app.post('/register', async (req, res) => {
             userId: result.insertedId,
             token,
             refreshToken,
-            // Проверка достижений (регистрация)
-            achievementCheck: await checkAchievements(result.insertedId),
             user: {
                 id: result.insertedId,
                 username: newUser.username,
@@ -499,6 +626,29 @@ app.post('/api/projects/:id/apply', authMiddleware, async (req, res) => {
             { $inc: { responsesCount: 1 } }
         );
 
+        // Запись события отклика
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'project_apply',
+                eventData: { projectId: project._id, projectTitle: project.title },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события отклика:', err);
+        }
+
+        // Запись события отклика
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'project_apply',
+            eventData: { projectId: project._id, projectTitle: project.title },
+            createdAt: new Date()
+        });
+
         // XP за отклик
         const xpDelta = req.user.role === 'ORGANIZER' ? 15 : 10; // организатор чуть больше
         await usersCollection.updateOne(
@@ -610,6 +760,29 @@ app.post('/api/applications/:id/cancel', authMiddleware, async (req, res) => {
             { _id: appDoc._id },
             { $set: { status: 'CANCELLED', cancelledAt: new Date() } }
         );
+
+        // Запись события отмены отклика
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'project_apply_cancel',
+                eventData: { projectId: appDoc.projectId },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события отмены отклика:', err);
+        }
+
+        // Запись события отмены отклика
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'project_apply_cancel',
+            eventData: { projectId: appDoc.projectId },
+            createdAt: new Date()
+        });
 
         // Попробуем уменьшить счётчик откликов у проекта
         await projectsCollection.updateOne(
@@ -1132,6 +1305,28 @@ app.post('/api/news', authMiddleware, requireAdmin, async (req, res) => {
         };
 
         const result = await newsCollection.insertOne(doc);
+
+        // Запись события создания новости
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'news_created',
+                eventData: { newsId: result.insertedId, newsTitle: title },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события создания новости:', err);
+        }
+        // Запись события создания новости
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'news_created',
+            eventData: { newsId: result.insertedId, newsTitle: title },
+            createdAt: new Date()
+        });
         const created = await newsCollection.findOne({ _id: result.insertedId });
 
         res.status(201).json({
@@ -1168,7 +1363,30 @@ app.delete('/api/news/:id', authMiddleware, async (req, res) => {
         }
 
         await newsCollection.deleteOne({ _id: doc._id });
+
+        // Запись события удаления новости
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'news_deleted',
+                eventData: { newsId: req.params.id },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события удаления новости:', err);
+        }
+
         res.json({ message: 'Новость удалена' });
+        // Запись события удаления новости
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'news_deleted',
+            eventData: { newsId: req.params.id },
+            createdAt: new Date()
+        });
     } catch (err) {
         console.error('❌ Ошибка удаления новости:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
@@ -1257,6 +1475,28 @@ app.post('/api/community/posts', authMiddleware, async (req, res) => {
         };
 
         const result = await postsCollection.insertOne(doc);
+
+        // Запись события создания поста
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'post_created',
+                eventData: { postId: result.insertedId, postText: (text || '').substring(0, 100) },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события создания поста:', err);
+        }
+        // Запись события создания поста
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'post_created',
+            eventData: { postId: result.insertedId, postText: (text || '').substring(0, 100) },
+            createdAt: new Date()
+        });
         const created = await postsCollection.findOne({ _id: result.insertedId });
 
         // Проверяем достижения
@@ -1300,6 +1540,20 @@ app.post('/api/community/posts/:id/like', authMiddleware, async (req, res) => {
                 ? { $pull: { likes: new ObjectId(userId) } }
                 : { $addToSet: { likes: new ObjectId(userId) } }
         );
+
+        // Запись события комментария
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'comment_created',
+                eventData: { postId: postId, commentText: (text || '').substring(0, 100) },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события комментария:', err);
+        }
 
         const updated = await postsCollection.findOne({ _id: post._id });
         res.json({
@@ -1351,6 +1605,15 @@ app.post('/api/community/posts/:id/comment', authMiddleware, async (req, res) =>
             { $push: { comments: comment } }
         );
 
+        // Запись события комментария
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'comment_created',
+            eventData: { postId: postId, commentText: (text || '').substring(0, 100) },
+            createdAt: new Date()
+        });
+
         const updated = await postsCollection.findOne({ _id: new ObjectId(postId) });
         res.status(201).json({
             message: 'Комментарий добавлен',
@@ -1389,7 +1652,29 @@ app.delete('/api/community/posts/:id', authMiddleware, async (req, res) => {
         }
 
         await postsCollection.deleteOne({ _id: post._id });
+        // Запись события удаления поста
+        try {
+            const sessionId = req.body?.sessionId || req.headers['x-session-id'] || 'unknown';
+            await db.collection('userevents').insertOne({
+                userId: new ObjectId(req.user.userId),
+                sessionId: sessionId,
+                eventType: 'post_deleted',
+                eventData: { postId: req.params.id },
+                createdAt: new Date()
+            });
+        } catch (err) {
+            console.error('Ошибка записи события удаления поста:', err);
+        }
         res.json({ message: 'Пост удалён' });
+        // Запись события удаления поста
+        await db.collection('userevents').insertOne({
+            userId: new ObjectId(req.user.userId),
+            sessionId: req.body.sessionId || 'unknown',
+            eventType: 'post_deleted',
+            eventData: { postId: req.params.id },
+            createdAt: new Date()
+        });
+
     } catch (err) {
         console.error('❌ Ошибка удаления поста сообщества:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
@@ -1699,6 +1984,25 @@ async function startServer() {
                 console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей`);
             }
         }
+        // Роут для получения РЕАЛЬНОЙ статистики в админку
+        // Обновленный роут статистики
+
+        const ErrorLog = require('./models/ErrorLog');
+
+// Глобальный обработчик ошибок
+        app.use(async (err, req, res, next) => {
+            try {
+                await ErrorLog.create({
+                    message: err.message,
+                    stack: err.stack,
+                    url: req.originalUrl,
+                    method: req.method,
+                    ip: req.ip,
+                    userId: req.user?._id
+                });
+            } catch (logErr) { console.error('Failed to log error', logErr); }
+            res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+        });
 
         // 4. Запуск прослушивания порта
         app.listen(PORT, () => {

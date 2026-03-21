@@ -2366,6 +2366,20 @@
 
   <div class="toast" id="toasts" aria-live="assertive"></div>
 
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+      (function(m,e,t,r,i,k,a){
+          m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=108180556', 'ym');
+
+      ym(108180556, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+  </script>
+  <noscript><div><img src="https://mc.yandex.ru/watch/108180556" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+  <!-- /Yandex.Metrika counter -->
+
   <script>
     /* ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ API ===== */
     const API_URL = 'http://localhost:3000';
@@ -2417,20 +2431,63 @@
       return role || '';
     }
 
+    function checkAuth() {
+        const user = localStorage.getItem('currentUser'); // Или как там у тебя называется ключ юзера
+        const adminPanel = document.getElementById('ddby_admin_dashboard');
+        const triggerBtn = document.getElementById('admin_trigger_btn');
+        const loginForm = document.getElementById('login_section'); // ID твоей формы входа
+
+        if (!user) {
+            // Если юзера нет в памяти — ГАСИМ ВСЁ
+            if (adminPanel) adminPanel.style.display = 'none';
+            if (triggerBtn) triggerBtn.style.display = 'none';
+            if (loginForm) loginForm.style.display = 'block';
+
+            // Если ты пытаешься зайти на защищенную страницу — кидаем на вход
+            if (window.location.pathname.includes('admin')) {
+                window.location.href = 'index1.html';
+            }
+        } else {
+            // Если юзер есть — показываем интерфейс
+            if (loginForm) loginForm.style.display = 'none';
+            if (triggerBtn) triggerBtn.style.display = 'flex';
+        }
+    }
+
+    // Запускаем проверку мгновенно при загрузке и каждые 500мс (для страховки)
+    checkAuth();
+    setInterval(checkAuth, 500);
+
     function performLogout(message) {
-        // 1. Сносим всё К ЧЕРТЯМ
-        localStorage.clear();
-        sessionStorage.clear();
+        console.log("Запуск протокола очистки...");
 
-        // 2. Очищаем куки (на всякий случай)
-        document.cookie.split(";").forEach(function(c) {
-            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-        });
+        // 1. Останавливаем все процессы (чтобы админка не пыталась обновиться в процессе удаления)
+        const highestId = window.setInterval(() => {}, 0);
+        for (let i = 0; i <= highestId; i++) {
+            window.clearInterval(i);
+        }
 
-        alert(message || 'Вы вышли из системы. Страница будет перезагружена.');
+        // 2. Очистка данных (Жесткая)
+        localStorage.removeItem('ddby_flat_v1'); // Удаляем именно твой ключ проекта
+        localStorage.clear();                   // Чистим всё остальное
+        sessionStorage.clear();                 // Чистим сессию
 
-        // 3. Жесткий редирект, который убьет все зависшие JS-процессы
-        window.location.href = 'index1.html';
+        // 3. Очистка куки
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i];
+            const eqPos = cookie.indexOf("=");
+            const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        }
+
+        // 4. Небольшая пауза для завершения операций диска и редирект
+        console.log("Данные стерты. Редирект...");
+
+        // Используем замену истории, чтобы нельзя было нажать "Назад"
+        setTimeout(() => {
+            window.location.replace('index1.html');
+        }, 100);
     }
 
     function handleAuthResponse(res, data) {
@@ -3612,7 +3669,7 @@
               pass: pass,
               points: data.user.points || 0,
               privacy: 'public',
-              createdAt: new Date().toISOString()
+              createdAt: new Date()
             };
 
             // если вдруг в localStorage уже был пользователь с этим email — обновим его
@@ -3629,7 +3686,7 @@
                 status: "PENDING",
                 contacts: data.user.email,
                 rating: 0,
-                createdAt: new Date().toISOString()
+                createdAt: new Date()
               });
             }
 
@@ -6176,84 +6233,57 @@
   <script src="/js/tracker.js"></script>
   <script>
       (function() {
-          function injectAdminPanel() {
-              // 1. Проверяем, не создан ли он уже
-              if (document.getElementById('ultimate-admin-panel')) return;
+          function checkAdmin() {
+              const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+              const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-              // 2. Проверяем роль в localStorage
-              const userData = localStorage.getItem('user');
-              if (!userData) return;
-
-              try {
-                  const user = JSON.parse(userData);
-                  if (user.role !== 'ADMIN') return;
-
-                  // 3. Создаем элемент
-                  const panel = document.createElement('div');
-                  panel.id = 'ultimate-admin-panel';
-
-                  // Стили прямо в JS для максимального приоритета
-                  Object.assign(panel.style, {
-                      position: 'fixed',
-                      right: '0',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: '1000000', // Выше всего на свете
-                      display: 'flex',
-                      alignItems: 'center'
-                  });
-
-                  panel.innerHTML = `
-                <div id="admSideBtn" style="background:#4F46E5; color:white; width:40px; height:60px; display:flex; align-items:center; justify-content:center; border-radius:15px 0 0 15px; cursor:pointer; box-shadow:-2px 0 15px rgba(0,0,0,0.3); font-size:24px; font-weight:bold;">
-                    <span id="admArr">‹</span>
-                </div>
-                <div id="admBody" style="background:white; width:0; overflow:hidden; height:100px; display:flex; align-items:center; transition:0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius:10px 0 0 10px; box-shadow:-10px 0 30px rgba(0,0,0,0.15); border:1px solid #e5e7eb;">
-                    <div style="padding:0 25px; min-width:200px;">
-                        <p style="margin:0 0 10px; font-size:12px; color:#6366f1; font-weight:bold; text-transform:uppercase; letter-spacing:1px;">Admin Access</p>
-                        <button onclick="window.location.href='/admin.html'" style="background:#4F46E5; color:white; border:none; padding:12px 20px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold; font-family:sans-serif; transition:0.2s;">
-                           Перейти в Админку
-                        </button>
-                    </div>
-                </div>
-            `;
-
-                  document.body.appendChild(panel);
-
-                  // Логика открытия/закрытия
-                  const btn = panel.querySelector('#admSideBtn');
-                  const body = panel.querySelector('#admBody');
-                  const arr = panel.querySelector('#admArr');
-                  let isOpen = false;
-
-                  btn.onclick = (e) => {
-                      e.stopPropagation();
-                      isOpen = !isOpen;
-                      body.style.width = isOpen ? '250px' : '0';
-                      arr.style.display = 'inline-block';
-                      arr.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
-                      btn.style.background = isOpen ? '#1e1b4b' : '#4F46E5';
-                  };
-
-                  // Закрывать при клике мимо
-                  document.addEventListener('click', () => {
-                      if (isOpen) {
-                          isOpen = false;
-                          body.style.width = '0';
-                          arr.style.transform = 'rotate(0deg)';
-                          btn.style.background = '#4F46E5';
-                      }
-                  });
-
-                  console.log("✅ Бронебойный виджет Админа запущен!");
-
-              } catch (err) {
-                  console.error("Ошибка виджета:", err);
+              // Если роль в localStorage или в токене — ADMIN
+              if (user.role === 'ADMIN') return true;
+              if (token) {
+                  try {
+                      const payload = JSON.parse(atob(token.split('.')[1]));
+                      return payload.role === 'ADMIN';
+                  } catch(e) { return false; }
               }
+              return false;
           }
 
-          // Запускаем проверку часто (чтобы переиграть SPA)
-          setInterval(injectAdminPanel, 1000);
-          window.addEventListener('load', injectAdminPanel);
+          if (checkAdmin()) {
+              const btn = document.createElement('div');
+              btn.innerHTML = '📈';
+              btn.style = "position:fixed; bottom:30px; right:30px; width:66px; height:66px; background:#4F46E5; color:white; border-radius:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:9999; box-shadow:0 10px 25px rgba(79,70,229,0.5); font-size:28px; transition:0.3s;";
+              btn.onclick = () => window.location.href = 'admin.html';
+              btn.onmouseover = () => btn.style.transform = "scale(1.1)";
+              btn.onmouseout = () => btn.style.transform = "scale(1)";
+              document.body.appendChild(btn);
+          }
+      })();
+
+      (function() {
+          async function sendEvent(type, extra = {}) {
+              const user = JSON.parse(localStorage.getItem('user') || '{}');
+              const data = {
+                  eventType: type,
+                  path: window.location.pathname,
+                  email: user.email || null,
+                  timestamp: new Date().toISOString(),
+                  userAgent: navigator.userAgent,
+                  ...extra
+              };
+              try {
+                  // Отправляем на твой роут аналитики
+                  await fetch('/api/v1/analytics/collect', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(data)
+                  });
+              } catch(e) {}
+          }
+          // Трекаем просмотр страницы при загрузке
+          sendEvent('navigation');
+
+          // Перехватываем клики по ссылкам (для SPA)
+          window.addEventListener('popstate', () => sendEvent('navigation'));
       })();
   </script>
 </body>
