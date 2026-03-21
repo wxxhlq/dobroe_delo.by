@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dobroe Delo | Pro-Admin Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary: #4F46E5; --bg: #F3F4F6; --text: #1F2937; --card: #FFFFFF; --sidebar: #111827; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; }
+
+        /* Sidebar */
+        .sidebar { width: 280px; background: var(--sidebar); color: white; height: 100vh; position: fixed; padding: 30px 20px; box-sizing: border-box; display: flex; flex-direction: column; }
+        .sidebar h2 { color: #818CF8; margin-bottom: 5px; font-size: 22px; }
+        .sidebar p { font-size: 12px; color: #9CA3AF; margin-bottom: 30px; }
+        .nav-link { color: #D1D5DB; text-decoration: none; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; display: block; transition: 0.3s; }
+        .nav-link:hover, .nav-link.active { background: #374151; color: white; }
+        .logout-btn { margin-top: auto; width: 100%; padding: 12px; background: #EF4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .logout-btn:hover { background: #DC2626; }
+
+        /* Main Content */
+        .main-content { margin-left: 280px; padding: 40px; width: 100%; box-sizing: border-box; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        h1 { font-size: 28px; color: #111827; margin: 0; }
+
+        /* KPI Widgets */
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px; }
+        .kpi-card { background: var(--card); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 5px solid var(--primary); }
+        .kpi-title { font-size: 13px; color: #6B7280; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+        .kpi-value { font-size: 32px; font-weight: 800; margin: 10px 0 5px; color: #111827; }
+        .kpi-desc { font-size: 12px; color: #9CA3AF; }
+
+        /* Charts & Tables */
+        .charts-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; }
+        .card-container { background: var(--card); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .card-container h2 { font-size: 18px; margin-top: 0; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; font-size: 12px; color: #6B7280; text-transform: uppercase; border-bottom: 1px solid #E5E7EB; }
+        td { padding: 15px 12px; border-bottom: 1px solid #F3F4F6; font-size: 14px; }
+        .source-name { font-weight: 600; color: #374151; }
+        .badge { background: #DCFCE7; color: #166534; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Dobroe Delo</h2>
+    <p>Метрики эффективности</p>
+
+    <nav>
+        <a href="#" class="nav-link active"><i class="fas fa-chart-line"></i> &nbsp; Дашборд</a>
+        <a href="/index1.html" class="nav-link"><i class="fas fa-home"></i> &nbsp; На главную</a>
+    </nav>
+
+    <button onclick="logout()" class="logout-btn">
+        <i class="fas fa-sign-out-alt"></i> Выйти из системы
+    </button>
+</div>
+
+<div class="main-content">
+    <header>
+        <h1>Центр управления полетами 🚀</h1>
+        <div id="admin-info" style="font-size: 14px; color: #6B7280;"></div>
+    </header>
+
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-title">Волонтеры</div>
+            <div class="kpi-value" id="kpi-volunteers">0</div>
+            <div class="kpi-desc">Всего зарегистрировано</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Конверсия</div>
+            <div class="kpi-value" id="kpi-conversion">0%</div>
+            <div class="kpi-desc">Визит → Регистрация</div>
+        </div>
+        <div class="kpi-card" style="border-left-color: #10B981;">
+            <div class="kpi-title">LTV Индекс</div>
+            <div class="kpi-value" id="kpi-ltv">0</div>
+            <div class="kpi-desc">Ср. задач на волонтера</div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="card-container">
+            <h2><i class="fas fa-filter" style="color: #6366F1;"></i> Воронка вовлеченности</h2>
+            <div style="height: 300px;">
+                <canvas id="funnelChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card-container">
+            <h2><i class="fas fa-share-nodes" style="color: #EC4899;"></i> Источники трафика</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>Источник</th>
+                    <th>Визиты</th>
+                    <th>Конверсия</th>
+                </tr>
+                </thead>
+                <tbody id="traffic-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. JWT Парсер
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            return JSON.parse(window.atob(base64));
+        } catch (e) { return null; }
+    }
+
+    // 2. УСИЛЕННАЯ ПРОВЕРКА ДОСТУПА
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    const localUser = JSON.parse(localStorage.getItem('user') || 'null');
+    const userPayload = token ? parseJwt(token) : null;
+
+    // Проверяем либо через токен, либо через наш "бронебойный" localStorage
+    const isAdmin = (userPayload && userPayload.role === 'ADMIN') || (localUser && localUser.role === 'ADMIN');
+
+    if (!isAdmin) {
+        console.error('Доступ отклонен. Токен роль:', userPayload?.role, 'Local роль:', localUser?.role);
+        alert('Ошибка доступа! У вас нет прав администратора.');
+        window.location.href = '/index1.html';
+    } else {
+        document.getElementById('admin-info').innerText = `Администратор: ${localUser?.email || userPayload?.email || 'System'}`;
+    }
+
+    // 3. Загрузка данных
+    async function initDashboard() {
+        try {
+            const response = await fetch('/api/v1/admin/dashboard-data', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) throw new Error('Ошибка сервера (статус ' + response.status + ')');
+
+            const data = await response.json();
+
+            document.getElementById('kpi-volunteers').innerText = data.kpi.totalVolunteers || 0;
+            document.getElementById('kpi-conversion').innerText = (data.kpi.conversionRate || 0) + '%';
+            document.getElementById('kpi-ltv').innerText = data.kpi.ltv || 0;
+
+            renderFunnel(data.funnel || { visitors: 0, registrations: 0, applications: 0, tasks: 0 });
+            renderTrafficTable(data.trafficSources || []);
+
+        } catch (error) {
+            console.error('Ошибка дашборда:', error);
+            // Если сервер не пускает (403), но мы очень хотим потестить интерфейс -
+            // можно подставить фейковые данные (раскомментируй для демо):
+            /*
+            renderFunnel({ visitors: 1000, registrations: 300, applications: 50, tasks: 20 });
+            renderTrafficTable([{source: 'Direct', views: 500, conversion: 10}]);
+            */
+        }
+    }
+
+    function renderFunnel(funnelData) {
+        const ctx = document.getElementById('funnelChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Посетители', 'Регистрации', 'Отклики', 'Задачи'],
+                datasets: [{
+                    data: [funnelData.visitors, funnelData.registrations, funnelData.applications, funnelData.tasks],
+                    backgroundColor: ['#C7D2FE', '#818CF8', '#4F46E5', '#3730A3'],
+                    borderRadius: 10,
+                    barThickness: 50
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function renderTrafficTable(sources) {
+        const tbody = document.getElementById('traffic-body');
+        tbody.innerHTML = '';
+
+        if (!sources || sources.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3">Нет данных по трафику</td></tr>';
+            return;
+        }
+
+        sources.forEach(src => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><span class="source-name">${src.source}</span></td>
+                    <td>${src.views}</td>
+                    <td><span class="badge">${src.conversion}%</span></td>
+                </tr>
+            `;
+        });
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
+        window.location.href = '/index1.html';
+    }
+
+    initDashboard();
+</script>
+
+</body>
+</html>

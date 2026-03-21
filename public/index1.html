@@ -2339,16 +2339,16 @@
         <div>Доброе_дело.by</div>
       </a>
 
-      <nav class="nav" aria-label="Навигация">
-        <span class="chip" data-route="/">Главная</span>
-        <span class="chip" data-route="/projects">Проекты</span>
-        <span class="chip" data-route="/community">Сообщество</span>
-        <span class="chip" data-route="/news">Новости</span>
-        <span class="chip" data-route="/about">О нас</span>
-        <span class="chip" data-route="/contacts">Контакты</span>
-        <button class="iconbtn" id="btnOpenAuth">Вход</button>
-        <button class="btn" id="btnCtaHelp">Хочу помочь</button>
-      </nav>
+        <nav class="nav" aria-label="Навигация">
+            <span class="chip" data-route="/">Главная</span>
+            <span class="chip" data-route="/projects">Проекты</span>
+            <span class="chip" data-route="/community">Сообщество</span>
+            <span class="chip" data-route="/news">Новости</span>
+            <span class="chip" data-route="/about">О нас</span>
+            <span class="chip" data-route="/contacts">Контакты</span>
+            <button class="iconbtn" id="btnOpenAuth">Вход</button>
+            <button class="btn" id="btnCtaHelp">Хочу помочь</button>
+        </nav>
     </div>
   </header>
 
@@ -2418,17 +2418,19 @@
     }
 
     function performLogout(message) {
-      try {
-        localStorage.removeItem('authToken');
-      } catch (e) { }
-      authToken = null;
-      if (state && state.session) {
-        state.session.userId = null;
-        saveState();
-      }
-      toast('warn', 'Сессия завершена', message || 'Пожалуйста, войдите снова');
-      navigate('/');
-      renderApp();
+        // 1. Сносим всё К ЧЕРТЯМ
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // 2. Очищаем куки (на всякий случай)
+        document.cookie.split(";").forEach(function(c) {
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+
+        alert(message || 'Вы вышли из системы. Страница будет перезагружена.');
+
+        // 3. Жесткий редирект, который убьет все зависшие JS-процессы
+        window.location.href = 'index1.html';
     }
 
     function handleAuthResponse(res, data) {
@@ -2790,7 +2792,24 @@
       } catch (e) { return null; }
     }
     function saveState() {
-      localStorage.setItem(LS_KEY, JSON.stringify(state)); // [file:87]
+        if (!state) return;
+
+        // СИНХРОНИЗАЦИЯ: Если в памяти есть юзер, подтягиваем его ID в стейт перед сохранением
+        const savedUser = localStorage.getItem('user');
+        if (savedUser && savedUser !== "null") {
+            try {
+                const u = JSON.parse(savedUser);
+                if (u && u.id) {
+                    state.session.userId = u.id;
+                }
+            } catch (e) {}
+        }
+
+        try {
+            localStorage.setItem(LS_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.error("Ошибка сохранения стейта:", e);
+        }
     }
 
     function toast(type, title, msg) {
@@ -2839,6 +2858,9 @@
 
     /* seed (как у тебя) */
     function seed() {
+        window.news = window.news || [];
+        window.projects = window.projects || [];
+
       const admin = { id: uid("u"), role: "ADMIN", email: "admin@demo.by", pass: "admin", name: "Администратор", city: "Минск", phone: "+375(00)000-00-00", points: 999, privacy: "public", createdAt: nowISO() };
       const vol1 = { id: uid("u"), role: "VOLUNTEER", email: "vol@demo.by", pass: "vol", name: "Алина К.", city: "Минск", phone: "+375(29)123-45-67", points: 120, privacy: "public", createdAt: nowISO() };
       const vol2 = { id: uid("u"), role: "VOLUNTEER", email: "ivan@demo.by", pass: "vol", name: "Иван С.", city: "Брест", phone: "+375(33)555-11-22", points: 80, privacy: "public", createdAt: nowISO() };
@@ -2926,7 +2948,18 @@
     state.posts = [];
 
 
-    function currentUser() { return state.users.find(u => u.id === state.session.userId) || null; }
+    function currentUser() {
+        // Сначала смотрим в localStorage (это самый надежный источник)
+        const saved = localStorage.getItem('user');
+        if (saved && saved !== "null") {
+            try { return JSON.parse(saved); } catch (e) { }
+        }
+        // Если там нет, ищем в стейте
+        if (typeof state !== 'undefined' && state.session?.userId && state.users) {
+            return state.users.find(u => u.id === state.session.userId) || null;
+        }
+        return null;
+    }
     function requireAuth() { if (!currentUser()) { openAuthModal(); return false; } return true; }
 
     /* modal */
@@ -3441,71 +3474,89 @@
         // Используем глобальные переменные API_URL и authToken
 
         // Перезаписываем loginForm
-        $("#loginForm").onsubmit = async (e) => {
-          e.preventDefault();
-          const fd = new FormData(e.target);
-          const email = String(fd.get("email")).trim();
-          const pass = String(fd.get("pass")).trim();
+          $("#loginForm").onsubmit = async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.target);
+              const email = String(fd.get("email")).trim();
+              const pass = String(fd.get("pass")).trim();
 
-          console.log('📤 ЛОГИН:', email);
+              console.log('📤 ЛОГИН:', email);
 
-          try {
-            const res = await fetch(`${API_URL}/login`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password: pass })
-            });
+              try {
+                  const res = await fetch(`${API_URL}/login`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email, password: pass })
+                  });
 
-            const data = await res.json();
-            console.log('📥 Ответ сервера:', data);
+                  const data = await res.json();
+                  console.log('📥 Ответ сервера:', data);
 
-            if (!res.ok) {
-              toast("danger", "Не вошли", data.message || "Неверный логин или пароль.");
-              return;
-            }
+                  if (!res.ok) {
+                      toast("danger", "Не вошли", data.message || "Неверный логин или пароль.");
+                      return;
+                  }
 
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken);
+                  // --- КРИТИЧЕСКИЕ ИСПРАВЛЕНИЯ ТУТ ---
 
-            let existingUser = state.users.find(u => u.email === data.user.email);
-            if (!existingUser) {
-              state.users.push({
-                id: data.user.id,
-                email: data.user.email,
-                name: data.user.name,
-                role: data.user.role,
-                city: data.user.city || '',
-                phone: data.user.phone || '',
-                avatar: data.user.avatarUrl || '',
-                pass: pass,
-                points: data.user.points || 0,
-                privacy: 'public',
-                createdAt: new Date().toISOString()
-              });
-            } else {
-              // важно: синхронизируем id с тем, что пришёл с сервера,
-              // иначе currentUser() не найдётся и кабинет снова откроет модалку входа
-              existingUser.id = data.user.id;
-              existingUser.name = data.user.name;
-              existingUser.role = data.user.role;
-              existingUser.city = data.user.city || '';
-              existingUser.phone = data.user.phone || '';
-              existingUser.avatar = data.user.avatarUrl || existingUser.avatar || '';
-            }
+                  // 1. Сохраняем токены (оба варианта для совместимости)
+                  authToken = data.token;
+                  localStorage.setItem('authToken', authToken); // Оставляем для старого кода
+                  localStorage.setItem('token', data.token);     // ДОБАВЛЯЕМ ДЛЯ АДМИНКИ
+                  localStorage.setItem('user', JSON.stringify(data.user)); // ДОБАВЛЯЕМ ДЛЯ ПРОВЕРКИ РОЛИ
+                  localStorage.setItem('token', data.token);
 
-            state.session.userId = data.user.id;
-            saveState();
-            const closeBtn = document.getElementById('modalClose');
-            if (closeBtn) closeBtn.click();
-            toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
-            navigate("/cabinet");
-            renderApp();
+                  // 2. Сохраняем объект пользователя целиком в localStorage
+                  // Это позволит admin.html сразу понять, кто зашел
+                  localStorage.setItem('user', JSON.stringify(data.user));
 
-          } catch (err) {
-            console.error('❌ Ошибка:', err);
-            toast("danger", "Ошибка", "Сервер недоступен");
-          }
-        };
+                  // 3. Синхронизация со стейтом (твой существующий код)
+                  let existingUser = state.users.find(u => u.email === data.user.email);
+                  const userData = {
+                      id: data.user.id,
+                      email: data.user.email,
+                      name: data.user.name,
+                      role: data.user.role,
+                      city: data.user.city || '',
+                      phone: data.user.phone || '',
+                      avatar: data.user.avatarUrl || '',
+                      pass: pass,
+                      points: data.user.points || 0,
+                      privacy: 'public',
+                      createdAt: data.user.createdAt || new Date().toISOString()
+                  };
+
+                  if (!existingUser) {
+                      state.users.push(userData);
+                  } else {
+                      Object.assign(existingUser, userData);
+                  }
+
+                  state.session.userId = data.user.id;
+                  saveState();
+
+                  // 4. Закрываем модалку и уведомляем
+                  const closeBtn = document.getElementById('modalClose');
+                  if (closeBtn) closeBtn.click();
+                  toast("ok", "Вход", `Добро пожаловать, ${data.user.name}!`);
+
+                  // 5. УМНАЯ НАВИГАЦИЯ:
+                  // Если зашел админ — кидаем в админку, если нет — в кабинет
+                  if (data.user.role === 'ADMIN') {
+                      console.log('🚀 Переход в панель управления...');
+                      setTimeout(() => {
+                          window.location.href = '/admin.html';
+                      }, 1000);
+                  } else {
+                      navigate("/cabinet");
+                      renderApp();
+                  }
+
+              } catch (err) {
+                  console.error('❌ Ошибка:', err);
+                  toast("danger", "Ошибка", "Сервер недоступен или ошибка в коде");
+              }
+          };
 
         // Перезаписываем regForm
         $("#regForm").onsubmit = async (e) => {
@@ -3545,8 +3596,10 @@
               return;
             }
 
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken);
+              authToken = data.token;
+              localStorage.setItem('authToken', authToken); // Оставляем для старого кода
+              localStorage.setItem('token', data.token);     // ДОБАВЛЯЕМ ДЛЯ АДМИНКИ
+              localStorage.setItem('user', JSON.stringify(data.user)); // ДОБАВЛЯЕМ ДЛЯ ПРОВЕРКИ РОЛИ
 
             const newUser = {
               id: data.user.id,
@@ -4350,6 +4403,7 @@
     /* ===== ОБНОВЛЕННЫЙ ЛИЧНЫЙ КАБИНЕТ ===== */
     /* === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ГЕЙМИФИКАЦИИ === */
 
+
     function calcLevel(points) {
       const pts = Math.max(0, points || 0);
 
@@ -4861,8 +4915,10 @@
 
         // Если сервер вернул новый access token (например, после смены email) — обновим его
         if (data.token) {
-          authToken = data.token;
-          localStorage.setItem('authToken', authToken);
+            authToken = data.token;
+            localStorage.setItem('authToken', authToken); // Оставляем для старого кода
+            localStorage.setItem('token', data.token);     // ДОБАВЛЯЕМ ДЛЯ АДМИНКИ
+            localStorage.setItem('user', JSON.stringify(data.user)); // ДОБАВЛЯЕМ ДЛЯ ПРОВЕРКИ РОЛИ
         }
 
         // НЕ вызываем saveState() - данные только на сервере!
@@ -5012,29 +5068,72 @@
         return;
       }
 
-      // При переходе на другие страницы, завязанные на бэкенд, заранее подгружаем данные
-      if (path === "/news" && typeof loadNewsFromServer === "function") {
-        loadNewsFromServer().then(() => fn()).catch(() => fn());
-      } else if (path === "/community" && typeof loadCommunityFromServer === "function") {
-        loadCommunityFromServer().then(() => fn()).catch(() => fn());
-      } else {
-        fn();
-      }
-      updateScrollBar();
+        function checkAdminAccess() {
+            const adminChip = document.getElementById('adminChip');
+            const userData = localStorage.getItem('user');
+
+            if (!userData) {
+                if (adminChip) adminChip.style.display = 'none';
+                return;
+            }
+
+            try {
+                const user = JSON.parse(userData);
+                if (adminChip) {
+                    adminChip.style.display = (user && user.role === 'ADMIN') ? 'inline-flex' : 'none';
+                }
+                // Запуск виджета, если функция существует
+                if (typeof injectAdminPanel === 'function') {
+                    injectAdminPanel();
+                }
+            } catch (e) {
+                console.error("Ошибка проверки роли:", e);
+            }
+        }
+
+        // Вызов проверки
+        checkAdminAccess();
+
+        // Логика переходов и загрузки данных
+        if (path === "/news" && typeof loadNewsFromServer === "function") {
+            loadNewsFromServer().then(() => fn()).catch(() => fn());
+        } else if (path === "/community" && typeof loadCommunityFromServer === "function") {
+            loadCommunityFromServer().then(() => fn()).catch(() => fn());
+        } else {
+            fn();
+        }
+
+        if (typeof updateScrollBar === "function") {
+            updateScrollBar();
+        }
+    } // Закрывает основную функцию (например, navigate или renderApp)
+
+    /* Навигация и обработчики (вне функции) */
+    if (document.querySelector(".chip[data-route]")) {
+        document.querySelectorAll(".chip[data-route]").forEach(el => {
+            el.addEventListener("click", () => {
+                if (typeof navigate === "function") navigate(el.dataset.route);
+            });
+        });
     }
 
-    /* nav */
-    $$(".chip[data-route]").forEach(el => el.addEventListener("click", () => navigate(el.dataset.route)));
-    $("#btnCtaHelp").addEventListener("click", () => navigate("/projects"));
-    $("#btnOpenAuth").onclick = () => {
-      if (currentUser()) {
-        // Если юзер есть, переходим в кабинет
-        navigate("/cabinet");
-      } else {
-        // Если юзера нет, открываем модалку входа
-        openAuthModal();
-      }
-    };
+    const helpBtn = document.getElementById("btnCtaHelp");
+    if (helpBtn) {
+        helpBtn.addEventListener("click", () => {
+            if (typeof navigate === "function") navigate("/projects");
+        });
+    }
+
+    const authBtn = document.getElementById("btnOpenAuth");
+    if (authBtn) {
+        authBtn.onclick = () => {
+            if (typeof currentUser === "function" && currentUser()) {
+                if (typeof navigate === "function") navigate("/cabinet");
+            } else if (typeof openAuthModal === "function") {
+                openAuthModal();
+            }
+        };
+    }
 
     // === ЗАГРУЗКА СЕССИИ ПРИ СТАРТЕ ===
     async function loadServerSession() {
@@ -5045,44 +5144,60 @@
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          console.log('✓ Сессия восстановлена:', data.user.name);
+          if (res.ok) {
+              const data = await res.json();
+              console.log('✓ Сессия восстановлена:', data.user.name);
 
-          let existingUser = state.users.find(u => u.id === data.user.id);
-          if (!existingUser) {
-            state.users.push({
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.name,
-              role: data.user.role,
-              city: data.user.city || '',
-              phone: data.user.phone || '',
-              avatar: data.user.avatarUrl || '',
-              pass: 'restored',
-              points: data.user.points || 0,
-              privacy: 'public',
-              createdAt: new Date().toISOString()
-            });
+              // --- 1. КРИТИЧЕСКИЕ СОХРАНЕНИЯ ДЛЯ АДМИНКИ ---
+              localStorage.setItem('token', data.token || localStorage.getItem('authToken'));
+              localStorage.setItem('authToken', data.token || localStorage.getItem('authToken'));
+              localStorage.setItem('user', JSON.stringify(data.user));
+
+              // --- 2. ОБНОВЛЕНИЕ ЛОКАЛЬНОГО СТЕЙТА ---
+              let existingUser = state.users.find(u => u.id === data.user.id);
+
+              if (!existingUser) {
+                  state.users.push({
+                      id: data.user.id,
+                      email: data.user.email,
+                      name: data.user.name,
+                      role: data.user.role,
+                      city: data.user.city || '',
+                      phone: data.user.phone || '',
+                      avatar: data.user.avatarUrl || '',
+                      pass: 'restored',
+                      points: data.user.points || 0,
+                      privacy: 'public',
+                      createdAt: data.user.createdAt || new Date().toISOString()
+                  });
+              } else {
+                  existingUser.email = data.user.email;
+                  existingUser.name = data.user.name;
+                  existingUser.role = data.user.role;
+                  existingUser.city = data.user.city || '';
+                  existingUser.phone = data.user.phone || '';
+                  existingUser.avatar = data.user.avatarUrl || existingUser.avatar || '';
+              }
+
+              state.session.userId = data.user.id;
+              saveState();
+
+              // --- 3. АКТИВАЦИЯ ВИДЖЕТА ---
+              if (typeof createAdminWidget === 'function') {
+                  createAdminWidget();
+              }
+
           } else {
-            existingUser.email = data.user.email;
-            existingUser.name = data.user.name;
-            existingUser.role = data.user.role;
-            existingUser.city = data.user.city || '';
-            existingUser.phone = data.user.phone || '';
-            existingUser.avatar = data.user.avatarUrl || existingUser.avatar || '';
+              // Если сессия не восстановилась
+              const data = await res.json().catch(() => ({}));
+              if (typeof handleAuthResponse === 'function') {
+                  handleAuthResponse(res, data);
+              }
           }
-
-          state.session.userId = data.user.id;
-          saveState();
-        } else {
-          const data = await res.json().catch(() => ({}));
-          handleAuthResponse(res, data);
-        }
       } catch (err) {
-        console.error('Ошибка загрузки сессии:', err);
+          console.error('❌ Ошибка загрузки сессии:', err);
       }
-    }
+    } // <--- Финальная скобка всей функции
 
     window.addEventListener("popstate", renderApp);
     // начальный маршрут
@@ -5867,51 +5982,50 @@
 
     // === Загрузка профиля с сервера ===
     async function loadProfileFromServer() {
-      if (!authToken) return;
+        const token = authToken || localStorage.getItem('token') || localStorage.getItem('authToken');
+        if (!token) return;
 
-      console.log('🔄 Загрузка профиля с сервера...');
-
-      try {
-        const res = await fetch(`${API_URL}/me`, {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          console.log('✅ Профиль загружен из БД:', data);
-
-          const u = currentUser();
-          if (u) {
-            // Обновляем данные в памяти из БД
-            Object.assign(u, {
-              name: data.name,
-              city: data.city,
-              phone: data.phone,
-              email: data.email,
-              points: data.points,
-              avatar: data.avatarUrl || ''
+        try {
+            const res = await fetch(`${API_URL}/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            // НЕ сохраняем в localStorage!
-          }
 
-          // Загружаем достижения при каждом обновлении профиля
-          if (u.id) {
-            try {
-              const achRes = await fetch(`${API_URL}/api/achievements/${u.id}`);
-              const achData = await achRes.json();
-              if (achRes.ok && Array.isArray(achData.achievements)) {
-                state.serverAchievements = achData.achievements;
-              }
-            } catch (achErr) {
-              console.warn('⚠️ Ошибка загрузки достижений для кэша:', achErr);
+            if (res.ok) {
+                const data = await res.json();
+
+                // 1. Формируем объект
+                const userData = {
+                    id: data.id || data._id,
+                    name: data.name,
+                    role: data.role || 'USER',
+                    email: data.email,
+                    avatar: data.avatarUrl || ''
+                };
+
+                // 2. ЗАПИСЫВАЕМ В ЛОКАЛ (для виджета)
+                localStorage.setItem('user', JSON.stringify(userData));
+                localStorage.setItem('token', token);
+
+                // 3. ЗАПИСЫВАЕМ В СТЕЙТ (чтобы старый код не тупил)
+                if (typeof state !== 'undefined') {
+                    state.session.userId = userData.id;
+                    if (!state.users) state.users = [];
+                    const idx = state.users.findIndex(u => u.id === userData.id);
+                    if (idx !== -1) state.users[idx] = userData;
+                    else state.users.push(userData);
+
+                    // Сохраняем стейт, чтобы userId зафиксировался
+                    if (typeof saveState === 'function') saveState();
+                }
+
+                console.log('✅ Данные успешно вбиты в память. Роль:', userData.role);
+
+                // Запускаем виджет
+                if (typeof injectAdminPanel === 'function') injectAdminPanel();
             }
-          }
+        } catch (err) {
+            console.error('❌ Ошибка профиля:', err);
         }
-      } catch (err) {
-        console.error('❌ Ошибка загрузки из БД:', err);
-      }
     }
 
     // === Просмотр всех достижений ===
@@ -6060,6 +6174,88 @@
 
   </script>
   <script src="/js/tracker.js"></script>
+  <script>
+      (function() {
+          function injectAdminPanel() {
+              // 1. Проверяем, не создан ли он уже
+              if (document.getElementById('ultimate-admin-panel')) return;
+
+              // 2. Проверяем роль в localStorage
+              const userData = localStorage.getItem('user');
+              if (!userData) return;
+
+              try {
+                  const user = JSON.parse(userData);
+                  if (user.role !== 'ADMIN') return;
+
+                  // 3. Создаем элемент
+                  const panel = document.createElement('div');
+                  panel.id = 'ultimate-admin-panel';
+
+                  // Стили прямо в JS для максимального приоритета
+                  Object.assign(panel.style, {
+                      position: 'fixed',
+                      right: '0',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      zIndex: '1000000', // Выше всего на свете
+                      display: 'flex',
+                      alignItems: 'center'
+                  });
+
+                  panel.innerHTML = `
+                <div id="admSideBtn" style="background:#4F46E5; color:white; width:40px; height:60px; display:flex; align-items:center; justify-content:center; border-radius:15px 0 0 15px; cursor:pointer; box-shadow:-2px 0 15px rgba(0,0,0,0.3); font-size:24px; font-weight:bold;">
+                    <span id="admArr">‹</span>
+                </div>
+                <div id="admBody" style="background:white; width:0; overflow:hidden; height:100px; display:flex; align-items:center; transition:0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius:10px 0 0 10px; box-shadow:-10px 0 30px rgba(0,0,0,0.15); border:1px solid #e5e7eb;">
+                    <div style="padding:0 25px; min-width:200px;">
+                        <p style="margin:0 0 10px; font-size:12px; color:#6366f1; font-weight:bold; text-transform:uppercase; letter-spacing:1px;">Admin Access</p>
+                        <button onclick="window.location.href='/admin.html'" style="background:#4F46E5; color:white; border:none; padding:12px 20px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold; font-family:sans-serif; transition:0.2s;">
+                           Перейти в Админку
+                        </button>
+                    </div>
+                </div>
+            `;
+
+                  document.body.appendChild(panel);
+
+                  // Логика открытия/закрытия
+                  const btn = panel.querySelector('#admSideBtn');
+                  const body = panel.querySelector('#admBody');
+                  const arr = panel.querySelector('#admArr');
+                  let isOpen = false;
+
+                  btn.onclick = (e) => {
+                      e.stopPropagation();
+                      isOpen = !isOpen;
+                      body.style.width = isOpen ? '250px' : '0';
+                      arr.style.display = 'inline-block';
+                      arr.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+                      btn.style.background = isOpen ? '#1e1b4b' : '#4F46E5';
+                  };
+
+                  // Закрывать при клике мимо
+                  document.addEventListener('click', () => {
+                      if (isOpen) {
+                          isOpen = false;
+                          body.style.width = '0';
+                          arr.style.transform = 'rotate(0deg)';
+                          btn.style.background = '#4F46E5';
+                      }
+                  });
+
+                  console.log("✅ Бронебойный виджет Админа запущен!");
+
+              } catch (err) {
+                  console.error("Ошибка виджета:", err);
+              }
+          }
+
+          // Запускаем проверку часто (чтобы переиграть SPA)
+          setInterval(injectAdminPanel, 1000);
+          window.addEventListener('load', injectAdminPanel);
+      })();
+  </script>
 </body>
 
 </html>
