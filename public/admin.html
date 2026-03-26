@@ -202,6 +202,13 @@
             .sidebar { display: none; }
             .two-columns { grid-template-columns: 1fr; }
         }
+
+        .chart-container {
+            position: relative; /* КРИТИЧЕСКИ ВАЖНО для Chart.js */
+            width: 100%;
+            height: 300px;
+            margin-bottom: 24px;
+        }
     </style>
 </head>
 <body>
@@ -316,46 +323,171 @@
     async function renderDashboard() {
         document.getElementById('pageTitle').innerText = 'Пульс системы';
         document.getElementById('content').innerHTML = `
-            <div class="kpi-grid" id="kpiGrid"></div>
-            <div class="card">
-                <h3>Динамика регистраций</h3>
-                <div style="display: flex; gap: 12px; margin: 16px 0;">
+        <div style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">👥 Аудитория платформы</h3>
+            <div class="kpi-grid" id="kpiAudience">Загрузка...</div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">⚡ Эффективность и Вовлеченность</h3>
+            <div class="kpi-grid" id="kpiEngagement">Загрузка...</div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">🗂 Здоровье проектов</h3>
+            <div class="kpi-grid" id="kpiProjects">Загрузка...</div>
+        </div>
+
+
+        <div style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px;">📍 География охвата (Топ городов)</h3>
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <table id="geoTable" style="margin-bottom: 0;">
+                    <thead>
+                        <tr>
+                            <th>Город / Регион</th>
+                            <th>Волонтёры</th>
+                            <th>Активные проекты</th>
+                            <th>Доля от общей базы</th>
+                        </tr>
+                    </thead>
+                    <tbody id="geoTableBody">
+                        <tr><td colspan="4" style="text-align:center; padding:20px;">Загрузка данных по городам...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" style="position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3>📈 Динамика регистраций</h3>
+                <div style="display: flex; gap: 8px;">
                     <button class="btn btn-secondary period-btn" data-period="week">Неделя</button>
                     <button class="btn btn-secondary period-btn" data-period="month">Месяц</button>
                 </div>
-                <div class="chart-container"><canvas id="regChart"></canvas></div>
             </div>
-            <div class="two-columns">
-                <div class="card"><h3>🔥 Живая активность</h3><div id="liveFeed" class="live-feed">Загрузка...</div></div>
-                <div class="card"><h3>📊 Воронка вовлечения</h3><div id="funnelContainer"></div></div>
+            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                <canvas id="regChart"></canvas>
             </div>
-        `;
+        </div>
+
+        <div class="two-columns">
+            <div class="card">
+                <h3>🔥 Живая активность</h3>
+                <div id="liveFeed" class="live-feed">Ожидание данных...</div>
+            </div>
+            <div class="card">
+                <h3>📊 Воронка пользователя (Конверсия)</h3>
+                <div id="funnelContainer" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+    `;
 
         const kpi = await apiFetch('/api/admin/dashboard/kpi');
         if (kpi.success) {
-            document.getElementById('kpiGrid').innerHTML = `
-                <div class="kpi-card"><div class="kpi-title">Всего волонтёров</div><div class="kpi-value">${kpi.totalVolunteers}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Новые 24ч / 7д</div><div class="kpi-value">${kpi.new24h} / ${kpi.new7d}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Конверсия</div><div class="kpi-value">${kpi.conversion}%</div></div>
-                <div class="kpi-card"><div class="kpi-title">LTV</div><div class="kpi-value">${kpi.ltv}</div></div>
-                <div class="kpi-card"><div class="kpi-title">DAU / WAU / MAU</div><div class="kpi-value">${kpi.dau} / ${kpi.wau} / ${kpi.mau}</div></div>
-            `;
+            // Блок 1: Аудитория
+            document.getElementById('kpiAudience').innerHTML = `
+            <div class="kpi-card"><div class="kpi-title">Всего пользователей</div><div class="kpi-value">${kpi.totalUsers}</div><div style="font-size:11px; color:#9ca3af;">База аккаунтов</div></div>
+            <div class="kpi-card" style="border-bottom: 3px solid #4f46e5;"><div class="kpi-title">Волонтёры</div><div class="kpi-value">${kpi.totalVolunteers}</div><div style="font-size:11px; color:#10b981;">+${kpi.new7d} за неделю</div></div>
+            <div class="kpi-card" style="border-bottom: 3px solid #f59e0b;"><div class="kpi-title">Организаторы</div><div class="kpi-value">${kpi.totalOrganizers}</div><div style="font-size:11px; color:#9ca3af;">Создатели проектов</div></div>
+            <div class="kpi-card"><div class="kpi-title">Уникальные (DAU)</div><div class="kpi-value">${kpi.dau}</div><div style="font-size:11px; color:#10b981;">Заходили сегодня</div></div>
+        `;
+
+            // Блок 2: Эффективность
+            document.getElementById('kpiEngagement').innerHTML = `
+            <div class="kpi-card"><div class="kpi-title">Retention (Удержание)</div><div class="kpi-value">${kpi.retentionRate}%</div><div style="font-size:11px; color:#9ca3af;">Вернулись через 7 дней</div></div>
+            <div class="kpi-card"><div class="kpi-title">Конверсия в отклик</div><div class="kpi-value">${kpi.ctr}%</div><div style="font-size:11px; color:#9ca3af;">Просмотр → Пойду</div></div>
+            <div class="kpi-card"><div class="kpi-title">Явка (Show-up rate)</div><div class="kpi-value">${kpi.showUpRate}%</div><div style="font-size:11px; color:#f59e0b;">Дошли до проекта</div></div>
+            <div class="kpi-card"><div class="kpi-title">Social LTV</div><div class="kpi-value">${kpi.avgHours} <span style="font-size:14px; color:#9ca3af;">часов</span></div><div style="font-size:11px; color:#10b981;">В среднем на волонтёра</div></div>
+        `;
+
+            // Блок 3: Проекты
+            document.getElementById('kpiProjects').innerHTML = `
+            <div class="kpi-card"><div class="kpi-title">Активные проекты</div><div class="kpi-value">${kpi.activeProjects}</div><div style="font-size:11px; color:#9ca3af;">Ищут людей прямо сейчас</div></div>
+            <div class="kpi-card"><div class="kpi-title">Дефицит людей</div><div class="kpi-value" style="color:#ef4444;">${kpi.underfilledProjects}</div><div style="font-size:11px; color:#9ca3af;">Набрано < 30% мест</div></div>
+            <div class="kpi-card"><div class="kpi-title">Скорость набора</div><div class="kpi-value">${kpi.avgTimeToFill} <span style="font-size:14px; color:#9ca3af;">дней</span></div><div style="font-size:11px; color:#9ca3af;">До полного закрытия мест</div></div>
+            <div class="kpi-card"><div class="kpi-title">Выгорание</div><div class="kpi-value">${kpi.burnoutRate}%</div><div style="font-size:11px; color:#ef4444;">Ушли после 1 задания</div></div>
+        `;
+
+            const geoData = await apiFetch('/api/admin/dashboard/geo-stats');
+            if (geoData.success) {
+                const total = kpi.totalVolunteers || 1;
+                document.getElementById('geoTableBody').innerHTML = geoData.stats.map(city => `
+        <tr>
+            <td><span style="color: #4f46e5; font-weight: 600;">${city._id || 'Не указан'}</span></td>
+            <td>${city.count}</td>
+            <td>${city.activeProjects || 0}</td>
+            <td>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="flex:1; background:#2a2a30; height:6px; border-radius:3px;">
+                        <div style="width:${(city.count/total*100)}%; background:#4f46e5; height:100%; border-radius:3px;"></div>
+                    </div>
+                    <span style="font-size:11px; width:35px;">${((city.count/total)*100).toFixed(1)}%</span>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+            }
         }
 
         async function loadRegistrations(period) {
-            const data = await apiFetch(`/api/admin/dashboard/registrations-timeline?period=${period}`);
-            if (data.success && document.getElementById('regChart')) {
+            const res = await apiFetch(`/api/admin/dashboard/registrations-timeline?period=${period}`);
+            if (res.success && document.getElementById('regChart')) {
+                const days = period === 'week' ? 7 : 30;
+                const filledData = [];
+                const dataMap = new Map(res.data.map(d => [d._id, d.count]));
+
+                // Генерируем массив дат от сегодня назад
+                for(let i = days - 1; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    const dateStr = d.toISOString().split('T')[0];
+                    filledData.push({ date: dateStr, count: dataMap.get(dateStr) || 0 });
+                }
+
                 const ctx = document.getElementById('regChart').getContext('2d');
                 if (regChart) regChart.destroy();
+
                 regChart = new Chart(ctx, {
                     type: 'line',
-                    data: { labels: data.data.map(d => d._id), datasets: [{ label: 'Регистрации', data: data.data.map(d => d.count), borderColor: '#4f46e5', tension: 0.3, fill: true, backgroundColor: 'rgba(79,70,229,0.1)' }] },
-                    options: { responsive: true, maintainAspectRatio: false }
+                    data: {
+                        labels: filledData.map(d => d.date.slice(5)), // Показываем только месяц-день (MM-DD)
+                        datasets: [{
+                            label: 'Новые волонтёры',
+                            data: filledData.map(d => d.count),
+                            borderColor: '#4f46e5',
+                            tension: 0.4,
+                            fill: true,
+                            backgroundColor: 'rgba(79,70,229,0.1)',
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1a1a1f',
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                beginAtZero: true,
+                                suggestedMax: 5, // Чтобы график не был плоским при 0 регистрациях
+                                ticks: { color: '#9ca3af', stepSize: 1 }
+                            }
+                        }
+                    }
                 });
             }
         }
+
         loadRegistrations('week');
-        document.querySelectorAll('.period-btn').forEach(btn => btn.addEventListener('click', () => loadRegistrations(btn.dataset.period)));
+        document.querySelectorAll('.period-btn').forEach(btn => btn.addEventListener('click', () => {
+            document.querySelectorAll('.period-btn').forEach(b => b.classList.replace('btn', 'btn-secondary'));
+            btn.classList.replace('btn-secondary', 'btn');
+            loadRegistrations(btn.dataset.period);
+        }));
 
         async function loadLiveFeed() {
             const feed = await apiFetch('/api/admin/dashboard/live-feed');

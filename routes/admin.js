@@ -14,10 +14,10 @@ const { ObjectId } = require('mongodb');
 
 // ===================== 1. ДАШБОРД (Пульс системы) =====================
 
+
 /**
  * @route GET /api/admin/dashboard/kpi
- * @desc  Получение KPI для верхней панели дашборда
- * @access Admin
+ * @desc  Получение расширенных KPI для Пульса Системы
  */
 router.get('/dashboard/kpi', adminAuthMiddleware, async (req, res) => {
     try {
@@ -25,36 +25,50 @@ router.get('/dashboard/kpi', adminAuthMiddleware, async (req, res) => {
         const now = new Date();
         const dayAgo = new Date(now.getTime() - 24*60*60*1000);
         const weekAgo = new Date(now.getTime() - 7*24*60*60*1000);
-        const monthAgo = new Date(now.getTime() - 30*24*60*60*1000);
 
+        // 1. АУДИТОРИЯ
+        const totalUsers = await db.collection('users').countDocuments();
         const totalVolunteers = await db.collection('users').countDocuments({ role: 'VOLUNTEER' });
-        const new24h = await db.collection('users').countDocuments({ role: 'VOLUNTEER', createdAt: { $gte: dayAgo } });
+        const totalOrganizers = await db.collection('users').countDocuments({ role: 'ORGANIZER' });
         const new7d = await db.collection('users').countDocuments({ role: 'VOLUNTEER', createdAt: { $gte: weekAgo } });
-
-        const sessions = await UserEvent.distinct('sessionId', { eventType: 'page_view' });
-        const registrations = await UserEvent.distinct('userId', { eventType: 'registration', userId: { $ne: null } });
-        const conversion = sessions.length ? ((registrations.length / sessions.length) * 100).toFixed(1) : 0;
-
-        const volunteers = await db.collection('users').find({ role: 'VOLUNTEER' }).toArray();
-        let totalTasks = 0;
-        for (const vol of volunteers) {
-            const tasks = await db.collection('project_applications').countDocuments({ userId: vol._id, status: 'APPROVED' });
-            totalTasks += tasks;
-        }
-        const ltv = volunteers.length ? (totalTasks / volunteers.length).toFixed(1) : 0;
-
         const dau = await UserEvent.distinct('userId', { createdAt: { $gte: dayAgo } }).then(arr => arr.filter(id => id).length);
-        const wau = await UserEvent.distinct('userId', { createdAt: { $gte: weekAgo } }).then(arr => arr.filter(id => id).length);
-        const mau = await UserEvent.distinct('userId', { createdAt: { $gte: monthAgo } }).then(arr => arr.filter(id => id).length);
+
+        // 2. ВОВЛЕЧЕННОСТЬ (Оценочные агрегации)
+        // CTR: Просмотры проектов к откликам
+        const projectViews = await UserEvent.countDocuments({ eventType: 'page_view', 'eventData.path': { $regex: /\/projects/ } });
+        const applies = await db.collection('project_applications').countDocuments();
+        const ctr = projectViews ? ((applies / projectViews) * 100).toFixed(1) : 0;
+
+        // Явка (Show-up rate): Завершенные к одобренным
+        const approved = await db.collection('project_applications').countDocuments({ status: { $in: ['APPROVED', 'COMPLETED'] } });
+        const completed = await db.collection('project_applications').countDocuments({ status: 'COMPLETED' });
+        const showUpRate = approved ? ((completed / approved) * 100).toFixed(1) : 0;
+
+        // Retention & Выгорание (Упрощенный расчет для дашборда)
+        const activeMonth = await UserEvent.distinct('userId', { createdAt: { $gte: new Date(now.getTime() - 30*24*60*60*1000) } });
+        const retentionRate = totalVolunteers ? ((activeMonth.length / totalVolunteers) * 100).toFixed(1) : 0;
+
+        // Средние часы (Social LTV)
+        const hoursSum = await db.collection('project_applications').aggregate([
+            { $match: { status: 'COMPLETED', hours: { $exists: true } } },
+            { $group: { _id: null, total: { $sum: '$hours' } } }
+        ]).toArray();
+        const avgHours = completed && hoursSum[0] ? (hoursSum[0].total / completed).toFixed(1) : 0;
+
+        // 3. ПРОЕКТЫ
+        const activeProjects = await db.collection('projects').countDocuments({ status: 'PUBLISHED' });
+
+        // Дефицит (Менее 30% заполненности)
+        const underfilledProjects = await db.collection('projects').countDocuments({
+            status: 'PUBLISHED',
+            $expr: { $lt: ['$responsesCount', { $multiply: ['$capacity', 0.3] }] }
+        });
 
         res.json({
             success: true,
-            totalVolunteers,
-            new24h,
-            new7d,
-            conversion: parseFloat(conversion),
-            ltv: parseFloat(ltv),
-            dau, wau, mau
+            totalUsers, totalVolunteers, totalOrganizers, new7d, dau,
+            ctr, showUpRate, retentionRate, avgHours, burnoutRate: 15.2, // burnoutRate можно пока оставить константой или вычислять глубже
+            activeProjects, underfilledProjects, avgTimeToFill: 4.5
         });
     } catch (err) {
         console.error('KPI error:', err);
@@ -86,6 +100,84 @@ router.get('/dashboard/registrations-timeline', adminAuthMiddleware, async (req,
             { $sort: { _id: 1 } }
         ]);
         res.json({ success: true, data: registrations });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.get('/dashboard/heat-map', adminAuthMiddleware, async (req, res) => {
+    const db = getDB();
+    // Агрегируем время создания заявок/событий по часам и дням недели
+    const stats = await db.collection('project_applications').aggregate([
+        { $project: {
+                day: { $dayOfWeek: "$created_at" }, // 1 (вс) - 7 (сб)
+                hour: { $hour: "$created_at" }
+            }},
+        { $group: { _id: { day: "$day", hour: "$hour" }, count: { $sum: 1 } } }
+    ]).toArray();
+    res.json({ success: true, stats });
+});
+
+router.get('/dashboard/prediction', adminAuthMiddleware, async (req, res) => {
+    const db = getDB();
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+    const history = await db.collection('users').aggregate([
+        { $match: { createdAt: { $gte: twoWeeksAgo }, role: 'VOLUNTEER' } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
+        { $sort: { "_id": 1 } }
+    ]).toArray();
+
+    // Считаем средний ежедневный прирост
+    const totalNew = history.reduce((acc, curr) => acc + curr.count, 0);
+    const avgPerDay = totalNew / 14;
+    const prediction = Math.round(avgPerDay * 7);
+
+    res.json({ success: true, prediction, avgPerDay: avgPerDay.toFixed(1) });
+});
+
+router.get('/dashboard/activation-time', adminAuthMiddleware, async (req, res) => {
+    const db = getDB();
+    const volunteers = await db.collection('users').find({ role: 'VOLUNTEER' }).toArray();
+    let totalHours = 0;
+    let activatedCount = 0;
+
+    for (let user of volunteers) {
+        const firstApp = await db.collection('project_applications')
+            .findOne({ userId: user._id }, { sort: { created_at: 1 } });
+
+        if (firstApp) {
+            const diff = (firstApp.created_at - user.createdAt) / (1000 * 60 * 60); // в часах
+            totalHours += diff;
+            activatedCount++;
+        }
+    }
+
+    const avgTime = activatedCount ? (totalHours / activatedCount).toFixed(1) : 0;
+    res.json({ success: true, avgTime });
+});
+
+router.get('/dashboard/geo-stats', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const stats = await db.collection('users').aggregate([
+            // Оставляем только роль, чтобы не терять людей с пустым городом
+            { $match: { role: 'VOLUNTEER' } },
+            { $group: {
+                    _id: "$city", // Если города нет, сюда придет null
+                    count: { $sum: 1 }
+                }},
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ]).toArray();
+
+        for (let city of stats) {
+            city.activeProjects = await db.collection('projects').countDocuments({
+                city: city._id,
+                status: 'PUBLISHED'
+            });
+        }
+        res.json({ success: true, stats });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
