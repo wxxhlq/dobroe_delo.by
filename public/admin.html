@@ -209,6 +209,112 @@
             height: 300px;
             margin-bottom: 24px;
         }
+
+        /* --- НОВЫЕ СТИЛИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ --- */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .status-online { background: #10b981; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+        .status-offline { background: #4b5563; }
+
+        .interest-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(79, 70, 229, 0.1);
+            color: #818cf8;
+            border: 1px solid rgba(79, 70, 229, 0.2);
+            display: inline-block;
+            margin: 2px;
+        }
+
+        /* Выпадающее меню (Quick Actions) */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .action-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: #1a1a1f;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+            z-index: 100;
+            border: 1px solid #2a2a30;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .action-dropdown:hover .action-dropdown-content {
+            display: block;
+        }
+        .action-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 10px 16px;
+            background: none;
+            border: none;
+            color: #e1e4e8;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .action-btn:hover { background-color: #2a2a30; }
+        .action-btn.danger { color: #ef4444; }
+        .action-btn.danger:hover { background-color: rgba(239, 68, 68, 0.1); }
+
+        /* Модальное окно */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #1a1a1f;
+            border: 1px solid #2a2a30;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+
+        .modal-body input, .modal-body select {
+            width: 100%;
+            padding: 10px;
+            background: #2a2a30;
+            border: 1px solid #3f3f46;
+            border-radius: 8px;
+            color: #fff;
+            margin-top: 8px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
     </style>
 </head>
 <body>
@@ -583,25 +689,285 @@
     }
 
     // ===================== МЕТРИКИ ПОЛЬЗОВАТЕЛЕЙ =====================
+    let currentUsersData = []; // Храним данные для фильтрации
+
     async function renderUserMetrics() {
-        document.getElementById('pageTitle').innerText = 'Метрики пользователей';
-        const data = await apiFetch('/api/admin/metrics/users');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-title">Всего волонтёров</div><div class="kpi-value">${data.volunteers.total}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Активные (д/н/м)</div><div class="kpi-value">${data.volunteers.activeDay} / ${data.volunteers.activeWeek} / ${data.volunteers.activeMonth}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Новые (д/н/м)</div><div class="kpi-value">${data.volunteers.newDay} / ${data.volunteers.newWeek} / ${data.volunteers.newMonth}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Удержание</div><div class="kpi-value">${data.volunteers.retention}%</div></div>
-                <div class="kpi-card"><div class="kpi-title">Ср. участий</div><div class="kpi-value">${data.volunteers.avgTasks}</div></div>
+        document.getElementById('pageTitle').innerText = 'Управление сообществом';
+        const content = document.getElementById('content');
+
+        // 1. Отрисовка каркаса и фильтров
+        content.innerHTML = `
+        <div class="card" style="overflow: visible;"> <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <div style="display: flex; gap: 8px;" id="userFilters">
+                    <button class="btn user-filter" data-filter="all">Все</button>
+                    <button class="btn btn-secondary user-filter" data-filter="heroes">⭐ Герои</button>
+                    <button class="btn btn-secondary user-filter" data-filter="newbies">🌱 Новички</button>
+                    <button class="btn btn-secondary user-filter" data-filter="sleeping">💤 Спящие</button>
+                    <button class="btn btn-secondary user-filter" data-filter="orgs">🏢 Организаторы</button>
+                </div>
+                <div style="width: 250px;">
+                    <input type="text" id="userSearch" placeholder="Поиск по имени...">
+                </div>
             </div>
-            <div class="two-columns">
-                <div class="card"><h3>География волонтёров</h3><div id="geoChart" style="height:300px;"></div></div>
-                <div class="card"><h3>Топ организаторов</h3><table><thead><tr><th>Организатор</th><th>Проектов</th></tr></thead><tbody>${data.organizations.topByProjects.map(o => `<tr><td>${o.name}</td><td>${o.projectsCount}</td></tr>`).join('')}</tbody></table></div>
+
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; min-width: 800px;">
+                    <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Онлайн</th>
+                            <th>Город</th>
+                            <th>Опыт (XP)</th>
+                            <th style="text-align: right;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <tr><td colspan="5" style="text-align:center; padding:40px;">Загрузка списка...</td></tr>
+                    </tbody>
+                </table>
             </div>
-        `;
-        const geo = echarts.init(document.getElementById('geoChart'));
-        geo.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data: data.geography.map(c => ({ name: c._id, value: c.count })), radius: '60%' }] });
+        </div>
+    `;
+
+        try {
+            // Запрашиваем данные с бэкенда (убедись, что бэкенд отдает массив usersList)
+            const data = await apiFetch('/api/admin/metrics/users');
+            if (!data.success) throw new Error('Ошибка API');
+
+            // Ищем массив там, где он может лежать
+            currentUsersData = data.usersList || data.users || data.data || [];
+            console.log("Полученные пользователи:", currentUsersData); // Выведем в консоль для проверки
+            renderUsersTable(currentUsersData); // Рисуем таблицу
+
+            // Подключаем логику кнопок фильтров
+            document.querySelectorAll('.user-filter').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.user-filter').forEach(b => b.classList.replace('btn', 'btn-secondary'));
+                    e.target.classList.replace('btn-secondary', 'btn');
+                    applyUserFilters(e.target.dataset.filter);
+                });
+            });
+
+            // Подключаем поиск
+            document.getElementById('userSearch').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = currentUsersData.filter(u =>
+                    (u.name || '').toLowerCase().includes(query) ||
+                    (u.email || '').toLowerCase().includes(query)
+                );
+                renderUsersTable(filtered);
+            });
+
+        } catch (err) {
+            console.error("Сбой загрузки пользователей:", err);
+            document.getElementById('userTableBody').innerHTML = '<tr><td colspan="5" style="color:#ef4444; text-align:center;">Ошибка загрузки данных</td></tr>';
+        }
+    }
+
+    function getRelativeTimeString(date) {
+        if (!date) return 'никогда';
+        const now = new Date();
+        const then = new Date(date);
+        const diffSeconds = Math.floor((now - then) / 1000);
+        const diffMinutes = Math.floor(diffSeconds / 60);
+        const diffHours = Math.floor(diffMinutes / 60);
+
+        // 5 минут — считаем "В сети" (Online)
+        if (diffSeconds < 300) {
+            return '<span style="color:#10b981; font-weight:600;">online</span>';
+        }
+
+        if (diffMinutes < 60) return `был${getGenderSuffix(date)} ${diffMinutes} мин. назад`;
+
+        if (diffHours < 24) {
+            if (now.getDate() === then.getDate()) {
+                return `был${getGenderSuffix(date)} сегодня в ${then.getHours()}:${then.getMinutes().toString().padStart(2, '0')}`;
+            }
+        }
+
+        if (diffHours < 48) {
+            const yesterday = new Date();
+            yesterday.setDate(now.getDate() - 1);
+            if (yesterday.getDate() === then.getDate()) {
+                return `был${getGenderSuffix(date)} вчера в ${then.getHours()}:${then.getMinutes().toString().padStart(2, '0')}`;
+            }
+        }
+
+        return `был${getGenderSuffix(date)} ${then.toLocaleDateString()}`;
+    }
+
+    // Мини-функция для окончаний "был/была"
+    function getGenderSuffix(date) {
+        // В идеале брать из u.gender, но пока оставим универсально или привяжем к "а" в конце имени
+        return 'а'; // Ульяна, Яна, Лиана — у тебя в основном девушки :)
+    }
+
+    // --- ФИЛЬТРАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ---
+    function applyUserFilters(filterType) {
+        const now = new Date();
+
+        // ВАЖНО: Приводим всё к единому стандарту дат, как в таблице
+        const filtered = currentUsersData.filter(u => {
+            const regDate = new Date(u.created_at || u.createdAt || now);
+            const lastActive = new Date(u.lastLogin || u.last_login || regDate);
+
+            const diffDaysReg = (now - regDate) / (1000 * 60 * 60 * 24);
+            const diffDaysActive = (now - lastActive) / (1000 * 60 * 60 * 24);
+            const points = u.points || 0;
+
+            switch(filterType) {
+                case 'heroes':
+                    // Совпадает с иконкой ⭐ (XP >= 100)
+                    return points >= 100;
+                case 'newbies':
+                    // Совпадает с иконкой 🌱 (регистрация до 7 дней)
+                    return diffDaysReg <= 7;
+                case 'sleeping':
+                    // Совпадает с иконкой 💤 (не заходили > 30 дней)
+                    return diffDaysActive > 30;
+                case 'orgs':
+                    return u.role === 'ORGANIZER' || u.role === 'ADMIN';
+                default:
+                    return true;
+            }
+        });
+
+        // Визуальное переключение кнопок
+        document.querySelectorAll('.user-filter').forEach(btn => {
+            const isTarget = btn.dataset.filter === filterType || (filterType === 'all' && !btn.dataset.filter);
+            if (isTarget) {
+                btn.classList.add('active'); // Предположим, у тебя есть стиль .active
+                btn.style.background = '#4f46e5';
+                btn.style.color = '#fff';
+            } else {
+                btn.classList.remove('active');
+                btn.style.background = '';
+                btn.style.color = '';
+            }
+        });
+
+        renderUsersTable(filtered);
+    }
+
+    // --- ОТРИСОВКА ТАБЛИЦЫ ---
+    /**
+     * Умное форматирование времени а-ля ВК
+     * @param {Date} lastActive - дата последнего входа
+     * @param {string} name - имя для определения пола
+     */
+    function formatLastSeenVk(lastActive, name = '') {
+        const now = new Date();
+        const diffMs = now - lastActive;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+
+        // Простая логика пола: если имя заканчивается на "а" или "я" — она
+        const isFemale = /[ая]$/i.test(name.trim());
+        const action = isFemale ? '' : '';
+
+        // 1. Статус Online (до 7 минут, чтобы сгладить задержки пинга)
+        if (diffMins < 7 && diffMins >= 0) {
+            return '<span style="color:#10b981; font-weight:600;">online</span>';
+        }
+
+        // 2. Минуты
+        if (diffMins < 60) {
+            return `${action} ${diffMins} мин. назад`;
+        }
+
+        // 3. Сегодня в...
+        if (now.toDateString() === lastActive.toDateString()) {
+            const time = lastActive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `${action} сегодня в ${time}`;
+        }
+
+        // 4. Вчера в...
+        const yesterday = new Date();
+        yesterday.setDate(now.getDate() - 1);
+        if (yesterday.toDateString() === lastActive.toDateString()) {
+            const time = lastActive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `${action} вчера в ${time}`;
+        }
+
+        // 5. Давняя дата
+        return `${action} ${lastActive.toLocaleDateString()}`;
+    }
+
+    function renderUsersTable(users) {
+        const tbody = document.getElementById('userTableBody');
+        const now = new Date();
+
+        if (!users || users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#6b7280;">Список пуст</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+            const name = u.name || u.username || 'Аноним';
+            const points = u.points || 0;
+            const regDate = new Date(u.created_at || u.createdAt || now);
+
+            // Время последнего входа (из нашей новой системы пингов)
+            const lastActive = new Date(u.lastLogin || u.last_login || regDate);
+
+            // Определяем, рисовать ли зеленую точку
+            const isOnline = (now - lastActive) < 420000; // 7 минут
+
+            // Иконки статусов
+            let statusIcon = '';
+            if (points >= 100) statusIcon = '⭐';
+            else if ((now - regDate) / 86400000 <= 7) statusIcon = '🌱';
+            else if ((now - lastActive) / 86400000 > 30) statusIcon = '💤';
+
+            const roleColor = u.role === 'ADMIN' ? 'badge-danger' : (u.role === 'ORGANIZER' ? 'badge-warning' : 'badge-success');
+
+            return `
+<tr style="${u.isBlocked ? 'opacity: 0.6;' : ''}">
+    <td>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="position:relative;">
+                <div style="width:40px; height:40px; background:#2a2a30; border:1px solid #3f3f46; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#818cf8;">
+                    ${name[0].toUpperCase()}
+                </div>
+                ${isOnline ? '<div class="status-dot status-online" style="position:absolute; bottom:2px; right:2px; border:2px solid #1a1a1f; width:10px; height:10px; background:#10b981; border-radius:50%;"></div>' : ''}
+            </div>
+            <div>
+                <div style="font-weight:600; color:#fff; display:flex; align-items:center; gap:6px;">
+                    ${statusIcon} ${name}
+                    ${u.isBlocked ? '<span title="Заблокирован" style="color:#ef4444; font-size:12px;">🚫</span>' : ''}
+                </div>
+                <div style="font-size:11px; color:#6b7280;">
+                    ${u.email} • <span class="badge ${roleColor}" style="font-size:9px;">${u.role}</span>
+                </div>
+            </div>
+        </div>
+    </td>
+    <td>
+        <div style="font-size:12px; color:#e1e4e8; font-weight:500;">
+            ${formatLastSeenVk(lastActive, name)}
+        </div>
+        <div style="font-size:10px; color:#4b5563;">активность</div>
+    </td>
+    <td>
+        <div style="font-size:12px; color:#818cf8; font-weight:500;">${u.city || 'Не указан'}</div>
+        <div style="font-size:10px; color:#6b7280;">рег: ${regDate.toLocaleDateString()}</div>
+    </td>
+    <td>
+        <div style="font-size:15px; font-weight:700; color:#4f46e5;">${points}</div>
+        <div style="font-size:9px; color:#4b5563;">XP</div>
+    </td>
+    <td style="text-align: right;">
+        <div class="action-dropdown">
+            <button class="btn-secondary" style="padding:6px 10px; border-radius:8px;">⚙️</button>
+            <div class="action-dropdown-content">
+                <button class="action-btn" onclick="handleAction('bonus', '${u._id}')">🎁 Начислить XP</button>
+                <button class="action-btn" onclick="handleAction('role', '${u._id}')">🔄 Выбрать роль</button>
+
+            </div>
+        </div>
+    </td>
+</tr>`;
+        }).join('');
     }
 
     // ===================== МЕТРИКИ ПРОЕКТОВ =====================
@@ -830,6 +1196,81 @@
     document.getElementById('logoutBtn').addEventListener('click', logout);
 
     switchTab('dashboard');
+
+    // --- ОБРАБОТЧИК БЫСТРЫХ ДЕЙСТВИЙ ---
+    let activeTargetUserId = null;
+
+    function closeAdminModal() {
+        document.getElementById('adminModal').style.display = 'none';
+    }
+
+    window.handleAction = function(actionType, userId) {
+        activeTargetUserId = userId;
+        const modal = document.getElementById('adminModal');
+        const header = document.getElementById('modalHeader');
+        const body = document.getElementById('modalBody');
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+
+        modal.style.display = 'flex';
+
+        if (actionType === 'bonus') {
+            header.innerText = 'Начислить опыт (XP)';
+            body.innerHTML = `
+            <label>Количество баллов:</label>
+            <input type="number" id="bonusAmount" value="10" min="1">
+        `;
+            confirmBtn.onclick = async () => {
+                const amount = document.getElementById('bonusAmount').value;
+                await executeAction(`/api/admin/user/${userId}/bonus`, { amount: Number(amount) });
+            };
+        }
+        else if (actionType === 'role') {
+            header.innerText = 'Изменить роль';
+            body.innerHTML = `
+            <select id="newRole">
+                <option value="VOLUNTEER">Волонтёр</option>
+                <option value="ORGANIZER">Организатор</option>
+                <option value="ADMIN">Администратор</option>
+            </select>
+        `;
+            confirmBtn.onclick = async () => {
+                const role = document.getElementById('newRole').value;
+                await executeAction(`/api/admin/user/${userId}/role`, { role });
+            };
+        }
+        else if (actionType === 'block') {
+            header.innerText = 'Блокировка доступа';
+            body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите изменить статус блокировки этого пользователя?</p>`;
+            confirmBtn.onclick = async () => {
+                await executeAction(`/api/admin/user/${userId}/toggle-block`, {}, 'POST');
+            };
+        }
+    };
+
+    async function executeAction(url, data, method = 'POST') {
+        const res = await apiFetch(url, {
+            method: method,
+            body: JSON.stringify(data)
+        });
+        if (res.success) {
+            closeAdminModal();
+            renderUserMetrics(); // Перерисовываем таблицу
+        } else {
+            alert("Ошибка: " + res.error);
+        }
+    }
+
 </script>
+
+<div id="adminModal" class="modal-overlay">
+    <div class="modal-content">
+        <div id="modalHeader" class="modal-header">Действие</div>
+        <div id="modalBody" class="modal-body"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAdminModal()">Отмена</button>
+            <button class="btn" id="modalConfirmBtn">Подтвердить</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

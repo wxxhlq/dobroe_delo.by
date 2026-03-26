@@ -944,6 +944,8 @@ async function getTestStats(testId) {
     };
 }
 
+
+
 // ===================== МЕТРИКИ ПОЛЬЗОВАТЕЛЕЙ =====================
 router.get('/metrics/users', adminAuthMiddleware, async (req, res) => {
     try {
@@ -953,30 +955,77 @@ router.get('/metrics/users', adminAuthMiddleware, async (req, res) => {
         const weekAgo = new Date(now.getTime() - 7*24*60*60*1000);
         const monthAgo = new Date(now.getTime() - 30*24*60*60*1000);
 
+        // 1. СТАТИСТИКА ВОЛОНТЕРОВ (Твоя логика)
         const totalVolunteers = await db.collection('users').countDocuments({ role: 'VOLUNTEER' });
+
+        // Используем UserEvent (твоя модель событий)
         const activeDay = await UserEvent.distinct('userId', { createdAt: { $gte: dayAgo } }).then(arr => arr.filter(id => id).length);
         const activeWeek = await UserEvent.distinct('userId', { createdAt: { $gte: weekAgo } }).then(arr => arr.filter(id => id).length);
         const activeMonth = await UserEvent.distinct('userId', { createdAt: { $gte: monthAgo } }).then(arr => arr.filter(id => id).length);
+
         const newDay = await db.collection('users').countDocuments({ role: 'VOLUNTEER', createdAt: { $gte: dayAgo } });
         const newWeek = await db.collection('users').countDocuments({ role: 'VOLUNTEER', createdAt: { $gte: weekAgo } });
         const newMonth = await db.collection('users').countDocuments({ role: 'VOLUNTEER', createdAt: { $gte: monthAgo } });
 
-        const monthAgoDate = new Date(Date.now() - 30*24*60*60*1000);
-        const usersMonthAgo = await db.collection('users').find({ role: 'VOLUNTEER', createdAt: { $gte: monthAgoDate, $lt: new Date(monthAgoDate.getTime() + 24*60*60*1000) } }).toArray();
+        // Retention (Твоя логика)
+        const usersMonthAgo = await db.collection('users').find({
+            role: 'VOLUNTEER',
+            createdAt: { $gte: monthAgo, $lt: new Date(monthAgo.getTime() + 86400000) }
+        }).toArray();
+
         let retention = 0;
         if (usersMonthAgo.length) {
-            const activeAmongThem = await UserEvent.distinct('userId', { userId: { $in: usersMonthAgo.map(u => u._id) }, createdAt: { $gte: new Date(Date.now() - 7*24*60*60*1000) } });
+            const activeAmongThem = await UserEvent.distinct('userId', {
+                userId: { $in: usersMonthAgo.map(u => u._id) },
+                createdAt: { $gte: weekAgo }
+            });
             retention = (activeAmongThem.length / usersMonthAgo.length) * 100;
         }
 
-        const volunteers = await db.collection('users').find({ role: 'VOLUNTEER' }).toArray();
-        let totalTasks = 0;
-        for (const vol of volunteers) {
-            const tasks = await db.collection('project_applications').countDocuments({ userId: vol._id, status: 'APPROVED' });
-            totalTasks += tasks;
-        }
-        const avgTasks = volunteers.length ? (totalTasks / volunteers.length).toFixed(1) : 0;
+        // --- НОВОЕ: ПОЛУЧЕНИЕ СПИСКА ПОЛЬЗОВАТЕЛЕЙ ДЛЯ ТАБЛИЦЫ ---
+        // Берем всех пользователей (или только волонтеров, если нужно)
+        const allUsers = await db.collection('users')
+            .find({})
+            .sort({ createdAt: -1 })
+            .limit(100) // Ограничим сотней последних для производительности
+            .toArray();
 
+        // Оптимизированный подсчет задач (вместо цикла for)
+        const appStats = await db.collection('project_applications').aggregate([
+            { $match: { userId: { $in: allUsers.map(u => u._id) } } },
+            { $group: {
+                    _id: "$userId",
+                    totalApplied: { $sum: 1 },
+                    totalApproved: { $sum: { $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0] } }
+                }}
+        ]).toArray();
+
+
+
+        const statsMap = Object.fromEntries(appStats.map(s => [s._id.toString(), s]));
+
+        // Собираем enriched-список для фронтенда
+        const usersList = allUsers.map(u => ({
+            _id: u._id,
+            name: u.name || u.username || 'Аноним',
+            email: u.email,
+            role: u.role,
+            city: u.city,
+            points: u.points || 0,
+            created_at: u.created_at, // ДАТА РЕГИСТРАЦИИ: берем точное поле из твоей БД
+            lastLogin: u.lastLogin || u.created_at, // ПОСЛЕДНИЙ ВХОД: если в БД пусто, берем дату регистрации как запасную
+            isOnline: u.isOnline || false,
+            isBlocked: u.isBlocked || false,
+            interests: u.interests || [],
+            tasksApplied: statsMap[u._id.toString()]?.totalApplied || 0,
+            tasksCompleted: statsMap[u._id.toString()]?.totalApproved || 0
+        }));
+
+        // Расчет среднего (avgTasks) на основе всех данных
+        const totalApprovedGlobal = await db.collection('project_applications').countDocuments({ status: 'APPROVED' });
+        const avgTasks = totalVolunteers ? (totalApprovedGlobal / totalVolunteers).toFixed(1) : 0;
+
+        // География (Твоя логика)
         const geography = await db.collection('users').aggregate([
             { $match: { role: 'VOLUNTEER', city: { $exists: true, $ne: null } } },
             { $group: { _id: '$city', count: { $sum: 1 } } },
@@ -984,6 +1033,7 @@ router.get('/metrics/users', adminAuthMiddleware, async (req, res) => {
             { $limit: 20 }
         ]).toArray();
 
+        // Организации (Твоя логика)
         const totalOrganizations = await db.collection('users').countDocuments({ role: 'ORGANIZER' });
         const newOrganizations = await db.collection('users').countDocuments({ role: 'ORGANIZER', createdAt: { $gte: weekAgo } });
         const projectsByOrgs = await db.collection('projects').aggregate([
@@ -995,13 +1045,27 @@ router.get('/metrics/users', adminAuthMiddleware, async (req, res) => {
             { $limit: 10 }
         ]).toArray();
 
+        // 3. ФИНАЛЬНЫЙ ОТВЕТ (Все структуры сохранены + добавлен usersList)
         res.json({
             success: true,
-            volunteers: { total: totalVolunteers, activeDay, activeWeek, activeMonth, newDay, newWeek, newMonth, retention: retention.toFixed(1), avgTasks },
+            volunteers: {
+                total: totalVolunteers,
+                activeDay, activeWeek, activeMonth,
+                newDay, newWeek, newMonth,
+                retention: retention.toFixed(1),
+                avgTasks
+            },
+            usersList, // <-- Это оживит твою таблицу!
             geography,
-            organizations: { total: totalOrganizations, new: newOrganizations, topByProjects: projectsByOrgs }
+            organizations: {
+                total: totalOrganizations,
+                new: newOrganizations,
+                topByProjects: projectsByOrgs
+            }
         });
+
     } catch (err) {
+        console.error("Ошибка в /metrics/users:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -1250,6 +1314,40 @@ router.get('/metrics/efficiency', adminAuthMiddleware, async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
+// 1. Начисление бонусов (XP)
+router.post('/user/:id/bonus', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const { amount } = req.body;
+        const userId = new ObjectId(req.params.id);
+
+        await db.collection('users').updateOne(
+            { _id: userId },
+            { $inc: { points: amount } } // $inc увеличивает число на заданное значение
+        );
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 2. Изменение роли
+router.post('/user/:id/role', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const { role } = req.body;
+        const userId = new ObjectId(req.params.id);
+
+        await db.collection('users').updateOne(
+            { _id: userId },
+            { $set: { role: role } }
+        );
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+
 
 // ===================== ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЯ ПО ID =====================
 router.get('/user/:userId', adminAuthMiddleware, async (req, res) => {

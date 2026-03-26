@@ -387,6 +387,11 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Неверный email или пароль' });
         }
 
+        await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: { lastLogin: new Date() } }
+        );
+
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
         await addRefreshToken(usersCollection, user._id, refreshToken);
@@ -1955,6 +1960,72 @@ app.get('/api/achievements/:userId', async (req, res) => {
         console.error('❌ Ошибка получения достижений:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
     }
+});
+
+
+// Обновление статуса "в сети" без перезагрузки сессии
+// Это остается в server.js
+app.post('/api/user/ping', authMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        await db.collection('users').updateOne(
+            { _id: req.user._id },
+            { $set: { lastLogin: new Date() } }
+        );
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send();
+    }
+});
+
+async function sendPing() {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        await fetch('/api/user/ping', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    } catch (e) {
+        console.log('Ping lost');
+    }
+}
+
+// Добавь это в server.js
+app.post('/api/user/update-activity', authMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        await db.collection('users').updateOne(
+            { _id: req.user._id },
+            { $set: { lastLogin: new Date() } }
+        );
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send();
+    }
+});
+
+// Обработка закрытия вкладки (Beacon)
+app.post('/api/user/logout-ping', async (req, res) => {
+    try {
+        // В Beacon API сложнее прокинуть authMiddleware,
+        // поэтому здесь мы просто гасим статус последнего активного (опционально)
+        // Но проще всего дождаться истечения 3-х минут в админке.
+        res.sendStatus(200);
+    } catch (err) {
+        res.sendStatus(500);
+    }
+});
+
+// Твой основной роут (убедись, что он такой)
+app.post('/api/user/update-activity', authMiddleware, async (req, res) => {
+    const db = getDB();
+    await db.collection('users').updateOne(
+        { _id: req.user._id },
+        { $set: { lastLogin: new Date() } }
+    );
+    res.sendStatus(200);
 });
 
 // === ЗАПУСК СЕРВЕРА (ГИБРИДНЫЙ: NATIVE + MONGOOSE) ===
