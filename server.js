@@ -2028,6 +2028,34 @@ app.post('/api/user/update-activity', authMiddleware, async (req, res) => {
     res.sendStatus(200);
 });
 
+app.post('/api/track', async (req, res) => {
+    try {
+        const db = getDB(); // Убедись, что функция получения БД называется так
+        const { eventType, eventData, path, sessionId } = req.body;
+
+        // Создаем запись в коллекции user_events
+        const newEvent = {
+            eventType: eventType || 'unknown',
+            eventData: eventData || {},
+            path: path || '',
+            sessionId: sessionId || 'guest',
+            createdAt: new Date() // Важно для фильтрации в Хабе!
+        };
+
+        await db.collection('user_events').insertOne(newEvent);
+
+        // Отправляем пустой успешный ответ
+        res.status(200).json({ success: true });
+
+        // Для отладки в терминале WebStorm:
+        console.log(`[METRIKA] Событие: ${eventType} на пути: ${path}`);
+
+    } catch (error) {
+        console.error("Ошибка сохранения метрики:", error);
+        res.status(500).json({ success: false });
+    }
+});
+
 // === ЗАПУСК СЕРВЕРА (ГИБРИДНЫЙ: NATIVE + MONGOOSE) ===
 async function startServer() {
     try {

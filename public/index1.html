@@ -3178,7 +3178,7 @@
     <div class="project-card" style="position: relative; display: flex; flex-direction: column; height: 100%;">
       ${menuHTML}
 
-      <div class="img-wrapper" onclick="openProjectModal('${p.id}')" style="height: 220px; overflow: hidden; position: relative;">
+      <div class="img-wrapper" onclick="trackProjectClick('${p.id}'); openProjectModal('${p.id}')" style="height: 220px; overflow: hidden; position: relative;">
         <img src="${imgUrl}"
              alt="${esc(p.title)}"
              style="width: 100%; height: 100%; object-fit: cover; display: block;"
@@ -3187,7 +3187,7 @@
         </div>
       </div>
 
-      <div style="padding: 24px; cursor: pointer; flex: 1; display: flex; flex-direction: column;" onclick="openProjectModal('${p.id}')">
+      <div style="padding: 24px; cursor: pointer; flex: 1; display: flex; flex-direction: column;" onclick="trackProjectClick('${p.id}'); openProjectModal('${p.id}')">
         <div style="font-size: 12px; color: var(--blue); font-weight: 700; margin-bottom: 8px;">
            📍 ${esc(p.city || 'Минск')}
         </div>
@@ -3205,6 +3205,26 @@
         ${statusLabel ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); overflow: hidden;"><span class="catbadge" style="display: inline-block; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; white-space: normal;">${esc(statusLabel)}</span></div>` : ''}
       </div>
     </div>`;
+    }
+
+    // Добавь это в конец файла со скриптами фронтенда
+    async function trackProjectClick(projectId, type = 'project_click') {
+        try {
+            await fetch('/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: localStorage.getItem('sessionId') || 'guest',
+                    eventType: type, // Теперь сюда может прийти и 'project_apply'
+                    eventData: { projectId: projectId },
+                    path: window.location.pathname
+                })
+            });
+            console.log(`✅ Аналитика [${type}]:`, projectId);
+        } catch (err) {
+            // Ошибка аналитики не должна мешать пользователю
+            console.warn('⚠️ Ошибка отправки метрики');
+        }
     }
 
     function toggleFavorite(id) {
@@ -3313,30 +3333,66 @@
     }
 
     function applyToProject(projectId) {
-      if (!requireAuth()) return;
-      const u = currentUser();
-      const p = state.projects.find(x => x.id === projectId);
-      if (!p) { toast("danger", "Ошибка", "Проект не найден."); return; }
-      if (p.approved >= p.capacity) { toast("warn", "Нет мест", "Набор закрыт."); return; }
+        if (!requireAuth()) return;
 
-      const exists = state.applications.find(a => a.projectId === projectId && a.userId === u.id && a.status !== "CANCELLED");
-      if (exists) { toast("warn", "Уже есть", "Вы уже откликались."); return; }
+        // 1. СРАЗУ ШЛЕМ СИГНАЛ НА СЕРВЕР (Для Хаба)
+        if (typeof trackProjectClick === 'function') {
+            // Передаем 'project_apply', чтобы админка увидела конверсию
+            trackProjectClick(projectId, 'project_apply');
+        }
 
-      state.applications.unshift({ id: uid("app"), projectId, userId: u.id, status: "PENDING", createdAt: nowISO() });
-      saveState();
-      toast("ok", "Отклик отправлен", "Статус: ожидает подтверждения (демо).");
+        const u = currentUser();
+        const p = state.projects.find(x => x.id === projectId);
+        if (!p) { toast("danger", "Ошибка", "Проект не найден."); return; }
 
-      setTimeout(() => {
-        const app = state.applications.find(a => a.projectId === projectId && a.userId === u.id);
-        if (!app) return;
-        app.status = "APPROVED";
-        p.approved = clamp(p.approved + 1, 0, p.capacity);
-        if (u.role === "VOLUNTEER") { u.points = (u.points || 0) + 5; }
-        state.messages.unshift({ id: uid("m"), projectId, fromId: "system", toId: u.id, text: `Отклик подтверждён: «${p.title}».`, date: nowISO() });
+        if (p.approved >= p.capacity) {
+            toast("warn", "Нет мест", "Набор закрыт.");
+            return;
+        }
+
+        const exists = state.applications.find(a => a.projectId === projectId && a.userId === u.id && a.status !== "CANCELLED");
+        if (exists) {
+            toast("warn", "Уже есть", "Вы уже откликались.");
+            return;
+        }
+
+        // Создаем заявку
+        state.applications.unshift({
+            id: uid("app"),
+            projectId,
+            userId: u.id,
+            status: "PENDING",
+            createdAt: nowISO()
+        });
+
         saveState();
-        toast("ok", "Подтверждено", "Вы добавлены в участники.");
-        renderApp();
-      }, 850);
+        toast("ok", "Отклик отправлен", "Статус: ожидает подтверждения.");
+
+        // Демо-эффект подтверждения через 850мс
+        setTimeout(() => {
+            const app = state.applications.find(a => a.projectId === projectId && a.userId === u.id);
+            if (!app) return;
+
+            app.status = "APPROVED";
+            p.approved = clamp(p.approved + 1, 0, p.capacity);
+
+            if (u.role === "VOLUNTEER") {
+                u.points = (u.points || 0) + 5;
+            }
+
+            state.messages.unshift({
+                id: uid("m"),
+                projectId,
+                fromId: "system",
+                toId: u.id,
+                text: `Отклик подтверждён: «${p.title}».`,
+                date: nowISO()
+            });
+
+            saveState();
+            toast("ok", "Подтверждено", "Вы добавлены в участники.");
+            renderApp();
+        }, 850);
     }
 
     /* Modals */
@@ -5263,20 +5319,61 @@
     }
     loadServerSession().then(() => renderApp());
 
+    // Функция отрисовки проектов (тот самый "мостик", которого не хватает)
+    function renderProjectDashboard(projects) {
+        const container = document.getElementById('projectsContainer'); // Проверь, что ID совпадает с твоим HTML
+        if (!container) {
+
+            return;
+        }
+
+        if (!projects || projects.length === 0) {
+            container.innerHTML = '<div class="empty-state">Проектов пока нет...</div>';
+            return;
+        }
+
+        // Генерируем HTML для каждой карточки (используем обновленный шаблон с трекингом)
+        container.innerHTML = projects.map(p => {
+            // Тут твои переменные для прогресса (пример)
+            const total = p.targetVolunteers || 0;
+            const current = p.currentVolunteers || 0;
+            const progress = total > 0 ? Math.round((current / total) * 100) : 0;
+            const imgUrl = p.image || 'images/img1.png';
+
+            // Возвращаем тот самый шаблон, который мы правили выше
+            return `
+            <div class="project-card" style="position: relative; display: flex; flex-direction: column; height: 100%;">
+                <div class="img-wrapper" onclick="trackProjectClick('${p.id}'); openProjectModal('${p.id}')" style="height: 220px; overflow: hidden; position: relative; cursor: pointer;">
+                    <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <div style="padding: 24px; cursor: pointer; flex: 1;" onclick="trackProjectClick('${p.id}'); openProjectModal('${p.id}')">
+                    <h3 style="font-weight: 850;">${p.title}</h3>
+                    <p>${p.descriptionShort || ''}</p>
+                    </div>
+            </div>
+        `;
+        }).join('');
+    }
+
+
     // === Загрузка проектов и откликов из БД ===
     async function loadProjectsFromServer() {
-      try {
-        const res = await fetch(`${API_URL}/api/projects`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !Array.isArray(data.projects)) return;
+        try {
+            const res = await fetch(`${API_URL}/api/projects`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !Array.isArray(data.projects)) return;
 
-        // Если с сервера пришли проекты — подменяем демо-проекты
-        // Фильтруем удаленные проекты на клиенте для дополнительной безопасности
-        state.projects = data.projects.filter(p => p.status !== 'DELETED');
-        saveState();
-      } catch (err) {
-        console.error('❌ Ошибка загрузки проектов с сервера:', err);
-      }
+            // Сохраняем проекты в стейт
+            state.projects = data.projects.filter(p => p.status !== 'DELETED');
+            saveState();
+
+            // ВЫЗОВ ОБНОВЛЕНИЯ ДАШБОРДА
+            // Передаем проекты из стейта и события (если они есть в ответе сервера)
+            renderProjectDashboard(state.projects, data.events || []);
+
+        } catch (err) {
+            console.error('❌ Ошибка загрузки проектов с сервера:', err);
+        }
     }
 
     async function loadNewsFromServer() {

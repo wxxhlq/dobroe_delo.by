@@ -315,6 +315,78 @@
             margin-top: 24px;
         }
 
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .project-dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+        }
+        .stat-card {
+            background: #1a1a1f;
+            border: 1px solid #2a2a30;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        /* Сетка для динамики */
+        .activity-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .activity-item {
+            background: #1a1a1f;
+            border: 1px solid #2a2a30;
+            border-radius: 12px;
+            padding: 16px;
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .activity-item:hover {
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-approved { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .status-pending { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-completed { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+
+        .date-divider {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0 10px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .date-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #2a2a30;
+        }
+
     </style>
 </head>
 <body>
@@ -324,16 +396,11 @@
     <div class="nav-item" data-tab="userMetrics">🧑‍🤝‍🧑 Пользователи</div>
     <div class="nav-item" data-tab="projectMetrics">🗂 Проекты</div>
     <div class="nav-item" data-tab="participationMetrics">🕒 Участие</div>
-    <div class="nav-item" data-tab="qualityMetrics">⭐ Качество</div>
     <div class="nav-item" data-tab="activityMetrics">📈 Активность</div>
-    <div class="nav-item" data-tab="communicationsMetrics">💬 Коммуникации</div>
-    <div class="nav-item" data-tab="operationalMetrics">🔧 Операционные</div>
-    <div class="nav-item" data-tab="efficiencyMetrics">🎯 Эффективность</div>
+
     <div class="nav-item" data-tab="analytics">📈 Аналитика каналов</div>
     <div class="nav-item" data-tab="segments">🎯 Сегментация</div>
     <div class="nav-item" data-tab="communications">✉️ Рассылки</div>
-    <div class="nav-item" data-tab="landings">🌐 Лендинги</div>
-    <div class="nav-item" data-tab="abtests">🧪 А/Б тесты</div>
     <div class="nav-item" data-tab="monitoring">🔧 Мониторинг</div>
     <div style="flex:1"></div>
     <div class="nav-item" id="goToMainBtn" style="color:#4f46e5;">🏠 На главную</div>
@@ -352,10 +419,11 @@
     let currentTab = 'dashboard';
     let liveFeedInterval = null;
     let regChart = null;
+    const API_URL = window.location.origin;
 
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
+        return str.replace(/[&<>]/g, function (m) {
             if (m === '&') return '&amp;';
             if (m === '<') return '&lt;';
             if (m === '>') return '&gt;';
@@ -363,19 +431,47 @@
         });
     }
 
+
+
+
     async function apiFetch(url, options = {}) {
+        // 2. Формируем полный URL.
+        // Если url уже начинается с http, оставляем как есть, иначе добавляем API_URL
+        const targetUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+
         const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            // Добавляем заголовок только если токен существует
+            ...(token && { 'Authorization': `Bearer ${token}` }),
             ...options.headers
         };
-        const res = await fetch(url, { ...options, headers });
-        if (res.status === 401) {
-            logout();
-            throw new Error('Сессия истекла');
+
+        try {
+            const res = await fetch(targetUrl, { ...options, headers });
+
+            if (res.status === 401) {
+                // Убедись, что функция logout() определена в коде
+                if (typeof logout === 'function') {
+                    logout();
+                } else {
+                    localStorage.clear();
+                    window.location.href = '/login.html';
+                }
+                throw new Error('Сессия истекла');
+            }
+
+            // Проверка на пустой ответ (чтобы не упасть на res.json())
+            if (res.status === 204 || res.headers.get('content-length') === '0') {
+                return { success: true };
+            }
+
+            return await res.json();
+        } catch (err) {
+            console.error(`Ошибка при запросе к ${targetUrl}:`, err);
+            return { success: false, error: err.message };
         }
-        return res.json();
     }
 
     function logout() {
@@ -402,7 +498,7 @@
         document.body.appendChild(modal);
     }
 
-    window.openPublicProfile = async function(userId) {
+    window.openPublicProfile = async function (userId) {
         try {
             const data = await apiFetch(`/api/admin/user/${userId}`);
             if (data.success && data.user) {
@@ -422,7 +518,9 @@
                     </div>
                 `);
             } else alert('Не удалось загрузить профиль');
-        } catch (err) { alert('Ошибка загрузки профиля'); }
+        } catch (err) {
+            alert('Ошибка загрузки профиля');
+        }
     };
 
     // ===================== ДАШБОРД =====================
@@ -526,9 +624,9 @@
             <td>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div style="flex:1; background:#2a2a30; height:6px; border-radius:3px;">
-                        <div style="width:${(city.count/total*100)}%; background:#4f46e5; height:100%; border-radius:3px;"></div>
+                        <div style="width:${(city.count / total * 100)}%; background:#4f46e5; height:100%; border-radius:3px;"></div>
                     </div>
-                    <span style="font-size:11px; width:35px;">${((city.count/total)*100).toFixed(1)}%</span>
+                    <span style="font-size:11px; width:35px;">${((city.count / total) * 100).toFixed(1)}%</span>
                 </div>
             </td>
         </tr>
@@ -544,11 +642,11 @@
                 const dataMap = new Map(res.data.map(d => [d._id, d.count]));
 
                 // Генерируем массив дат от сегодня назад
-                for(let i = days - 1; i >= 0; i--) {
+                for (let i = days - 1; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(d.getDate() - i);
                     const dateStr = d.toISOString().split('T')[0];
-                    filledData.push({ date: dateStr, count: dataMap.get(dateStr) || 0 });
+                    filledData.push({date: dateStr, count: dataMap.get(dateStr) || 0});
                 }
 
                 const ctx = document.getElementById('regChart').getContext('2d');
@@ -573,14 +671,14 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: {legend: {display: false}},
                         scales: {
-                            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                            x: {grid: {color: 'rgba(255, 255, 255, 0.05)'}, ticks: {color: '#9ca3af'}},
                             y: {
-                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                grid: {color: 'rgba(255, 255, 255, 0.05)'},
                                 beginAtZero: true,
                                 suggestedMax: 5, // Чтобы график не был плоским при 0 регистрациях
-                                ticks: { color: '#9ca3af', stepSize: 1 }
+                                ticks: {color: '#9ca3af', stepSize: 1}
                             }
                         }
                     }
@@ -672,6 +770,7 @@
                 document.getElementById('liveFeed').innerHTML = '<div class="feed-item">Ошибка загрузки ленты</div>';
             }
         }
+
         loadLiveFeed();
         if (liveFeedInterval) clearInterval(liveFeedInterval);
         liveFeedInterval = setInterval(loadLiveFeed, 5000);
@@ -682,7 +781,7 @@
             document.getElementById('funnelContainer').innerHTML = funnel.funnel.map(step => `
                 <div style="margin-bottom: 16px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${step.name}</span><span style="color:#4f46e5;">${step.count}</span></div>
-                    <div style="background:#2a2a30; border-radius:8px; overflow:hidden;"><div style="width:${max ? (step.count/max*100) : 0}%; background:#4f46e5; height:8px;"></div></div>
+                    <div style="background:#2a2a30; border-radius:8px; overflow:hidden;"><div style="width:${max ? (step.count / max * 100) : 0}%; background:#4f46e5; height:8px;"></div></div>
                 </div>
             `).join('');
         }
@@ -799,7 +898,7 @@
     // Мини-функция для окончаний "был/была"
     function getGenderSuffix(date) {
         // В идеале брать из u.gender, но пока оставим универсально или привяжем к "а" в конце имени
-        return 'а'; // Ульяна, Яна, Лиана — у тебя в основном девушки :)
+        return 'а';
     }
 
     // --- ФИЛЬТРАЦИЯ ПОЛЬЗОВАТЕЛЕЙ ---
@@ -815,7 +914,7 @@
             const diffDaysActive = (now - lastActive) / (1000 * 60 * 60 * 24);
             const points = u.points || 0;
 
-            switch(filterType) {
+            switch (filterType) {
                 case 'heroes':
                     // Совпадает с иконкой ⭐ (XP >= 100)
                     return points >= 100;
@@ -877,7 +976,7 @@
 
         // 3. Сегодня в...
         if (now.toDateString() === lastActive.toDateString()) {
-            const time = lastActive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const time = lastActive.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
             return `${action} сегодня в ${time}`;
         }
 
@@ -885,7 +984,7 @@
         const yesterday = new Date();
         yesterday.setDate(now.getDate() - 1);
         if (yesterday.toDateString() === lastActive.toDateString()) {
-            const time = lastActive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const time = lastActive.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
             return `${action} вчера в ${time}`;
         }
 
@@ -971,70 +1070,461 @@
     }
 
     // ===================== МЕТРИКИ ПРОЕКТОВ =====================
+    const CATEGORIES = [
+        {id: "elderly", name: "Помощь пожилым", color: "#4f46e5"},
+        {id: "animals", name: "Защита животных", color: "#10b981"},
+        {id: "eco", name: "Экология", color: "#fbbf24"},
+        {id: "children", name: "Дети и семья", color: "#ec4899"},
+        {id: "events", name: "События", color: "#8b5cf6"},
+    ];
+
     async function renderProjectMetrics() {
-        document.getElementById('pageTitle').innerText = 'Метрики проектов';
+        const content = document.getElementById('content');
+        if (document.getElementById('pageTitle')) {
+            document.getElementById('pageTitle').innerText = 'Метрики проектов';
+        }
+
+        // 1. Запрос к твоему роуту
         const data = await apiFetch('/api/admin/metrics/projects');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-title">Всего проектов</div><div class="kpi-value">${data.total}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Активные</div><div class="kpi-value">${data.active}</div></div>
-                <div class="kpi-card"><div class="kpi-title">В ожидании</div><div class="kpi-value">${data.pending}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Закрыто (всего/неделя)</div><div class="kpi-value">${data.closed.total} / ${data.closed.week}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Ср. время набора</div><div class="kpi-value">${data.avgRecruitmentDays} дн.</div></div>
-                <div class="kpi-card"><div class="kpi-title">Недобор участников</div><div class="kpi-value">${data.underfilled}</div></div>
+
+        if (!data || !data.success) {
+            content.innerHTML = `<div style="padding:20px; color:#ef4444;">Ошибка БД: ${data?.error || 'Нет связи'}</div>`;
+            return;
+        }
+
+        // 2. Отрисовка верстки с использованием пришедших цифр
+        content.innerHTML = `
+        <div style="padding: 25px; animation: fadeIn 0.3s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+
+
             </div>
-            <div class="card"><h3>Категории проектов</h3><div id="catsChart" style="height:300px;"></div></div>
-        `;
-        const cats = echarts.init(document.getElementById('catsChart'));
-        cats.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'pie', data: data.categories.map(c => ({ name: c._id, value: c.count })), radius: '55%' }] });
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
+                <div class="stat-card">
+                    <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase;">Всего проектов</div>
+                    <div style="font-size: 28px; font-weight: 700; margin-top: 8px;">${data.total}</div>
+                </div>
+                <div class="stat-card">
+                    <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase;">Активно / В ожидании</div>
+                    <div style="font-size: 28px; font-weight: 700; margin-top: 8px;">
+                        <span style="color: #10b981;">${data.active}</span>
+                        <span style="color: #94a3b8; font-size: 18px;"> / ${data.pending}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase;">Средний срок набора</div>
+                    <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: #fbbf24;">${data.avgRecruitmentDays} дн.</div>
+                </div>
+                <div class="stat-card" style="${data.underfilled > 0 ? 'border-color: #ef4444;' : ''}">
+                    <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase;">Недобор (закрытые)</div>
+                    <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: ${data.underfilled > 0 ? '#ef4444' : '#10b981'};">
+                        ${data.underfilled}
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
+                <div class="stat-card">
+                    <h3 style="font-size: 15px; margin-bottom: 20px;">Популярные направления</h3>
+                    <div style="display: flex; align-items: center; gap: 30px;">
+                        <div style="width: 200px; height: 200px;">
+                            <canvas id="projectDonutChart"></canvas>
+                        </div>
+                        <div id="projectChartLegend" style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h3 style="font-size: 15px; margin-bottom: 20px;">Итоги работы</h3>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="background: #0f0f12; padding: 15px; border-radius: 8px;">
+                            <div style="color: #94a3b8; font-size: 12px;">Закрыто проектов (всего)</div>
+                            <div style="font-size: 20px; font-weight: 600; color: #fff;">${data.closed.total}</div>
+                        </div>
+                        <div style="background: #0f0f12; padding: 15px; border-radius: 8px;">
+                            <div style="color: #94a3b8; font-size: 12px;">Завершено за неделю</div>
+                            <div style="font-size: 20px; font-weight: 600; color: #10b981;">+${data.closed.week}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+        // Вызываем отрисовку графика
+        renderCategoryChart(data.categories);
+    }
+
+    function renderCategoryChart(apiCategories) {
+        const canvas = document.getElementById('projectDonutChart');
+        if (!canvas) return;
+
+        // Сопоставляем данные из БД с нашим массивом CATEGORIES для имен и цветов
+        const chartLabels = [];
+        const chartData = [];
+        const chartColors = [];
+        const legendHtml = [];
+
+        CATEGORIES.forEach(cat => {
+            // Ищем в ответе от сервера (data.categories) объект с таким же _id
+            const found = apiCategories.find(c => c._id === cat.id);
+            const count = found ? found.count : 0;
+
+            chartLabels.push(cat.name);
+            chartData.push(count);
+            chartColors.push(cat.color);
+
+            legendHtml.push(`
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: ${cat.color};"></div>
+                    <span style="color: #94a3b8;">${cat.name}</span>
+                </div>
+                <span style="color: #fff; font-weight: 600;">${count}</span>
+            </div>
+        `);
+        });
+
+        document.getElementById('projectChartLegend').innerHTML = legendHtml.join('');
+
+        // Инициализация Chart.js
+        new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: chartColors,
+                    borderWidth: 0,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                cutout: '80%',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {legend: {display: false}}
+            }
+        });
     }
 
     // ===================== МЕТРИКИ УЧАСТИЯ =====================
     async function renderParticipationMetrics() {
-        document.getElementById('pageTitle').innerText = 'Участие волонтёров';
-        const data = await apiFetch('/api/admin/metrics/participation');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-title">Всего откликов</div><div class="kpi-value">${data.applications}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Подтверждённых</div><div class="kpi-value">${data.confirmed}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Завершённых</div><div class="kpi-value">${data.completed}</div></div>
-                <div class="kpi-card"><div class="kpi-title">% завершённых</div><div class="kpi-value">${data.completionRate}%</div></div>
-                <div class="kpi-card"><div class="kpi-title">Дней до первого участия</div><div class="kpi-value">${data.avgDaysToFirst}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Повторные участия</div><div class="kpi-value">${data.repeatVolunteers}</div></div>
+        const content = document.getElementById('content');
+        if (document.getElementById('pageTitle')) {
+            document.getElementById('pageTitle').innerText = 'Аналитика участия';
+        }
+
+        const res = await apiFetch('/api/admin/metrics/participation');
+
+        if (!res || !res.success) {
+            content.innerHTML = `<div style="padding:20px; color:#ef4444;">Ошибка: ${res?.error || 'Нет связи с БД'}</div>`;
+            return;
+        }
+
+        const data = res;
+
+        content.innerHTML = `
+    <div style="padding: 25px; animation: fadeIn 0.4s ease-out;">
+        <div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <h1 style="font-size: 24px; font-weight: 700; color: #fff;">Пульс участия волонтеров</h1>
+                <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Эффективность вовлечения и удержания помощников</p>
             </div>
-        `;
+            <div style="text-align: right; color: #64748b; font-size: 12px;">
+                Обновлено: ${new Date().toLocaleTimeString()}
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
+            <div class="stat-card" style="position: relative; overflow: hidden;">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Всего заявок</div>
+                <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: #fff;">${data.applications}</div>
+                <div style="font-size: 12px; color: #10b981; margin-top: 5px; display: flex; align-items: center; gap: 4px;">
+                    <span style="width: 6px; height: 6px; background: #10b981; border-radius: 50%;"></span>
+                    Подтверждено: ${data.confirmed}
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Процент успеха</div>
+                <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: #6366f1;">${data.completionRate}%</div>
+                <div style="height: 6px; background: #0f0f12; border-radius: 10px; margin-top: 12px; overflow: hidden;">
+                    <div style="width: ${data.completionRate}%; height: 100%; background: linear-gradient(90deg, #6366f1, #a855f7); border-radius: 10px;"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Скорость отклика</div>
+                <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: #fbbf24;">${data.avgDaysToFirst} <span style="font-size: 14px;">дн.</span></div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 5px;">До первой одобренной заявки</div>
+            </div>
+
+            <div class="stat-card">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Постоянные волонтеры</div>
+                <div style="font-size: 28px; font-weight: 700; margin-top: 8px; color: #ec4899;">${data.repeatVolunteers}</div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 5px;">Актив более 1 раза</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+            <div class="stat-card">
+                <h3 style="font-size: 15px; margin-bottom: 25px; color: #f8fafc; font-weight: 600;">Здоровье сообщества</h3>
+                <div style="display: flex; flex-direction: column; gap: 25px;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px;">
+                            <span style="color: #94a3b8;">Коэффициент удержания</span>
+                            <span style="color: #fff; font-weight: 600;">${data.applications > 0 ? Math.round((data.repeatVolunteers / data.applications) * 100) : 0}%</span>
+                        </div>
+                        <div style="height: 8px; background: #0f0f12; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${data.applications > 0 ? (data.repeatVolunteers / data.applications) * 100 : 0}%; height: 100%; background: #ec4899;"></div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(99, 102, 241, 0.05); padding: 20px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.1);">
+                        <div style="display: flex; gap: 12px;">
+                            <span style="font-size: 20px;">💡</span>
+                            <div>
+                                <h4 style="font-size: 13px; color: #e2e8f0; margin-bottom: 4px;">Аналитика онбординга</h4>
+                                <p style="font-size: 12px; color: #94a3b8; line-height: 1.6;">
+                                    Среднее время активации волонтера: <b>${data.avgDaysToFirst} дня</b>.
+                                    Оптимальное значение для НКО — до 3 дней.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card" style="display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <h3 style="font-size: 15px; color: #f8fafc; font-weight: 600;">Распределение этапов участия</h3>
+                    <div style="display: flex; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8;">
+                            <span style="width: 8px; height: 8px; border-radius: 2px; background: rgba(99, 102, 241, 0.5);"></span> Заявки
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8;">
+                            <span style="width: 8px; height: 8px; border-radius: 2px; background: #6366f1;"></span> Успех
+                        </div>
+                    </div>
+                </div>
+                <div style="flex: 1; min-height: 250px; position: relative;">
+                    <canvas id="participationChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+        renderParticipationGraph(data);
     }
 
-    // ===================== МЕТРИКИ КАЧЕСТВА =====================
-    async function renderQualityMetrics() {
-        document.getElementById('pageTitle').innerText = 'Качество и обратная связь';
-        const data = await apiFetch('/api/admin/metrics/quality');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-title">Ср. оценка проектам</div><div class="kpi-value">${data.avgProjectRating}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Ср. оценка координаторам</div><div class="kpi-value">${data.avgCoordinatorRating}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Жалобы</div><div class="kpi-value">${data.complaints}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Ср. время реакции</div><div class="kpi-value">${data.avgReactionTime || '—'}</div></div>
-            </div>
-        `;
+    function renderParticipationGraph(data) {
+        const ctx = document.getElementById('participationChart');
+        if (!ctx) return;
+
+        // Генерируем градиент для заливки
+        const chartCtx = ctx.getContext('2d');
+        const gradient = chartCtx.createLinearGradient(0, 0, 0, 250);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Всего откликов', 'Подтвержденные', 'Завершенные'],
+                datasets: [{
+                    label: 'Кол-во волонтеров',
+                    data: [data.applications, data.confirmed, data.completed],
+                    borderColor: '#6366f1',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#6366f1',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {display: false},
+                    tooltip: {
+                        backgroundColor: '#1a1a1f',
+                        titleColor: '#94a3b8',
+                        bodyColor: '#fff',
+                        bodyFont: {size: 13, weight: '600'},
+                        padding: 12,
+                        displayColors: false,
+                        borderColor: '#2a2a30',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {color: 'rgba(255, 255, 255, 0.05)', drawBorder: false},
+                        ticks: {color: '#64748b', font: {size: 11}, stepSize: 1}
+                    },
+                    x: {
+                        grid: {display: false},
+                        ticks: {color: '#94a3b8', font: {size: 12}}
+                    }
+                }
+            }
+        });
     }
 
-    // ===================== МЕТРИКИ АКТИВНОСТИ =====================
+
+
+
     async function renderActivityMetrics() {
-        document.getElementById('pageTitle').innerText = 'Активность платформы';
-        const data = await apiFetch('/api/admin/metrics/activity');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="kpi-grid">
-                <div class="kpi-card"><div class="kpi-title">DAU / WAU / MAU</div><div class="kpi-value">${data.dau} / ${data.wau} / ${data.mau}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Просмотры проектов</div><div class="kpi-value">${data.projectPageViews}</div></div>
-                <div class="kpi-card"><div class="kpi-title">Конверсия просмотр→клик</div><div class="kpi-value">${data.conversion.viewToClick}%</div></div>
-                <div class="kpi-card"><div class="kpi-title">Конверсия клик→участие</div><div class="kpi-value">${data.conversion.clickToParticipation}%</div></div>
-            </div>
-        `;
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) pageTitle.innerText = 'Аналитика платформы';
+
+        const contentArea = document.getElementById('content');
+        if (!contentArea) return;
+
+        // Вставляем стили один раз
+        const hubStyles = `
+<style>
+    .hub-wrapper { animation: fadeIn 0.4s ease; font-family: 'Inter', sans-serif; color: #e1e4e8; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .hub-banner {
+        background: linear-gradient(135deg, #1e1e26 0%, #111115 100%);
+        border: 1px solid #2a2a30; padding: 24px; border-radius: 20px;
+        margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .hub-banner h3 { font-size: 20px; color: #fff; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+    .hub-banner p { color: #64748b; font-size: 13px; margin: 5px 0 0 0; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+
+    .m-card {
+        background: #1a1a1f; border: 1px solid #2a2a30; padding: 24px; border-radius: 18px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden;
+    }
+    .m-card:hover { border-color: #4f46e5; transform: translateY(-4px); background: #1f1f26; }
+
+    .m-label { color: #94a3b8; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 14px; display: block; }
+    .m-value { font-size: 32px; font-weight: 800; color: #fff; display: block; line-height: 1; margin-bottom: 10px; }
+    .m-footer { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+    /* Эффект загрузки (Skeleton) */
+    .is-loading .m-value {
+        background: linear-gradient(90deg, #2a2a30 25%, #33333c 50%, #2a2a30 75%);
+        background-size: 200% 100%;
+        animation: skeleton-pulse 1.5s infinite;
+        color: transparent !important;
+        border-radius: 4px;
+        width: 80%;
+    }
+    @keyframes skeleton-pulse { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+    .refresh-btn {
+        background: #4f46e5; color: #fff; border: none; padding: 10px 20px;
+        border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .refresh-btn:hover { background: #6366f1; transform: scale(1.02); }
+    .refresh-btn:disabled { background: #2a2a30; cursor: not-allowed; }
+
+    .accent-indigo { color: #818cf8; } .accent-green { color: #10b981; }
+    .accent-orange { color: #f59e0b; } .accent-red { color: #ef4444; }
+</style>
+`;
+
+        contentArea.innerHTML = hubStyles + `
+<div class="hub-wrapper">
+    <div class="hub-banner">
+        <div>
+
+            <p id="hub-status">Синхронизировано с базой данных</p>
+        </div>
+        <button class="refresh-btn" id="manualRefresh">Обновить метрики</button>
+    </div>
+
+    <div class="metrics-grid" id="metrics-container">
+        ${renderCard('Audience (D/W/M)', 'h-usage', 'Уникальные пользователи')}
+        ${renderCard('Sticky Factor', 'h-sticky', 'Лояльность (DAU/MAU)', 'accent-indigo')}
+        ${renderCard('Средняя сессия', 'h-duration', '0 стр. за визит', '', 'h-depth')}
+        ${renderCard('Bounce Rate', 'h-bounce', 'Отказы (до 15 сек)')}
+        ${renderCard('Просмотры проектов', 'h-views', 'Всего кликов')}
+        ${renderCard('Интерес (CTR)', 'h-c1', 'Просмотр → Клик', 'accent-orange')}
+        ${renderCard('Конверсия (Final)', 'h-c2', 'Поданные заявки', 'accent-green')}
+    </div>
+</div>`;
+
+        function renderCard(label, id, footer, accent = '', footerId = '') {
+            return `
+        <div class="m-card is-loading" id="card-${id}">
+            <span class="m-label">${label}</span>
+            <span id="${id}" class="m-value ${accent}">...</span>
+            <div class="m-footer" id="${footerId}">${footer}</div>
+        </div>`;
+        }
+
+        async function loadData() {
+            const btn = document.getElementById('manualRefresh');
+            const container = document.getElementById('metrics-container');
+            const cards = container.querySelectorAll('.m-card');
+
+            btn.disabled = true;
+            btn.innerText = 'Загрузка...';
+            cards.forEach(c => c.classList.add('is-loading'));
+
+            try {
+                const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+                if (!token) throw new Error('Требуется авторизация');
+
+                const res = await fetch(`${API_URL}/api/admin/activity-metrics`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error(`Status: ${res.status}`);
+                const data = await res.json();
+
+                // Заполнение данных
+                cards.forEach(c => c.classList.remove('is-loading'));
+
+                document.getElementById('h-usage').innerText = data.dau_wau_mau || "0/0/0";
+                document.getElementById('h-sticky').innerText = (data.stickyFactor || 0) + '%';
+                document.getElementById('h-views').innerText = (data.views || 0).toLocaleString();
+                document.getElementById('h-c1').innerText = (data.convClick || 0) + '%';
+                document.getElementById('h-c2').innerText = (data.convApply || 0) + '%';
+                document.getElementById('h-depth').innerText = `${data.avgDepth || 0} стр. за визит`;
+
+                // Обработка времени
+                const sec = data.avgDuration || 0;
+                document.getElementById('h-duration').innerText = `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
+
+                // Логика цвета для Bounce Rate
+                const bEl = document.getElementById('h-bounce');
+                const bVal = parseFloat(data.bounceRate || 0);
+                bEl.innerText = bVal + '%';
+                bEl.className = `m-value ${bVal > 40 ? 'accent-red' : 'accent-green'}`;
+
+                document.getElementById('hub-status').innerText = `Обновлено в ${new Date().toLocaleTimeString()}`;
+
+            } catch (e) {
+                console.error("Hub Error:", e);
+                document.getElementById('hub-status').innerHTML = `<span class="accent-red">Ошибка: ${e.message}</span>`;
+                cards.forEach(c => c.classList.remove('is-loading'));
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Обновить метрики';
+            }
+        }
+
+        document.getElementById('manualRefresh').onclick = loadData;
+        loadData();
     }
 
     // ===================== МЕТРИКИ КОММУНИКАЦИЙ =====================
@@ -1096,11 +1586,23 @@
             <div class="two-columns"><div class="card"><h3>🥧 Распределение трафика</h3><div id="pieChart" style="height:300px;"></div></div><div class="card"><h3>📊 Воронка конверсии</h3><div id="funnelChart" style="height:300px;"></div></div></div>
         `;
         const pie = echarts.init(document.getElementById('pieChart'));
-        pie.setOption({ series: [{ type: 'pie', data: data.pieData.map(d => ({ name: d.name, value: d.value })), radius: '60%' }] });
+        pie.setOption({
+            series: [{
+                type: 'pie',
+                data: data.pieData.map(d => ({name: d.name, value: d.value})),
+                radius: '60%'
+            }]
+        });
         const funnelData = await apiFetch('/api/admin/analytics/funnel');
         if (funnelData.success) {
             const funnel = echarts.init(document.getElementById('funnelChart'));
-            funnel.setOption({ series: [{ type: 'funnel', data: funnelData.funnel.map(s => ({ name: s.name, value: s.count })), gap: 2 }] });
+            funnel.setOption({
+                series: [{
+                    type: 'funnel',
+                    data: funnelData.funnel.map(s => ({name: s.name, value: s.count})),
+                    gap: 2
+                }]
+            });
         }
     }
 
@@ -1113,12 +1615,26 @@
             <div class="card"><h3>⚙️ Конструктор правил</h3><div class="two-columns"><div><select id="fieldSelect"><option value="city">Город</option><option value="minEvents">Мин. событий</option><option value="isActive">Активен</option><option value="source">Источник</option><option value="role">Роль</option></select><input id="fieldValue" placeholder="Значение" /><button class="btn" id="addRuleBtn">+ Добавить</button></div><div><div id="ruleList"></div><button class="btn" id="calcSegmentCount">Посчитать</button><span id="segmentCountResult" class="badge" style="margin-left:12px;"></span></div></div></div>
         `;
         let rules = [];
-        const renderRules = () => { document.getElementById('ruleList').innerHTML = rules.map((r,i) => `<div>${r.field}=${r.value} <button class="btn-secondary btn-sm" data-idx="${i}">✖</button></div>`).join(''); };
-        document.getElementById('addRuleBtn').onclick = () => { rules.push({ field: document.getElementById('fieldSelect').value, value: document.getElementById('fieldValue').value }); renderRules(); };
+        const renderRules = () => {
+            document.getElementById('ruleList').innerHTML = rules.map((r, i) => `<div>${r.field}=${r.value} <button class="btn-secondary btn-sm" data-idx="${i}">✖</button></div>`).join('');
+        };
+        document.getElementById('addRuleBtn').onclick = () => {
+            rules.push({
+                field: document.getElementById('fieldSelect').value,
+                value: document.getElementById('fieldValue').value
+            });
+            renderRules();
+        };
         document.getElementById('calcSegmentCount').onclick = async () => {
             const criteria = {};
-            rules.forEach(r => { if (r.field === 'city') criteria.city = r.value; if (r.field === 'minEvents') criteria.minEvents = parseInt(r.value); if (r.field === 'isActive') criteria.isActive = r.value === 'true'; if (r.field === 'source') criteria.source = r.value; if (r.field === 'role') criteria.role = r.value; });
-            const res = await apiFetch('/api/admin/segments/count', { method: 'POST', body: JSON.stringify({ criteria }) });
+            rules.forEach(r => {
+                if (r.field === 'city') criteria.city = r.value;
+                if (r.field === 'minEvents') criteria.minEvents = parseInt(r.value);
+                if (r.field === 'isActive') criteria.isActive = r.value === 'true';
+                if (r.field === 'source') criteria.source = r.value;
+                if (r.field === 'role') criteria.role = r.value;
+            });
+            const res = await apiFetch('/api/admin/segments/count', {method: 'POST', body: JSON.stringify({criteria})});
             if (res.success) document.getElementById('segmentCountResult').innerText = `Найдено: ${res.count}`;
         };
         document.getElementById('createSegmentBtn').onclick = () => showModal('Создать сегмент', `<div class="field"><label>Название</label><input id="segName" /></div><div class="field"><label>Критерии (JSON)</label><textarea id="segCriteria" rows="3"></textarea></div><button class="btn" id="saveSegBtn">Сохранить</button>`);
@@ -1170,7 +1686,6 @@
         userMetrics: renderUserMetrics,
         projectMetrics: renderProjectMetrics,
         participationMetrics: renderParticipationMetrics,
-        qualityMetrics: renderQualityMetrics,
         activityMetrics: renderActivityMetrics,
         communicationsMetrics: renderCommunicationsMetrics,
         operationalMetrics: renderOperationalMetrics,
@@ -1204,7 +1719,7 @@
         document.getElementById('adminModal').style.display = 'none';
     }
 
-    window.handleAction = function(actionType, userId) {
+    window.handleAction = function (actionType, userId) {
         activeTargetUserId = userId;
         const modal = document.getElementById('adminModal');
         const header = document.getElementById('modalHeader');
@@ -1221,10 +1736,9 @@
         `;
             confirmBtn.onclick = async () => {
                 const amount = document.getElementById('bonusAmount').value;
-                await executeAction(`/api/admin/user/${userId}/bonus`, { amount: Number(amount) });
+                await executeAction(`/api/admin/user/${userId}/bonus`, {amount: Number(amount)});
             };
-        }
-        else if (actionType === 'role') {
+        } else if (actionType === 'role') {
             header.innerText = 'Изменить роль';
             body.innerHTML = `
             <select id="newRole">
@@ -1235,10 +1749,9 @@
         `;
             confirmBtn.onclick = async () => {
                 const role = document.getElementById('newRole').value;
-                await executeAction(`/api/admin/user/${userId}/role`, { role });
+                await executeAction(`/api/admin/user/${userId}/role`, {role});
             };
-        }
-        else if (actionType === 'block') {
+        } else if (actionType === 'block') {
             header.innerText = 'Блокировка доступа';
             body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите изменить статус блокировки этого пользователя?</p>`;
             confirmBtn.onclick = async () => {
@@ -1258,6 +1771,258 @@
         } else {
             alert("Ошибка: " + res.error);
         }
+    }
+
+    let projectDonutChartInstance = null;
+
+    /**
+     * Главная функция обновления дашборда проектов
+     * @param {Array} projectsData - массив объектов проектов
+     * @param {Array} eventsData - массив событий активности
+     */
+    async function renderProjectDashboard(projectsData, eventsData) {
+        const projects = projectsData || [];
+        const events = eventsData || [];
+
+        // Безопасный вызов функций (проверка наличия данных)
+        renderProjectMetricsCards(projects);
+        renderProjectDonutChart(projects);
+        renderTopProjectsWidget(projects);
+        renderActivityFeed(events);
+    }
+
+    // === 1. ИНТЕРАКТИВНЫЕ КАРТОЧКИ С УЛУЧШЕННОЙ ДИНАМИКОЙ ===
+    function renderProjectMetricsCards(projects) {
+        const container = document.getElementById('project-metrics-container');
+        if (!container) return;
+
+        const total = projects.length;
+        const active = projects.filter(p => p.status === 'active' || p.status === 'in_progress').length;
+        const pending = projects.filter(p => p.status === 'pending').length;
+
+        // Расчет недобора и эффективности
+        let shortage = 0;
+        let totalNeeded = 0;
+        let totalApplied = 0;
+
+        projects.forEach(p => {
+            const needed = parseInt(p.volunteersNeeded) || 0;
+            const applied = parseInt(p.volunteersApplied) || 0;
+            totalNeeded += needed;
+            totalApplied += applied;
+            if (needed > applied) shortage += (needed - applied);
+        });
+
+        const efficiency = totalNeeded > 0 ? Math.round((totalApplied / totalNeeded) * 100) : 0;
+
+        // Логика визуального предупреждения
+        const isCritical = shortage > 5; // Например, если не хватает более 5 человек
+        const accentColor = isCritical ? '#ef4444' : (shortage > 0 ? '#fbbf24' : '#10b981');
+        const accentBg = isCritical ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.05)';
+
+        container.innerHTML = `
+        <div class="stat-card">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Всего проектов</div>
+            <div style="font-size: 32px; font-weight: 800; margin: 10px 0; font-family: 'Inter', sans-serif;">${total}</div>
+            <div style="font-size: 12px; color: #10b981; display: flex; align-items: center; gap: 4px;">
+                <span>↑</span> <span>12% за месяц</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">В работе</div>
+            <div style="font-size: 32px; font-weight: 800; margin: 10px 0; color: #4f46e5;">${active}</div>
+            <div style="font-size: 12px; color: #94a3b8;">${pending} ждут модерации</div>
+        </div>
+        <div class="stat-card" style="border: 1px solid ${isCritical ? '#ef4444' : '#2a2a30'}; background: ${accentBg}; transition: all 0.3s ease;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Недобор людей</div>
+            <div style="font-size: 32px; font-weight: 800; margin: 10px 0; color: ${accentColor};">${shortage}</div>
+            <div style="font-size: 12px; color: ${accentColor}; font-weight: 600;">
+                ${shortage > 0 ? '⚠️ Требуется реклама' : '✅ Штат укомплектован'}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Заполняемость</div>
+            <div style="font-size: 32px; font-weight: 800; margin: 10px 0;">${efficiency}%</div>
+            <div style="width: 100%; height: 4px; background: #2a2a30; border-radius: 2px; margin-top: 8px;">
+                <div style="width: ${efficiency}%; height: 100%; background: #6366f1; border-radius: 2px;"></div>
+            </div>
+        </div>
+    `;
+    }
+
+    // === 2. DONUT CHART С УМНЫМ ЦЕНТРАЛЬНЫМ ТЕКСТОМ ===
+    function renderProjectDonutChart(projects) {
+        const canvas = document.getElementById('projectDonutChart');
+
+        // Если канваса нет в DOM, просто выходим из функции без ошибки
+        if (!canvas) {
+            console.warn("⚠️ Канвас projectDonutChart не найден. Проверь наличие id в HTML.");
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const legendContainer = document.getElementById('projectChartLegend');
+
+        const categoryCounts = {};
+        projects.forEach(p => {
+            const cat = (p.category || 'Другое').trim();
+            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        });
+
+        const labels = Object.keys(categoryCounts);
+        const data = Object.values(categoryCounts);
+        const totalProjects = data.reduce((a, b) => a + b, 0);
+
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+        const icons = {'Экология': '🌱', 'Животные': '🐾', 'Пожилые': '👴', 'IT': '💻', 'Другое': '📌'};
+
+        // Кастомная легенда с процентами
+        if (legendContainer) {
+            legendContainer.innerHTML = labels.map((label, i) => {
+                const percent = totalProjects > 0 ? Math.round((data[i] / totalProjects) * 100) : 0;
+                return `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background: ${colors[i % colors.length]};"></div>
+                        <span style="color: #e1e4e8; font-size: 13px;">${icons[label] || '📍'} ${label}</span>
+                    </div>
+                    <span style="color: #94a3b8; font-size: 12px; font-weight: 600;">${data[i]} (${percent}%)</span>
+                </div>
+            `;
+            }).join('');
+        }
+
+        if (projectDonutChartInstance) projectDonutChartInstance.destroy();
+
+        projectDonutChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    hoverOffset: 15,
+                    borderWidth: 0,
+                    weight: 2
+                }]
+            },
+            options: {
+                cutout: '82%',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {display: false},
+                    tooltip: {
+                        backgroundColor: '#1a1a1f',
+                        padding: 12,
+                        bodyFont: {size: 13},
+                        displayColors: false
+                    }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                beforeDraw(chart) {
+                    const {width, height, ctx} = chart;
+                    ctx.restore();
+                    ctx.textBaseline = "middle";
+
+                    // Отрисовка числа
+                    ctx.font = "bold 32px 'Inter', sans-serif";
+                    ctx.fillStyle = "#ffffff";
+                    const text = totalProjects.toString();
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    ctx.fillText(text, textX, height / 2 - 5);
+
+                    // Отрисовка подписи
+                    ctx.font = "500 12px 'Inter', sans-serif";
+                    ctx.fillStyle = "#94a3b8";
+                    const subText = "ПРОЕКТОВ";
+                    const subTextX = Math.round((width - ctx.measureText(subText).width) / 2);
+                    ctx.fillText(subText, subTextX, height / 2 + 25);
+                    ctx.save();
+                }
+            }]
+        });
+    }
+
+    // === 3. ТОП-3 ПРОЕКТОВ (ГРАДИЕНТНЫЕ БАРЫ) ===
+    function renderTopProjectsWidget(projects) {
+        const container = document.getElementById('topProjectsContainer');
+        if (!container) return;
+
+        const sorted = [...projects]
+            .filter(p => (p.volunteersNeeded || 0) > 0)
+            .map(p => {
+                const applied = parseInt(p.volunteersApplied) || 0;
+                const needed = parseInt(p.volunteersNeeded) || 1;
+                return {...p, fillPercent: Math.min(100, Math.round((applied / needed) * 100))};
+            })
+            .sort((a, b) => b.fillPercent - a.fillPercent)
+            .slice(0, 3);
+
+        if (sorted.length === 0) {
+            container.innerHTML = '<div style="color: #6b7280; font-size: 13px; text-align: center; padding: 30px;">Нет активных наборов</div>';
+            return;
+        }
+
+        container.innerHTML = sorted.map(p => `
+        <div style="background: rgba(42, 42, 48, 0.5); padding: 14px; border-radius: 12px; border: 1px solid #2a2a30;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                <span style="color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">${p.title}</span>
+                <span style="color: #94a3b8; font-size: 11px;">${p.volunteersApplied} / ${p.volunteersNeeded}</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #0f0f12; border-radius: 10px; overflow: hidden; position: relative;">
+                <div style="width: ${p.fillPercent}%; height: 100%; background: linear-gradient(90deg, #4f46e5, #818cf8); border-radius: 10px; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);"></div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                <span style="font-size: 10px; color: ${p.fillPercent >= 100 ? '#10b981' : '#6366f1'}; font-weight: bold;">
+                    ${p.fillPercent}% заполнено
+                </span>
+            </div>
+        </div>
+    `).join('');
+    }
+
+    // === 4. ЛЕНТА СОБЫТИЙ С ЦВЕТОВЫМ КОДИРОВАНИЕМ ===
+    function renderActivityFeed(events) {
+        const container = document.getElementById('activityFeedContainer');
+        if (!container) return;
+
+        if (!events || events.length === 0) {
+            container.innerHTML = '<div style="color: #6b7280; font-size: 13px; text-align: center; padding: 20px;">Новых событий пока нет</div>';
+            return;
+        }
+
+        const formatTimeAgo = (date) => {
+            const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+            if (seconds < 60) return 'только что';
+            const mins = Math.floor(seconds / 60);
+            if (mins < 60) return `${mins} мин. назад`;
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return `${hours} ч. назад`;
+            return new Date(date).toLocaleDateString();
+        };
+
+        container.innerHTML = events.slice(0, 10).map(ev => {
+            let config = {icon: '⚡', color: '#6366f1'};
+            if (ev.type === 'apply') config = {icon: '🙌', color: '#10b981'};
+            if (ev.type === 'status_change') config = {icon: '🔄', color: '#f59e0b'};
+            if (ev.type === 'new_project') config = {icon: '🆕', color: '#8b5cf6'};
+
+            return `
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px; border-radius: 10px; background: #1a1a1f; margin-bottom: 8px; border-left: 4px solid ${config.color};">
+                <div style="font-size: 18px;">${config.icon}</div>
+                <div style="flex: 1;">
+                    <div style="color: #e1e4e8; font-size: 13px; line-height: 1.5; font-weight: 400;">${ev.text}</div>
+                    <div style="color: #64748b; font-size: 11px; margin-top: 5px; display: flex; align-items: center; gap: 5px;">
+                        <span style="width: 4px; height: 4px; border-radius: 50%; background: #475569;"></span>
+                        ${formatTimeAgo(ev.createdAt)}
+                    </div>
+                </div>
+            </div>
+        `;
+        }).join('');
     }
 
 </script>
