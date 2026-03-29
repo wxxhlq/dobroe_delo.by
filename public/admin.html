@@ -1578,32 +1578,33 @@
 
     // ===================== АНАЛИТИКА КАНАЛОВ =====================
     async function renderAnalytics() {
-        document.getElementById('pageTitle').innerText = 'Аналитика каналов';
-        const data = await apiFetch('/api/admin/analytics/sources');
-        if (!data.success) return;
-        document.getElementById('content').innerHTML = `
-            <div class="card"><h3>📈 Источники трафика</h3><table><thead><tr><th>Источник</th><th>Визиты</th><th>Сессии</th><th>Регистрации</th><th>Конверсия</th></tr></thead><tbody>${data.sources.map(s => `<tr><td>${s.source}</td><td>${s.visits}</td><td>${s.uniqueSessions}</td><td>${s.registrations}</td><td>${s.conversion}%</td></tr>`).join('')}</tbody></table></div>
-            <div class="two-columns"><div class="card"><h3>🥧 Распределение трафика</h3><div id="pieChart" style="height:300px;"></div></div><div class="card"><h3>📊 Воронка конверсии</h3><div id="funnelChart" style="height:300px;"></div></div></div>
-        `;
-        const pie = echarts.init(document.getElementById('pieChart'));
-        pie.setOption({
-            series: [{
-                type: 'pie',
-                data: data.pieData.map(d => ({name: d.name, value: d.value})),
-                radius: '60%'
-            }]
-        });
-        const funnelData = await apiFetch('/api/admin/analytics/funnel');
-        if (funnelData.success) {
-            const funnel = echarts.init(document.getElementById('funnelChart'));
-            funnel.setOption({
-                series: [{
-                    type: 'funnel',
-                    data: funnelData.funnel.map(s => ({name: s.name, value: s.count})),
-                    gap: 2
-                }]
-            });
-        }
+        const title = document.getElementById('pageTitle');
+        const content = document.getElementById('content');
+
+        if (title) title.innerText = 'Интеллектуальная аналитика (Umami)';
+        if (!content) return;
+
+        // Ссылка, которую ты получила в Шаге 1 (замени на свою!)
+        const shareUrl = "https://cloud.umami.is/analytics/eu/share/aOziHAjEdxqWankv";
+
+        content.innerHTML = `
+        <div class="analytics-container" style="height: 85vh; border-radius: 15px; overflow: hidden; position: relative; background: #121212;">
+            <div id="loader" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color: #4db8ff;">
+                Синхронизация с сервером Umami...
+            </div>
+            <iframe
+                src="${shareUrl}"
+                frameborder="0"
+                width="100%"
+                height="100%"
+                style="display:none; filter: invert(0.9) hue-rotate(180deg) brightness(1.1);"
+                onload="this.style.display='block'; document.getElementById('loader').style.display='none';">
+            </iframe>
+        </div>
+        <div style="margin-top: 15px; font-size: 13px; color: #666; text-align: center;">
+            Данные обновляются в реальном времени. Конфиденциальность соблюдена.
+        </div>
+    `;
     }
 
     // ===================== СЕГМЕНТАЦИЯ =====================

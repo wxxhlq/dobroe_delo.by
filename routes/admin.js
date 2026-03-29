@@ -1513,4 +1513,125 @@ router.get('/activity-metrics', adminAuthMiddleware, async (req, res) => {
     }
 });
 
+// Вспомогательная функция для безопасного получения данных (защита от undefined)
+const getField = (obj, paths, defaultVal = 'unknown') => {
+    for (let path of paths) {
+        const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
+        if (value !== undefined && value !== null) return value;
+    }
+    return defaultVal;
+};
+
+// ==========================================
+// 1. ЭНДПОИНТ: Источники трафика и Тех. метрики
+// ==========================================
+router.get('/api/admin/analytics/sources', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const events = await db.collection('user_events').find().toArray();
+
+        const sourcesMap = {};
+        // Гарантируем, что поля ОС всегда есть (даже если 0)
+        const techMap = { mobile: 0, desktop: 0, windows: 0, mac: 0, android: 0, ios: 0 };
+        const sessionCounts = {};
+
+        events.forEach(ev => {
+            const src = (ev.sourceData?.utm_source || 'direct').toLowerCase();
+            const sid = ev.sessionId || 'unknown';
+            const type = (ev.eventType || '').toLowerCase();
+
+            // Считаем события для Bounce Rate
+            sessionCounts[sid] = (sessionCounts[sid] || 0) + 1;
+
+            if (!sourcesMap[src]) {
+                sourcesMap[src] = { visits: 0, sessions: new Set(), registrations: 0 };
+            }
+
+            sourcesMap[src].visits++;
+            sourcesMap[src].sessions.add(sid);
+            if (type === 'registration') sourcesMap[src].registrations++;
+
+            // Обработка тех-данных
+            const os = (ev.deviceData?.os || '').toLowerCase();
+            const dev = (ev.deviceData?.type || '').toLowerCase();
+
+            if (dev.includes('mobi')) techMap.mobile++; else techMap.desktop++;
+            if (os.includes('win')) techMap.windows++;
+            else if (os.includes('mac')) techMap.mac++;
+            else if (os.includes('and')) techMap.android++;
+            else if (os.includes('ios') || os.includes('iphone')) techMap.ios++;
+        });
+
+        const sourcesResult = Object.keys(sourcesMap).map(name => {
+            const s = sourcesMap[name];
+            const uSess = s.sessions.size || 1;
+
+            // Считаем отказы
+            let bounces = 0;
+            s.sessions.forEach(id => { if(sessionCounts[id] === 1) bounces++; });
+
+            return {
+                source: name,
+                visits: s.visits,
+                uniqueSessions: uSess,
+                registrations: s.registrations,
+                conversion: ((s.registrations / uSess) * 100).toFixed(1),
+                bounceRate: ((bounces / uSess) * 100).toFixed(1)
+            };
+        });
+
+        res.json({ success: true, sources: sourcesResult, tech: techMap });
+    } catch (e) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// ==========================================
+// 2. ЭНДПОИНТ: Воронка конверсии (Marketing Funnel)
+// ==========================================
+router.get('/api/admin/analytics/funnel', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+        const events = await db.collection('user_events').find({
+            createdAt: { $gte: thirtyDaysAgo }
+        }).toArray();
+
+        // Используем Set для подсчета УНИКАЛЬНЫХ пользователей на каждом этапе
+        const funnelSteps = {
+            visitor: new Set(),      // Зашли на сайт
+            interested: new Set(),   // Нажали на проект (project_click)
+            lead: new Set(),         // Начали заполнять (form_start)
+            volunteer: new Set(),    // Завершили рег (registration)
+            active: new Set()        // Подали заявку (project_apply)
+        };
+
+        events.forEach(ev => {
+            const type = (ev.eventType || '').toLowerCase();
+            const sid = getField(ev, ['sessionId', 'session_id', 'sid']);
+            if (sid === 'unknown') return;
+
+            funnelSteps.visitor.add(sid);
+            if (type === 'project_click') funnelSteps.interested.add(sid);
+            if (type === 'form_start') funnelSteps.lead.add(sid);
+            if (type === 'registration') funnelSteps.volunteer.add(sid);
+            if (type === 'project_apply') funnelSteps.active.add(sid);
+        });
+
+        const funnelResult = [
+            { name: 'Посетители', count: funnelSteps.visitor.size },
+            { name: 'Интерес (Клик)', count: funnelSteps.interested.size },
+            { name: 'Лиды (Форма)', count: funnelSteps.lead.size },
+            { name: 'Регистрации', count: funnelSteps.volunteer.size },
+            { name: 'Активные (Заявка)', count: funnelSteps.active.size }
+        ];
+
+        res.json({ success: true, funnel: funnelResult });
+    } catch (error) {
+        console.error("Ошибка воронки:", error);
+        res.status(500).json({ success: false });
+    }
+});
+
 module.exports = router;

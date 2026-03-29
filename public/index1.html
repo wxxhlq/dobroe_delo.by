@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="f9ad662f-3488-47c5-af79-9b2da5aaeb0f"></script>
   <title>Доброе_дело.by</title>
   <!--марк сучка соснула ручку бем-->
   <style>
@@ -6384,6 +6385,49 @@
       })();
   </script>
   <script src="/js/auth-helper.js"></script>
+
+  <script>
+      async function trackEvent(type = 'page_view') {
+          try {
+              const urlParams = new URLSearchParams(window.location.search);
+
+              // Определяем ОС более точно
+              let os = "Unknown";
+              if (navigator.userAgent.indexOf("Win") != -1) os = "Windows";
+              if (navigator.userAgent.indexOf("Mac") != -1) os = "MacOS";
+              if (navigator.userAgent.indexOf("Android") != -1) os = "Android";
+              if (navigator.userAgent.indexOf("like Mac") != -1) os = "iOS";
+
+              const eventData = {
+                  eventType: type,
+                  sessionId: localStorage.getItem('active_session') || 's_' + Math.random().toString(36).substr(2, 9),
+                  sourceData: {
+                      utm_source: urlParams.get('utm_source') || 'direct'
+                  },
+                  deviceData: {
+                      os: os,
+                      type: /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
+                  }
+              };
+
+              if (!localStorage.getItem('active_session')) {
+                  localStorage.setItem('active_session', eventData.sessionId);
+              }
+
+              await fetch('/api/events', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(eventData)
+              });
+          } catch (e) { console.error('Analytics error'); }
+      }
+
+      // Запускаем при загрузке страницы
+      trackEvent('page_view');
+
+      // ТАКЖЕ добавь вызов trackEvent('registration') там, где у тебя
+      // происходит успешная регистрация волонтера!
+  </script>
 </body>
 
 </html>

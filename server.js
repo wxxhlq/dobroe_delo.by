@@ -244,6 +244,8 @@ async function findMatchingRefreshToken(user, refreshToken) {
     return null;
 }
 
+
+
 async function trackEvent(userId, sessionId, eventType, eventData = {}, sourceData = {}, deviceData = {}) {
     try {
         const UserEvent = require('./models/UserEvent');
@@ -1276,6 +1278,37 @@ app.get('/api/news', async (req, res) => {
     } catch (err) {
         console.error('❌ Ошибка получения новостей:', err);
         res.status(500).json({ message: 'Ошибка сервера' });
+    }
+});
+
+// Роут для приема аналитики с фронтенда
+app.post('/api/events', async (req, res) => {
+    try {
+        const db = getDB();
+        const { eventType, sessionId, sourceData, deviceData } = req.body;
+
+        // Создаем документ события
+        const newEvent = {
+            eventType: eventType || 'page_view',
+            sessionId: sessionId || 'unknown',
+            // Сохраняем данные об источнике (UTM)
+            sourceData: {
+                utm_source: sourceData?.utm_source || 'direct',
+                utm_medium: sourceData?.utm_medium || 'none'
+            },
+            // Сохраняем данные об устройстве (ОС и Тип)
+            deviceData: {
+                os: deviceData?.os || 'unknown',
+                type: deviceData?.type || 'desktop'
+            },
+            createdAt: new Date() // Важно: тип Date для фильтрации в админке
+        };
+
+        await db.collection('user_events').insertOne(newEvent);
+        res.status(201).json({ success: true });
+    } catch (error) {
+        console.error("Ошибка при сохранении события:", error);
+        res.status(500).json({ success: false });
     }
 });
 
