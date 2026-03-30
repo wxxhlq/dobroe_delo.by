@@ -345,6 +345,7 @@ router.get('/segments', adminAuthMiddleware, async (req, res) => {
         }));
         res.json({ success: true, segments: enriched });
     } catch (err) {
+        console.error('Segments error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -358,7 +359,16 @@ router.post('/segments', adminAuthMiddleware, async (req, res) => {
     try {
         const { name, criteria, isDynamic } = req.body;
         if (!name) return res.status(400).json({ success: false, error: 'Имя сегмента обязательно' });
-        const segment = new Segment({ name, criteria, isDynamic });
+
+        // Очищаем критерии от пустых значений
+        const cleanedCriteria = {};
+        for (const [key, value] of Object.entries(criteria)) {
+            if (value !== undefined && value !== null && value !== '') {
+                cleanedCriteria[key] = value;
+            }
+        }
+
+        const segment = new Segment({ name, criteria: cleanedCriteria, isDynamic: isDynamic === true });
         await segment.save();
         res.json({ success: true, segment });
     } catch (err) {
@@ -374,7 +384,19 @@ router.post('/segments', adminAuthMiddleware, async (req, res) => {
 router.put('/segments/:id', adminAuthMiddleware, async (req, res) => {
     try {
         const { name, criteria, isDynamic } = req.body;
-        const segment = await Segment.findByIdAndUpdate(req.params.id, { name, criteria, isDynamic }, { new: true });
+        const cleanedCriteria = {};
+        for (const [key, value] of Object.entries(criteria)) {
+            if (value !== undefined && value !== null && value !== '') {
+                cleanedCriteria[key] = value;
+            }
+        }
+
+        // ИСПРАВЛЕНИЕ: используем returnDocument вместо new
+        const segment = await Segment.findByIdAndUpdate(
+            req.params.id,
+            { name, criteria: cleanedCriteria, isDynamic: isDynamic === true },
+            { returnDocument: 'after' }  // вместо new: true
+        );
         if (!segment) return res.status(404).json({ success: false, error: 'Сегмент не найден' });
         res.json({ success: true, segment });
     } catch (err) {
@@ -407,6 +429,7 @@ router.post('/segments/count', adminAuthMiddleware, async (req, res) => {
         const count = await getSegmentUserCount(criteria);
         res.json({ success: true, count });
     } catch (err) {
+        console.error('Segments count error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -416,45 +439,193 @@ async function getSegmentUserCount(criteria) {
     const db = getDB();
     const query = {};
 
+    // Базовые поля
     if (criteria.city) query.city = criteria.city;
     if (criteria.role) query.role = criteria.role;
     if (criteria.status) query.status = criteria.status;
 
-    if (criteria.minEvents !== undefined) {
-        const usersWithEvents = await UserEvent.aggregate([
-            { $group: { _id: '$userId', count: { $sum: 1 } } },
-            { $match: { count: { $gte: criteria.minEvents } } },
-            { $group: { _id: null, userIds: { $push: '$_id' } } }
-        ]);
-        const userIds = usersWithEvents[0]?.userIds || [];
-        if (userIds.length) query._id = { $in: userIds };
-        else return 0;
-    }
-
+    // Интересы (массив)
     if (criteria.interests && criteria.interests.length) {
         query.interests = { $in: criteria.interests };
     }
 
+    // Активность за 30 дней (isActive)
     if (criteria.isActive !== undefined) {
-        const monthAgo = new Date(Date.now() - 30*24*60*60*1000);
-        const activeUsers = await UserEvent.distinct('userId', { createdAt: { $gte: monthAgo } });
-        if (criteria.isActive) query._id = { $in: activeUsers };
-        else query._id = { $nin: activeUsers };
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        // Используем userevents, фильтруя только валидные userId
+        const activeUsers = await db.collection('userevents').distinct('userId', {
+            createdAt: { $gte: monthAgo },
+            userId: { $ne: null, $ne: 'guest' }
+        });
+        const validUserIds = activeUsers.filter(id => id && typeof id !== 'string');
+        if (criteria.isActive) {
+            if (validUserIds.length) query._id = { $in: validUserIds };
+            else return 0;
+        } else {
+            query._id = { $nin: validUserIds };
+        }
     }
 
+    // Источник трафика (только через события)
     if (criteria.source) {
-        const usersFromSource = await UserEvent.distinct('userId', {
+        const usersFromSource = await db.collection('userevents').distinct('userId', {
             eventType: 'page_view',
+            userId: { $ne: null, $ne: 'guest' },
             $or: [
                 { 'sourceData.utm_source': criteria.source },
                 { 'sourceData.referrer': criteria.source }
             ]
         });
-        query._id = { $in: usersFromSource };
+        const validUserIds = usersFromSource.filter(id => id);
+        if (validUserIds.length) {
+            if (query._id) {
+                query._id = { $in: validUserIds };
+            } else {
+                query._id = { $in: validUserIds };
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    // Минимум событий (исправлено: используем native driver)
+    if (criteria.minEvents !== undefined && criteria.minEvents > 0) {
+        const usersWithEvents = await db.collection('userevents').aggregate([
+            { $match: { userId: { $ne: null, $ne: 'guest' } } },
+            { $group: { _id: '$userId', count: { $sum: 1 } } },
+            { $match: { count: { $gte: criteria.minEvents } } },
+            { $group: { _id: null, userIds: { $push: '$_id' } } }
+        ]).toArray();
+
+        const userIds = usersWithEvents[0]?.userIds || [];
+        if (userIds.length) {
+            if (query._id) {
+                query._id = { $in: userIds };
+            } else {
+                query._id = { $in: userIds };
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    // Дата регистрации
+    if (criteria.registrationDate) {
+        const reg = criteria.registrationDate;
+        if (reg.$gte && reg.$lte) {
+            query.createdAt = { $gte: new Date(reg.$gte), $lte: new Date(reg.$lte) };
+        } else if (reg.$gt) {
+            query.createdAt = { $gt: new Date(reg.$gt) };
+        } else if (reg.$lt) {
+            query.createdAt = { $lt: new Date(reg.$lt) };
+        } else if (typeof reg === 'string') {
+            const date = new Date(reg);
+            const nextDay = new Date(date);
+            nextDay.setDate(date.getDate() + 1);
+            query.createdAt = { $gte: date, $lt: nextDay };
+        }
+    }
+
+    // Завершённые проекты
+    if (criteria.completedProjects) {
+        const comp = criteria.completedProjects;
+        let operator = '$gte';
+        let value = 1;
+        if (comp.$gte) { operator = '$gte'; value = comp.$gte; }
+        else if (comp.$lte) { operator = '$lte'; value = comp.$lte; }
+        else if (comp.$eq) { operator = '$eq'; value = comp.$eq; }
+        else if (typeof comp === 'number') { value = comp; }
+
+        const usersWithCompleted = await db.collection('project_applications').aggregate([
+            { $match: { status: 'APPROVED' } },
+            { $group: { _id: '$userId', count: { $sum: 1 } } },
+            { $match: { count: { [operator]: value } } },
+            { $group: { _id: null, userIds: { $push: '$_id' } } }
+        ]).toArray();
+
+        const userIds = usersWithCompleted[0]?.userIds || [];
+        if (userIds.length) {
+            if (query._id) {
+                query._id = { $in: userIds };
+            } else {
+                query._id = { $in: userIds };
+            }
+        } else {
+            return 0;
+        }
     }
 
     const count = await db.collection('users').countDocuments(query);
     return count;
+}
+
+// Вспомогательная функция для получения списка пользователей сегмента
+async function getSegmentUsers(criteria) {
+    const db = getDB();
+    const query = {};
+
+    if (criteria.city) query.city = criteria.city;
+    if (criteria.role) query.role = criteria.role;
+    if (criteria.status) query.status = criteria.status;
+
+    if (criteria.interests && criteria.interests.length) {
+        query.interests = { $in: criteria.interests };
+    }
+
+    if (criteria.minEvents !== undefined && criteria.minEvents > 0) {
+        const usersWithEvents = await db.collection('userevents').aggregate([
+            { $match: { userId: { $ne: null, $ne: 'guest' } } },
+            { $group: { _id: '$userId', count: { $sum: 1 } } },
+            { $match: { count: { $gte: criteria.minEvents } } },
+            { $group: { _id: null, userIds: { $push: '$_id' } } }
+        ]).toArray();
+        const userIds = usersWithEvents[0]?.userIds || [];
+        if (userIds.length) query._id = { $in: userIds };
+        else return [];
+    }
+
+    if (criteria.source) {
+        const usersFromSource = await db.collection('userevents').distinct('userId', {
+            eventType: 'page_view',
+            userId: { $ne: null, $ne: 'guest' },
+            $or: [
+                { 'sourceData.utm_source': criteria.source },
+                { 'sourceData.referrer': criteria.source }
+            ]
+        });
+        const validUserIds = usersFromSource.filter(id => id);
+        if (validUserIds.length) query._id = { $in: validUserIds };
+        else return [];
+    }
+
+    if (criteria.completedProjects) {
+        const comp = criteria.completedProjects;
+        let operator = '$gte';
+        let value = 1;
+        if (comp.$gte) { operator = '$gte'; value = comp.$gte; }
+        else if (comp.$lte) { operator = '$lte'; value = comp.$lte; }
+        else if (comp.$eq) { operator = '$eq'; value = comp.$eq; }
+        else if (typeof comp === 'number') { value = comp; }
+
+        const usersWithCompleted = await db.collection('project_applications').aggregate([
+            { $match: { status: 'APPROVED' } },
+            { $group: { _id: '$userId', count: { $sum: 1 } } },
+            { $match: { count: { [operator]: value } } },
+            { $group: { _id: null, userIds: { $push: '$_id' } } }
+        ]).toArray();
+        const userIds = usersWithCompleted[0]?.userIds || [];
+        if (userIds.length) {
+            if (query._id) {
+                query._id = { $in: userIds };
+            } else {
+                query._id = { $in: userIds };
+            }
+        } else {
+            return [];
+        }
+    }
+
+    return await db.collection('users').find(query).toArray();
 }
 
 // ===================== 4. КОММУНИКАЦИИ И ТРИГГЕРЫ =====================
@@ -880,8 +1051,16 @@ router.get('/export/segments/:id', adminAuthMiddleware, async (req, res) => {
     try {
         const segment = await Segment.findById(req.params.id);
         if (!segment) return res.status(404).json({ success: false, error: 'Сегмент не найден' });
+        // Если сегмент динамический – пересчитываем пользователей
         const userIds = segment.users || [];
-        const users = await getDB().collection('users').find({ _id: { $in: userIds } }).toArray();
+        let users = [];
+        if (segment.isDynamic || !userIds.length) {
+            // Вычисляем пользователей по критериям
+            users = await getSegmentUsers(segment.criteria);
+            userIds = users.map(u => u._id);
+        } else {
+            users = await getDB().collection('users').find({ _id: { $in: userIds } }).toArray();
+        }
         const fields = ['_id', 'name', 'email', 'city', 'role', 'points', 'createdAt'];
         const csv = users.map(u => fields.map(f => JSON.stringify(u[f])).join(',')).join('\n');
         const header = fields.join(',');
