@@ -6,6 +6,9 @@
     <title>Маркетинговый Хаб | Доброе_дело.by</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1799,54 +1802,68 @@
                 if (!res.success) throw new Error(res.error);
                 if (!res.segments.length) { tbody.innerHTML = ' <td colspan="5">Нет сегментов  '; return; }
                 tbody.innerHTML = res.segments.map(seg => `
-                <tr>
-                    <td><strong>${escapeHtml(seg.name)}</strong></td>
-                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(JSON.stringify(seg.criteria))}">${JSON.stringify(seg.criteria).substring(0, 50)}${JSON.stringify(seg.criteria).length > 50 ? '…' : ''}</td>
-                    <td>${seg.count || '—'}</td>
-                    <td><span class="badge ${seg.isDynamic ? 'badge-success' : 'badge-warning'}">${seg.isDynamic ? 'Динамический' : 'Статический'}</span></td>
-                    <td>
-                        <button class="btn-secondary edit-seg" data-id="${seg._id}" data-name="${escapeHtml(seg.name)}" data-criteria='${JSON.stringify(seg.criteria)}' data-dynamic="${seg.isDynamic}">✏️</button>
-                        <button class="btn-secondary del-seg" data-id="${seg._id}">🗑️</button>
-                        <button class="btn-secondary exp-seg" data-id="${seg._id}">📎</button>
-                     </td>
-                 </tr>
-            `).join('');
+            <tr>
+                <td><strong>${escapeHtml(seg.name)}</strong></td>
+                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(JSON.stringify(seg.criteria))}">${JSON.stringify(seg.criteria).substring(0, 50)}${JSON.stringify(seg.criteria).length > 50 ? '…' : ''}</td>
+                <td>${seg.count || '—'}</td>
+                <td><span class="badge ${seg.isDynamic ? 'badge-success' : 'badge-warning'}">${seg.isDynamic ? 'Динамический' : 'Статический'}</span></td>
+                <td>
+                    <button class="btn-secondary edit-seg" data-id="${seg._id}" data-name="${escapeHtml(seg.name)}" data-criteria='${JSON.stringify(seg.criteria)}' data-dynamic="${seg.isDynamic}">✏️</button>
+                    <button class="btn-secondary del-seg" data-id="${seg._id}">🗑️</button>
+                    <button class="btn-secondary exp-seg" data-id="${seg._id}" data-name="${escapeHtml(seg.name)}">📎</button>
+                </td>
+             </tr>
+        `).join('');
 
-                document.querySelectorAll('.edit-seg').forEach(btn => btn.onclick = () => {
-                    editingId = btn.dataset.id;
-                    document.getElementById('segmentName').value = btn.dataset.name;
-                    document.getElementById('segmentType').value = btn.dataset.dynamic === 'true' ? 'dynamic' : 'static';
-                    const criteria = JSON.parse(btn.dataset.criteria);
-                    currentRules = [];
-                    for (const [field, value] of Object.entries(criteria)) {
-                        if (value === undefined || value === null) continue;
-                        // Определяем оператор по типу значения
-                        let op = 'eq';
-                        if (typeof value === 'object') {
-                            if (value.$ne) { op = 'neq'; value = value.$ne; }
-                            else if (value.$gt) { op = 'gt'; value = value.$gt; }
-                            else if (value.$lt) { op = 'lt'; value = value.$lt; }
-                            else if (value.$gte) { op = 'gte'; value = value.$gte; }
-                            else if (value.$lte) { op = 'lte'; value = value.$lte; }
-                            else continue;
+                // Редактирование
+                document.querySelectorAll('.edit-seg').forEach(btn => {
+                    btn.onclick = () => {
+                        editingId = btn.dataset.id;
+                        document.getElementById('segmentName').value = btn.dataset.name;
+                        document.getElementById('segmentType').value = btn.dataset.dynamic === 'true' ? 'dynamic' : 'static';
+                        const criteria = JSON.parse(btn.dataset.criteria);
+                        currentRules = [];
+                        for (const [field, value] of Object.entries(criteria)) {
+                            if (value === undefined || value === null) continue;
+                            // Определяем оператор по типу значения
+                            let op = 'eq';
+                            if (typeof value === 'object') {
+                                if (value.$ne) { op = 'neq'; value = value.$ne; }
+                                else if (value.$gt) { op = 'gt'; value = value.$gt; }
+                                else if (value.$lt) { op = 'lt'; value = value.$lt; }
+                                else if (value.$gte) { op = 'gte'; value = value.$gte; }
+                                else if (value.$lte) { op = 'lte'; value = value.$lte; }
+                                else continue;
+                            }
+                            let strVal = String(value);
+                            if (field === 'isActive') strVal = value === true ? 'true' : 'false';
+                            currentRules.push({ field, operator: op, value: strVal });
                         }
-                        let strVal = String(value);
-                        if (field === 'isActive') strVal = value === true ? 'true' : 'false';
-                        currentRules.push({ field, operator: op, value: strVal });
-                    }
-                    renderRulesList();
-                    updatePreviewCountDebounced();
-                    document.getElementById('editHint').style.display = 'block';
-                    document.getElementById('editSegmentId').innerText = btn.dataset.name;
+                        renderRulesList();
+                        updatePreviewCountDebounced();
+                        document.getElementById('editHint').style.display = 'block';
+                        document.getElementById('editSegmentId').innerText = btn.dataset.name;
+                    };
                 });
-                document.querySelectorAll('.del-seg').forEach(btn => btn.onclick = async () => {
-                    if (!confirm('Удалить сегмент?')) return;
-                    const delRes = await apiFetch(`/api/admin/segments/${btn.dataset.id}`, { method: 'DELETE' });
-                    if (delRes.success) { if (editingId === btn.dataset.id) resetForm(); loadSegmentsList(); }
-                    else alert('Ошибка удаления');
+
+                // Удаление
+                document.querySelectorAll('.del-seg').forEach(btn => {
+                    btn.onclick = async () => {
+                        if (!confirm('Удалить сегмент?')) return;
+                        const delRes = await apiFetch(`/api/admin/segments/${btn.dataset.id}`, { method: 'DELETE' });
+                        if (delRes.success) { if (editingId === btn.dataset.id) resetForm(); loadSegmentsList(); }
+                        else alert('Ошибка удаления');
+                    };
                 });
-                document.querySelectorAll('.exp-seg').forEach(btn => btn.onclick = () => window.open(`/api/admin/export/segments/${btn.dataset.id}`, '_blank'));
-            } catch (err) { tbody.innerHTML = ` <td colspan="5" style="color:#ef4444;">Ошибка: ${err.message}  `; }
+
+                // ЭКСПОРТ – заменяем на вызов модального окна
+                document.querySelectorAll('.exp-seg').forEach(btn => {
+                    btn.onclick = () => showExportModal(btn.dataset.id, btn.dataset.name);
+                });
+
+            } catch (err) {
+                tbody.innerHTML = ` <td colspan="5" style="color:#ef4444;">Ошибка: ${err.message}  </tr>`;
+            }
         }
 
         async function saveSegment() {
@@ -2281,6 +2298,152 @@
         }).join('');
     }
 
+    // --- Экспорт сегментов ---
+    let currentExportSegment = null;
+
+    async function showExportModal(segmentId, segmentName) {
+        currentExportSegment = { id: segmentId, name: segmentName };
+        const modal = document.getElementById('exportModal');
+        modal.style.display = 'flex';
+    }
+
+    async function exportSegment() {
+        if (!currentExportSegment) return;
+        const format = document.getElementById('exportFormat').value;
+        const selectedFields = Array.from(document.querySelectorAll('#exportFields input:checked')).map(cb => cb.value);
+
+        if (selectedFields.length === 0) {
+            alert('Выберите хотя бы одно поле для экспорта');
+            return;
+        }
+
+        try {
+            const res = await apiFetch(`/api/admin/export/segments/${currentExportSegment.id}?format=json`);
+            if (!res.success) throw new Error(res.error);
+            let users = res.users;
+
+            const fieldMap = {
+                name: 'Имя',
+                email: 'Email',
+                city: 'Город',
+                role: 'Роль',
+                points: 'Баллы (XP)',
+                createdAt: 'Дата регистрации',
+                lastLogin: 'Последняя активность',
+                tasksCompleted: 'Выполнено проектов'
+            };
+
+            const exportData = users.map(user => {
+                const row = {};
+                for (const field of selectedFields) {
+                    const label = fieldMap[field];
+                    if (field === 'name') row[label] = user.name || user.username || '';
+                    else if (field === 'email') row[label] = user.email || '';
+                    else if (field === 'city') row[label] = user.city || '';
+                    else if (field === 'role') {
+                        let roleText = '';
+                        if (user.role === 'VOLUNTEER') roleText = 'Волонтёр';
+                        else if (user.role === 'ORGANIZER') roleText = 'Организатор';
+                        else if (user.role === 'ADMIN') roleText = 'Администратор';
+                        else roleText = user.role || '';
+                        row[label] = roleText;
+                    }
+                    else if (field === 'points') row[label] = user.points || 0;
+                    else if (field === 'createdAt') {
+                        // Пытаемся найти дату в разных вариантах
+                        let date = user.createdAt || user.created_at || user.registrationDate || user.registeredAt;
+                        if (date) {
+                            row[label] = new Date(date).toLocaleDateString('ru-RU');
+                        } else {
+                            row[label] = '';
+                        }
+                    }
+                    else if (field === 'lastLogin') row[label] = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '';
+                    else if (field === 'tasksCompleted') row[label] = user.tasksCompleted || 0;
+                }
+                return row;
+            });
+
+            const safeName = (currentExportSegment.name || 'segment').replace(/[^a-zа-яё0-9_\-]/gi, '_');
+
+            if (format === 'csv') {
+                // Для русскоязычного Excel лучше использовать разделитель ';'
+                const delimiter = ';';
+                const headers = Object.keys(exportData[0] || {});
+                const csvRows = [headers.join(delimiter)];
+                for (const row of exportData) {
+                    const values = headers.map(header => {
+                        let val = row[header] || '';
+                        // Экранирование: если содержит разделитель, кавычки или перевод строки, оборачиваем в двойные кавычки
+                        if (typeof val === 'string' && (val.includes(delimiter) || val.includes('"') || val.includes('\n'))) {
+                            val = '"' + val.replace(/"/g, '""') + '"';
+                        }
+                        return val;
+                    });
+                    csvRows.push(values.join(delimiter));
+                }
+                // Добавляем BOM для корректной кириллицы
+                const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `segment_${safeName}_${Date.now()}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            } else if (format === 'xlsx') {
+                const wsData = [Object.keys(exportData[0] || [])];
+                for (const row of exportData) {
+                    wsData.push(Object.values(row));
+                }
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+                // Автоподбор ширины столбцов
+                const colWidths = wsData[0].map((_, idx) => ({ wch: Math.max(15, ...wsData.slice(1).map(r => String(r[idx] || '').length)) }));
+                ws['!cols'] = colWidths;
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Segment Data');
+                XLSX.writeFile(wb, `segment_${safeName}_${Date.now()}.xlsx`);
+            } else if (format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                // Устанавливаем шрифт, поддерживающий кириллицу (times работает лучше)
+                const doc = new jsPDF('landscape');
+                // Пытаемся установить шрифт, поддерживающий кириллицу
+                doc.setFont('times');
+                doc.setFontSize(16);
+                doc.text(`Сегмент: ${currentExportSegment.name}`, 14, 20);
+                const headers = Object.keys(exportData[0] || []);
+                const rows = exportData.map(row => headers.map(h => row[h] || ''));
+                doc.autoTable({
+                    head: [headers],
+                    body: rows,
+                    startY: 30,
+                    theme: 'striped',
+                    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', font: 'times' },
+                    styles: { cellPadding: 3, fontSize: 9, font: 'times' },
+                    margin: { left: 14, right: 14 }
+                });
+                doc.save(`segment_${safeName}_${Date.now()}.pdf`);
+            }
+
+            closeExportModal();
+        } catch (err) {
+            console.error('Export error:', err);
+            alert('Ошибка экспорта: ' + err.message);
+        }
+    }
+
+    function closeExportModal() {
+        document.getElementById('exportModal').style.display = 'none';
+        currentExportSegment = null;
+    }
+
+    // Привязываем кнопки в модалке
+    // Привязка обработчиков модального окна экспорта после загрузки DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmBtn = document.getElementById('confirmExportBtn');
+        const cancelBtn = document.getElementById('cancelExportBtn');
+        if (confirmBtn) confirmBtn.onclick = exportSegment;
+        if (cancelBtn) cancelBtn.onclick = closeExportModal;
+    });
+
 </script>
 
 <div id="adminModal" class="modal-overlay">
@@ -2290,6 +2453,37 @@
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeAdminModal()">Отмена</button>
             <button class="btn" id="modalConfirmBtn">Подтвердить</button>
+        </div>
+    </div>
+</div>
+<!-- Модальное окно экспорта -->
+<div id="exportModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>📤 Экспорт сегмента</h3>
+        <div class="field">
+            <label>Формат файла</label>
+            <select id="exportFormat">
+                <option value="csv">CSV</option>
+                <option value="xlsx">Excel (XLSX)</option>
+
+            </select>
+        </div>
+        <div class="field">
+            <label>Выберите поля для экспорта</label>
+            <div id="exportFields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                <label><input type="checkbox" value="name" checked> Имя</label>
+                <label><input type="checkbox" value="email" checked> Email</label>
+                <label><input type="checkbox" value="city" checked> Город</label>
+                <label><input type="checkbox" value="role" checked> Роль</label>
+                <label><input type="checkbox" value="points" checked> Баллы (XP)</label>
+                <label><input type="checkbox" value="createdAt" checked> Дата регистрации</label>
+                <label><input type="checkbox" value="lastLogin"> Последняя активность</label>
+                <label><input type="checkbox" value="tasksCompleted"> Выполнено проектов</label>
+            </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px;">
+            <button class="btn btn-secondary" id="cancelExportBtn">Отмена</button>
+            <button class="btn" id="confirmExportBtn">Экспортировать</button>
         </div>
     </div>
 </div>

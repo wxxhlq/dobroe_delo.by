@@ -1051,16 +1051,21 @@ router.get('/export/segments/:id', adminAuthMiddleware, async (req, res) => {
     try {
         const segment = await Segment.findById(req.params.id);
         if (!segment) return res.status(404).json({ success: false, error: 'Сегмент не найден' });
-        // Если сегмент динамический – пересчитываем пользователей
-        const userIds = segment.users || [];
+
         let users = [];
-        if (segment.isDynamic || !userIds.length) {
-            // Вычисляем пользователей по критериям
-            users = await getSegmentUsers(segment.criteria);
-            userIds = users.map(u => u._id);
+        // Получаем пользователей (кэш или динамический подсчёт)
+        if (segment.users && segment.users.length && !segment.isDynamic) {
+            users = await getDB().collection('users').find({ _id: { $in: segment.users } }).toArray();
         } else {
-            users = await getDB().collection('users').find({ _id: { $in: userIds } }).toArray();
+            users = await getSegmentUsers(segment.criteria);
         }
+
+        // Если запрошен JSON – возвращаем
+        if (req.query.format === 'json') {
+            return res.json({ success: true, users });
+        }
+
+        // Иначе – CSV
         const fields = ['_id', 'name', 'email', 'city', 'role', 'points', 'createdAt'];
         const csv = users.map(u => fields.map(f => JSON.stringify(u[f])).join(',')).join('\n');
         const header = fields.join(',');
