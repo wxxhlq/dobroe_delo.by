@@ -14,7 +14,8 @@ const userSchema = new mongoose.Schema({
     privacy: String,
     achievements: Array,
     createdAt: Date,
-    updatedAt: Date
+    updatedAt: Date,
+    telegramId: { type: String, default: null }
 }, { strict: false, timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
