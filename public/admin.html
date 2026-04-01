@@ -1913,17 +1913,397 @@
         await loadSegmentsList();
     }
 
-    // ===================== РАССЫЛКИ =====================
+    // ===================== РАССЫЛКИ (EMAIL) С БОЛЬШИМ МОДАЛЬНЫМ ОКНОМ НА ВЕСЬ ЭКРАН =====================
     async function renderCommunications() {
-        document.getElementById('pageTitle').innerText = 'Рассылки и триггеры';
-        const campaigns = await apiFetch('/api/admin/communications/campaigns');
-        const triggers = await apiFetch('/api/admin/communications/triggers');
-        const referrals = await apiFetch('/api/admin/communications/referrals');
-        document.getElementById('content').innerHTML = `
-            <div class="card"><h3>📧 Статистика рассылок</h3><button class="btn" id="createCampaignBtn" style="margin-bottom:16px;">+ Создать</button><table><thead><tr><th>Название</th><th>Отправлено</th><th>Открыто</th><th>Open Rate</th></tr></thead><tbody>${campaigns.campaigns.map(c => `<tr><td>${c.name}</td><td>${c.stats.sent}</td><td>${c.stats.opened}</td><td>${c.stats.openRate}%</td></tr>`).join('')}</tbody></table></div>
-            <div class="card"><h3>⚙️ Триггеры</h3>${triggers.triggers.map(t => `<div style="margin-bottom:12px;"><b>${t.name}</b> <span class="badge">${t.enabled ? 'Вкл' : 'Выкл'}</span><div>${t.steps.map(s => `${s.delay}ч`).join(' → ')}</div></div>`).join('')}</div>
-            <div class="card"><h3>🏆 Топ рефералов</h3><table><thead><tr><th>Волонтёр</th><th>Приглашено</th></tr></thead><tbody>${referrals.topReferrers.map(r => `<tr><td>${r.name}</td><td>${r.invitedCount}</td></tr>`).join('')}</tbody></table></div>
+        document.getElementById('pageTitle').innerText = 'Email-рассылки';
+
+        // Загружаем сегменты
+        let segments = [];
+        try {
+            const segRes = await apiFetch('/api/admin/segments');
+            if (segRes.success) segments = segRes.segments;
+        } catch (e) {}
+
+        // Сохранённые пользовательские шаблоны (localStorage)
+        let savedTemplates = [];
+        try {
+            const stored = localStorage.getItem('user_email_templates');
+            if (stored) savedTemplates = JSON.parse(stored);
+        } catch(e) {}
+
+        // Базовые шаблоны
+        const baseTemplates = {
+            welcome: {
+                name: '🎉 Приветственное письмо',
+                subject: 'Добро пожаловать, {{name}}!',
+                html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: #4f46e5; padding: 20px; text-align: center;">
+        <h1 style="color: white;">Доброе_дело.by</h1>
+    </div>
+    <div style="padding: 30px;">
+        <h2>Привет, {{name}}! 👋</h2>
+        <p>Рады приветствовать вас в нашем сообществе волонтёров!</p>
+        <p>Вместе мы делаем мир лучше. Выберите проект, который вам по душе:</p>
+        <div style="margin: 20px 0;">
+            <a href="https://dobroedelo.by/projects" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Найти проект →</a>
+        </div>
+        <hr style="margin: 20px 0;">
+        <p style="color: #6b7280; font-size: 12px;">С уважением, команда Доброе_дело.by</p>
+    </div>
+</body>
+</html>`
+            },
+            new_project: {
+                name: '🆕 Новый проект в городе',
+                subject: '{{name}}, новый проект в {{city}}!',
+                html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: #4f46e5; padding: 20px; text-align: center;">
+        <h1 style="color: white;">Новый проект</h1>
+    </div>
+    <div style="padding: 30px;">
+        <h2>Здравствуйте, {{name}}!</h2>
+        <p>В <strong>{{city}}</strong> появился новый волонтёрский проект, который ждёт вашего участия.</p>
+        <div style="margin: 20px 0;">
+            <a href="https://dobroedelo.by/projects" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Подробнее →</a>
+        </div>
+    </div>
+</body>
+</html>`
+            },
+            congrats: {
+                name: '🏆 Поздравление с достижением',
+                subject: '🎉 Поздравляем, {{name}}!',
+                html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 20px; text-align: center;">
+        <h1 style="color: white;">Поздравляем!</h1>
+    </div>
+    <div style="padding: 30px; text-align: center;">
+        <div style="font-size: 48px;">🏆</div>
+        <h2>Вы достигли нового уровня!</h2>
+        <p>Спасибо за вашу активность и помощь другим людям. Вы настоящий герой!</p>
+        <div style="margin: 20px 0;">
+            <a href="https://dobroedelo.by/cabinet" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Посмотреть профиль →</a>
+        </div>
+    </div>
+</body>
+</html>`
+            },
+            event_invite: {
+                name: '📅 Приглашение на мероприятие',
+                subject: '{{name}}, приглашаем вас на мероприятие!',
+                html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: #f59e0b; padding: 20px; text-align: center;">
+        <h1 style="color: white;">Приглашение</h1>
+    </div>
+    <div style="padding: 30px;">
+        <h2>Здравствуйте, {{name}}!</h2>
+        <p>Приглашаем вас на волонтёрское мероприятие, которое состоится в {{city}}.</p>
+        <p><strong>Когда:</strong> {{event_date}}</p>
+        <p><strong>Где:</strong> {{event_address}}</p>
+        <div style="margin: 20px 0;">
+            <a href="{{event_link}}" style="background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Подробнее →</a>
+        </div>
+    </div>
+</body>
+</html>`
+            },
+            thanks: {
+                name: '💙 Благодарность за участие',
+                subject: 'Спасибо, {{name}}!',
+                html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background: #10b981; padding: 20px; text-align: center;">
+        <h1 style="color: white;">Спасибо!</h1>
+    </div>
+    <div style="padding: 30px;">
+        <h2>Спасибо, {{name}}!</h2>
+        <p>Ваше участие в проекте очень важно для нас и для тех, кому вы помогли. Вы делаете мир лучше!</p>
+        <div style="margin: 20px 0;">
+            <a href="https://dobroedelo.by/cabinet" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Посмотреть свой вклад →</a>
+        </div>
+    </div>
+</body>
+</html>`
+            }
+        };
+
+        const allTemplates = { ...baseTemplates };
+        for (let t of savedTemplates) {
+            allTemplates[t.id] = t;
+        }
+
+        const html = `
+        <div class="two-columns" style="align-items: start;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>📧 Все рассылки</h3>
+                    <button class="btn" id="createCampaignBtn">+ Создать</button>
+                </div>
+                <div id="campaignsList" style="max-height: 600px; overflow-y: auto;">
+                    Загрузка...
+                </div>
+            </div>
+            <div class="card">
+                <h3 style="margin-bottom: 8px;" >📋 Шаблоны писем</h3>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    ${Object.entries(allTemplates).map(([id, tpl]) => `
+                        <div class="feed-item" style="cursor: pointer; margin-bottom: 8px;" onclick="openTemplate('${id}')">
+                            ${tpl.name}
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="btn-secondary" id="saveCurrentAsTemplateBtn" style="margin-top: 12px; width: 100%;">💾 Сохранить текущий как шаблон</button>
+                <hr>
+<!--                <div class="field" style="margin-top: 10px;">-->
+<!--                    <label>📧 Тестовая отправка</label>-->
+<!--                    <input type="email" id="testEmail" placeholder="Ваш email" style="margin-bottom: 8px;">-->
+<!--                    <button class="btn-secondary" id="testSendBtn" style="width: 100%;">Отправить тест</button>-->
+<!--                </div>-->
+            </div>
+        </div>
+    `;
+
+        document.getElementById('content').innerHTML = html;
+
+        let currentCampaignData = { name: '', subject: '', html: '' };
+
+        // ------------------------------------------------------------
+        // Модальное окно на весь экран с прокруткой
+        window.openTemplate = (templateId) => {
+            const tpl = allTemplates[templateId];
+            if (!tpl) return;
+
+            // Создаём overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+            const modalContainer = document.createElement('div');
+            modalContainer.style.cssText = 'width: 100%; height: 100%; max-width: none; background: #1a1a1f; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden;';
+            modalContainer.innerHTML = `
+            <div style="padding: 20px; border-bottom: 1px solid #2a2a30; flex-shrink: 0;">
+                <h3 style="margin: 0;">Создание рассылки</h3>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: row; overflow: hidden; padding: 20px; gap: 20px;">
+                <!-- Левая колонка -->
+                <div style="width: 40%; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-right: 10px;">
+                    <div class="field"><label>Название рассылки *</label><input type="text" id="campName" value="${escapeHtml(tpl.name)}" placeholder="Например: Приветственная рассылка"></div>
+                    <div class="field"><label>Тема письма *</label><input type="text" id="campSubject" value="${escapeHtml(tpl.subject)}"></div>
+                    <div class="field"><label>Сегмент получателей</label><select id="campSegment"><option value="">Все пользователи</option>${segments.map(s => `<option value="${s._id}">${escapeHtml(s.name)} (${s.count || '?'} чел.)</option>`).join('')}</select></div>
+                    <div class="field">
+                        <label>Время отправки</label>
+                        <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+                            <label><input type="radio" name="sendTime" value="now" checked> Сейчас</label>
+                            <label><input type="radio" name="sendTime" value="schedule"> Запланировать</label>
+                        </div>
+                        <input type="datetime-local" id="scheduleTime" style="display: none;">
+                    </div>
+                    <div class="field">
+                        <label>HTML содержимое *</label>
+                        <textarea id="campBody" style="width: 100%; height: 300px; font-family: monospace; font-size: 12px; resize: vertical;">${escapeHtml(tpl.html)}</textarea>
+                        <div class="hint" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                            📌 Доступные переменные: <code>{{name}}</code> — имя, <code>{{city}}</code> — город, <code>{{points}}</code> — баллы. Можно добавить свои переменные.
+                        </div>
+                    </div>
+                </div>
+                <!-- Правая колонка: предпросмотр -->
+                <div style="width: 60%; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; border-left: 1px solid #2a2a30; padding-left: 20px;">
+                    <label>📄 Предварительный просмотр</label>
+                    <div id="previewFrame" style="border: 1px solid #2a2a30; border-radius: 8px; background: white; padding: 16px; overflow: auto; min-height: 400px; color: black;"></div>
+                </div>
+            </div>
+            <div style="padding: 16px 20px; border-top: 1px solid #2a2a30; flex-shrink: 0; text-align: right;">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay')?.remove()" style="margin-right: 12px;">Отмена</button>
+                <button class="btn" id="saveCampaignBtn">Создать рассылку</button>
+            </div>
         `;
+            overlay.appendChild(modalContainer);
+            document.body.appendChild(overlay);
+            overlay.classList.add('modal-overlay'); // для удобства удаления
+
+            // Получаем элементы
+            const campName = modalContainer.querySelector('#campName');
+            const campSubject = modalContainer.querySelector('#campSubject');
+            const campBody = modalContainer.querySelector('#campBody');
+            const previewFrame = modalContainer.querySelector('#previewFrame');
+            const scheduleTime = modalContainer.querySelector('#scheduleTime');
+            const sendTimeRadios = modalContainer.querySelectorAll('input[name="sendTime"]');
+
+            const updatePreview = () => {
+                const htmlContent = campBody.value;
+                previewFrame.innerHTML = htmlContent;
+                currentCampaignData = {
+                    name: campName.value,
+                    subject: campSubject.value,
+                    html: campBody.value
+                };
+            };
+            campBody.addEventListener('input', updatePreview);
+            campSubject.addEventListener('input', updatePreview);
+            campName.addEventListener('input', updatePreview);
+            updatePreview();
+
+            sendTimeRadios.forEach(radio => {
+                radio.onchange = (e) => {
+                    scheduleTime.style.display = e.target.value === 'schedule' ? 'block' : 'none';
+                };
+            });
+
+            const saveBtn = modalContainer.querySelector('#saveCampaignBtn');
+            saveBtn.onclick = async () => {
+                const name = campName.value.trim();
+                const subject = campSubject.value.trim();
+                const body = campBody.value.trim();
+                const segmentId = modalContainer.querySelector('#campSegment').value || null;
+                const sendTime = modalContainer.querySelector('input[name="sendTime"]:checked').value;
+                const scheduleDate = scheduleTime.value;
+
+                if (!name || !subject || !body) {
+                    alert('Заполните все поля');
+                    return;
+                }
+
+                const payload = {
+                    name,
+                    targetSegmentId: segmentId,
+                    content: { subject, bodyHtml: body },
+                    sendNow: sendTime === 'now'
+                };
+
+                if (sendTime === 'schedule' && scheduleDate) {
+                    payload.schedule = { startDate: scheduleDate };
+                }
+
+                const res = await apiFetch('/api/admin/communications/campaigns', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.success) {
+                    overlay.remove();
+                    loadCampaigns();
+                    alert('Рассылка создана!');
+                } else {
+                    alert('Ошибка: ' + res.error);
+                }
+            };
+        };
+        // ------------------------------------------------------------
+
+        window.saveCurrentAsTemplate = () => {
+            if (!currentCampaignData.name || !currentCampaignData.html) {
+                alert('Сначала откройте любой шаблон или создайте рассылку');
+                return;
+            }
+            const newId = 'user_' + Date.now();
+            const newTemplate = {
+                id: newId,
+                name: currentCampaignData.name + ' (шаблон)',
+                subject: currentCampaignData.subject,
+                html: currentCampaignData.html
+            };
+            let saved = [];
+            try {
+                const stored = localStorage.getItem('user_email_templates');
+                if (stored) saved = JSON.parse(stored);
+            } catch(e) {}
+            saved.push(newTemplate);
+            localStorage.setItem('user_email_templates', JSON.stringify(saved));
+            alert('Шаблон сохранён! Обновите страницу для отображения');
+            renderCommunications();
+        };
+
+        async function loadCampaigns() {
+            const container = document.getElementById('campaignsList');
+            try {
+                const res = await apiFetch('/api/admin/communications/campaigns');
+                if (!res.success) throw new Error(res.error);
+                if (!res.campaigns || res.campaigns.length === 0) {
+                    container.innerHTML = '<div class="feed-item" style="text-align: center;">Нет созданных рассылок</div>';
+                    return;
+                }
+                container.innerHTML = res.campaigns.map(c => `
+                <div class="feed-item" style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <div style="font-weight: 600;">${escapeHtml(c.name)}</div>
+                            <div style="font-size: 11px; color: #6b7280;">
+                                Статус: ${c.status === 'completed' ? '✅ Завершена' : c.status === 'active' ? '📨 Отправляется' : c.status === 'scheduled' ? '⏰ Запланирована' : '📝 Черновик'}
+                            </div>
+                        </div>
+                        <div>
+                            ${c.status === 'draft' ? `<button class="btn-secondary" onclick="sendCampaign('${c._id}')" style="margin-right: 5px;">📨</button>` : ''}
+                            ${c.status === 'scheduled' ? `<button class="btn-secondary" onclick="cancelScheduledCampaign('${c._id}')" style="margin-right: 5px;">❌ Отменить</button>` : ''}
+                            <button class="btn-secondary" onclick="deleteCampaign('${c._id}')">🗑️</button>
+                        </div>
+                    </div>
+                    <div style="font-size: 11px; margin-top: 8px;">
+                        📤 Отправлено: ${c.stats.sent} | ❌ Ошибок: ${c.stats.failed}
+                    </div>
+                    ${c.schedule?.startDate ? `<div style="font-size: 10px; color: #4b5563;">⏰ Запланировано: ${new Date(c.schedule.startDate).toLocaleString()}</div>` : ''}
+                </div>
+            `).join('');
+            } catch (err) {
+                container.innerHTML = `<div class="feed-item" style="color: #ef4444;">Ошибка: ${err.message}</div>`;
+            }
+        }
+
+        window.sendCampaign = async (id) => {
+            if (!confirm('Отправить рассылку сейчас?')) return;
+            const res = await apiFetch(`/api/admin/communications/campaigns/${id}/send`, { method: 'POST' });
+            if (res.success) {
+                alert('Рассылка запущена');
+                loadCampaigns();
+            } else {
+                alert('Ошибка: ' + res.error);
+            }
+        };
+
+        window.cancelScheduledCampaign = async (id) => {
+            if (!confirm('Отменить запланированную рассылку?')) return;
+            const res = await apiFetch(`/api/admin/communications/campaigns/${id}`, { method: 'DELETE' });
+            if (res.success) {
+                alert('Рассылка отменена');
+                loadCampaigns();
+            } else {
+                alert('Ошибка: ' + res.error);
+            }
+        };
+
+        window.deleteCampaign = async (id) => {
+            if (!confirm('Удалить рассылку?')) return;
+            const res = await apiFetch(`/api/admin/communications/campaigns/${id}`, { method: 'DELETE' });
+            if (res.success) {
+                loadCampaigns();
+            } else {
+                alert('Ошибка: ' + res.error);
+            }
+        };
+
+
+
+        document.getElementById('saveCurrentAsTemplateBtn').onclick = () => {
+            if (!currentCampaignData.name || !currentCampaignData.html) {
+                alert('Сначала откройте любой шаблон или создайте рассылку');
+                return;
+            }
+            saveCurrentAsTemplate();
+        };
+
+        document.getElementById('createCampaignBtn').onclick = () => openTemplate('welcome');
+        await loadCampaigns();
     }
 
     // ===================== ЛЕНДИНГИ =====================

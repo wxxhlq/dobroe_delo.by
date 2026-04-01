@@ -9,8 +9,11 @@ const Referral = require('../models/Referral');
 const ABTest = require('../models/ABTest');
 const LandingPage = require('../models/LandingPage');
 const ErrorLog = require('../models/ErrorLog');
+const { sendBulkEmails, sendEmail } = require('../services/emailService');
+const schedule = require('node-schedule');
 const adminAuthMiddleware = require('../middleware/adminAuth');
 const { ObjectId } = require('mongodb');
+
 
 // ===================== 1. ДАШБОРД (Пульс системы) =====================
 
@@ -628,178 +631,6 @@ async function getSegmentUsers(criteria) {
     return await db.collection('users').find(query).toArray();
 }
 
-// ===================== 4. КОММУНИКАЦИИ И ТРИГГЕРЫ =====================
-
-/**
- * @route GET /api/admin/communications/campaigns
- * @desc  Список кампаний (рассылок) со статистикой
- * @access Admin
- */
-router.get('/communications/campaigns', adminAuthMiddleware, async (req, res) => {
-    try {
-        const campaigns = await Campaign.find().sort({ createdAt: -1 }).lean();
-        const enriched = await Promise.all(campaigns.map(async (camp) => {
-            const logs = await CampaignLog.find({ campaignId: camp._id });
-            const sent = logs.filter(l => l.status === 'sent').length;
-            const delivered = logs.filter(l => l.status === 'delivered').length;
-            const opened = logs.filter(l => l.status === 'opened').length;
-            const clicked = logs.filter(l => l.status === 'clicked').length;
-            return {
-                ...camp,
-                stats: {
-                    sent,
-                    delivered,
-                    opened,
-                    clicked,
-                    openRate: sent ? ((opened / sent) * 100).toFixed(1) : 0,
-                    clickRate: opened ? ((clicked / opened) * 100).toFixed(1) : 0
-                }
-            };
-        }));
-        res.json({ success: true, campaigns: enriched });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * @route POST /api/admin/communications/campaigns
- * @desc  Создать рассылку (email/push)
- * @access Admin
- */
-router.post('/communications/campaigns', adminAuthMiddleware, async (req, res) => {
-    try {
-        const { name, type, targetSegmentId, content, schedule } = req.body;
-        if (!name || !type || !targetSegmentId || !content) {
-            return res.status(400).json({ success: false, error: 'Не все обязательные поля заполнены' });
-        }
-
-        const campaign = new Campaign({
-            name,
-            type,
-            targetSegmentId,
-            content,
-            schedule: schedule ? { startDate: new Date(schedule.startDate), endDate: schedule.endDate ? new Date(schedule.endDate) : null } : null,
-            status: schedule?.startDate ? 'scheduled' : 'draft'
-        });
-        await campaign.save();
-        res.json({ success: true, campaign });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * @route POST /api/admin/communications/campaigns/:id/send
- * @desc  Отправить рассылку сейчас (запустить немедленно)
- * @access Admin
- */
-router.post('/communications/campaigns/:id/send', adminAuthMiddleware, async (req, res) => {
-    try {
-        const campaign = await Campaign.findById(req.params.id).populate('targetSegmentId');
-        if (!campaign) return res.status(404).json({ success: false, error: 'Кампания не найдена' });
-        if (campaign.status !== 'draft' && campaign.status !== 'scheduled') {
-            return res.status(400).json({ success: false, error: 'Кампания уже активна или завершена' });
-        }
-
-        let userIds = [];
-        if (campaign.targetSegmentId && campaign.targetSegmentId.users && campaign.targetSegmentId.users.length) {
-            userIds = campaign.targetSegmentId.users;
-        } else {
-            const users = await getSegmentUsers(campaign.targetSegmentId.criteria);
-            userIds = users.map(u => u._id);
-        }
-
-        if (!userIds.length) {
-            return res.status(400).json({ success: false, error: 'Сегмент пуст, некому отправлять' });
-        }
-
-        for (const userId of userIds) {
-            const log = new CampaignLog({
-                campaignId: campaign._id,
-                userId,
-                status: 'sent'
-            });
-            await log.save();
-            console.log(`[CAMPAIGN] Отправлено ${campaign.type} пользователю ${userId}`);
-        }
-
-        campaign.status = 'active';
-        campaign.sentAt = new Date();
-        await campaign.save();
-
-        res.json({ success: true, message: 'Рассылка запущена' });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * @route POST /api/admin/communications/campaigns/:id/schedule
- * @desc  Запланировать рассылку на определённое время (background job)
- * @access Admin
- */
-router.post('/communications/campaigns/:id/schedule', adminAuthMiddleware, async (req, res) => {
-    try {
-        const { scheduledAt } = req.body;
-        if (!scheduledAt) return res.status(400).json({ success: false, error: 'Не указано время' });
-        const campaign = await Campaign.findById(req.params.id);
-        if (!campaign) return res.status(404).json({ success: false, error: 'Кампания не найдена' });
-        campaign.schedule = { ...campaign.schedule, startDate: new Date(scheduledAt) };
-        campaign.status = 'scheduled';
-        await campaign.save();
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * @route GET /api/admin/communications/triggers
- * @desc  Получить список автоматических цепочек (триггеров)
- * @access Admin
- */
-router.get('/communications/triggers', adminAuthMiddleware, async (req, res) => {
-    const triggers = [
-        { id: 'welcome', name: 'Welcome-цепочка', enabled: true, steps: [{ delay: 0, type: 'email', subject: 'Добро пожаловать!' }, { delay: 24, type: 'email', subject: 'Как начать помогать?' }, { delay: 72, type: 'push', text: 'Уже нашли проект?' }] },
-        { id: 'inactive', name: 'Возвращение неактивных', enabled: false, steps: [{ delay: 30, type: 'email', subject: 'Давно не заходили?' }] },
-        { id: 'abandoned_registration', name: 'Брошенная регистрация', enabled: true, steps: [{ delay: 1, type: 'email', subject: 'Завершите регистрацию!' }] },
-        { id: 'first_task', name: 'Спасибо за первое задание', enabled: true, steps: [{ delay: 0, type: 'email', subject: 'Спасибо!' }] }
-    ];
-    res.json({ success: true, triggers });
-});
-
-/**
- * @route PUT /api/admin/communications/triggers/:id
- * @desc  Обновить состояние триггера (вкл/выкл)
- * @access Admin
- */
-router.put('/communications/triggers/:id', adminAuthMiddleware, async (req, res) => {
-    const { enabled } = req.body;
-    res.json({ success: true });
-});
-
-/**
- * @route GET /api/admin/communications/referrals
- * @desc  Топ рефералов (кто пригласил больше всего друзей)
- * @access Admin
- */
-router.get('/communications/referrals', adminAuthMiddleware, async (req, res) => {
-    try {
-        const topReferrers = await Referral.aggregate([
-            { $match: { status: { $in: ['registered', 'completed_first_task'] } } },
-            { $group: { _id: '$referrerUserId', invitedCount: { $sum: 1 } } },
-            { $sort: { invitedCount: -1 } },
-            { $limit: 10 },
-            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
-            { $unwind: '$user' }
-        ]);
-        const result = topReferrers.map(r => ({ name: r.user.name, invitedCount: r.invitedCount }));
-        res.json({ success: true, topReferrers: result });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
 
 // ===================== 5. ЛЕНДИНГИ =====================
 
@@ -1817,5 +1648,251 @@ router.get('/api/admin/analytics/funnel', adminAuthMiddleware, async (req, res) 
         res.status(500).json({ success: false });
     }
 });
+
+// ===================== РАССЫЛКИ =====================
+
+/**
+ * @route GET /api/admin/communications/campaigns
+ * @desc Получить список всех кампаний со статистикой
+ */
+router.get('/communications/campaigns', adminAuthMiddleware, async (req, res) => {
+    try {
+        const campaigns = await Campaign.find().sort({ createdAt: -1 }).lean();
+        const enriched = await Promise.all(campaigns.map(async (camp) => {
+            const logs = await CampaignLog.find({ campaignId: camp._id });
+            const sent = logs.filter(l => l.status === 'sent').length;
+            const failed = logs.filter(l => l.status === 'failed').length;
+            return {
+                ...camp,
+                stats: { sent, failed }
+            };
+        }));
+        res.json({ success: true, campaigns: enriched });
+    } catch (err) {
+        console.error('Campaigns error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route POST /api/admin/communications/campaigns
+ * @desc Создать новую кампанию (рассылку)
+ */
+router.post('/communications/campaigns', adminAuthMiddleware, async (req, res) => {
+    try {
+        const { name, targetSegmentId, content, sendNow, schedule: scheduleData } = req.body;
+
+        if (!name || !content?.subject || !content?.bodyHtml) {
+            return res.status(400).json({ success: false, error: 'Заполните все поля' });
+        }
+
+        const campaign = new Campaign({
+            name,
+            type: 'email',
+            targetSegmentId: targetSegmentId || null,
+            content: {
+                subject: content.subject,
+                bodyHtml: content.bodyHtml
+            },
+            status: sendNow ? 'active' : (scheduleData ? 'scheduled' : 'draft'),
+            createdBy: new ObjectId(req.user.userId)
+        });
+
+        await campaign.save();
+
+        // Если нужно отправить сразу
+        if (sendNow) {
+            processCampaignSend(campaign._id).catch(console.error);
+        }
+
+        // Если нужно запланировать
+        if (scheduleData && scheduleData.startDate && !sendNow) {
+            const jobDate = new Date(scheduleData.startDate);
+            if (jobDate > new Date()) {
+                schedule.scheduleJob(jobDate, async () => {
+                    await processCampaignSend(campaign._id);
+                });
+            }
+        }
+
+        res.json({ success: true, campaign });
+    } catch (err) {
+        console.error('Create campaign error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route POST /api/admin/communications/campaigns/:id/send
+ * @desc Отправить рассылку сейчас (для существующей кампании)
+ */
+router.post('/communications/campaigns/:id/send', adminAuthMiddleware, async (req, res) => {
+    try {
+        const campaign = await Campaign.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ success: false, error: 'Кампания не найдена' });
+        if (campaign.status !== 'draft' && campaign.status !== 'scheduled') {
+            return res.status(400).json({ success: false, error: 'Кампания уже активна или завершена' });
+        }
+
+        campaign.status = 'active';
+        await campaign.save();
+
+        processCampaignSend(campaign._id).catch(console.error);
+
+        res.json({ success: true, message: 'Рассылка запущена' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route POST /api/admin/communications/campaigns/:id/schedule
+ * @desc Запланировать рассылку
+ */
+router.post('/communications/campaigns/:id/schedule', adminAuthMiddleware, async (req, res) => {
+    try {
+        const { scheduledAt } = req.body;
+        if (!scheduledAt) return res.status(400).json({ success: false, error: 'Не указано время' });
+
+        const campaign = await Campaign.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ success: false, error: 'Кампания не найдена' });
+        if (campaign.status !== 'draft') {
+            return res.status(400).json({ success: false, error: 'Запланировать можно только черновик' });
+        }
+
+        campaign.schedule = { startDate: new Date(scheduledAt) };
+        campaign.status = 'scheduled';
+        await campaign.save();
+
+        const jobDate = new Date(scheduledAt);
+        schedule.scheduleJob(jobDate, async () => {
+            await processCampaignSend(campaign._id);
+        });
+
+        res.json({ success: true, message: 'Рассылка запланирована' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route DELETE /api/admin/communications/campaigns/:id
+ * @desc Удалить кампанию (только черновики и завершённые)
+ */
+router.delete('/communications/campaigns/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        const campaign = await Campaign.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ success: false, error: 'Кампания не найдена' });
+        if (campaign.status === 'active') {
+            return res.status(400).json({ success: false, error: 'Нельзя удалить активную рассылку' });
+        }
+
+        await CampaignLog.deleteMany({ campaignId: campaign._id });
+        await campaign.deleteOne();
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route POST /api/admin/communications/test-email
+ * @desc Тестовая отправка письма на указанный email
+ */
+router.post('/communications/test-email', adminAuthMiddleware, async (req, res) => {
+    try {
+        const { email, subject, html } = req.body;
+        if (!email || !subject || !html) {
+            return res.status(400).json({ success: false, error: 'Заполните все поля' });
+        }
+        const result = await sendEmail({ to: email, subject, html });
+        if (result.success) {
+            res.json({ success: true, message: 'Тестовое письмо отправлено' });
+        } else {
+            res.status(500).json({ success: false, error: result.error });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ===================== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ОТПРАВКИ =====================
+async function processCampaignSend(campaignId) {
+    const db = getDB();
+    try {
+        const campaign = await Campaign.findById(campaignId);
+        if (!campaign || campaign.status !== 'active') return;
+
+        console.log(`📧 Отправка кампании "${campaign.name}"`);
+
+        // Получаем пользователей
+        let users = [];
+        if (campaign.targetSegmentId) {
+            const segment = await Segment.findById(campaign.targetSegmentId);
+            if (segment) {
+                if (segment.users && segment.users.length) {
+                    users = await db.collection('users').find({ _id: { $in: segment.users } }).toArray();
+                } else {
+                    users = await getSegmentUsers(segment.criteria);
+                }
+            } else {
+                // Если сегмент не найден, логируем ошибку и завершаем
+                console.error(`❌ Сегмент ${campaign.targetSegmentId} не найден. Отправка отменена.`);
+                campaign.status = 'failed';
+                await campaign.save();
+                return;
+            }
+        } else {
+            users = await db.collection('users').find({ email: { $exists: true, $ne: null } }).toArray();
+        }
+
+        if (!users.length) {
+            campaign.status = 'completed';
+            await campaign.save();
+            console.log(`⚠️ Нет получателей для "${campaign.name}"`);
+            return;
+        }
+
+        console.log(`📧 Найдено получателей: ${users.length}`);
+
+        const results = await sendBulkEmails(
+            users,
+            campaign.content.subject,
+            campaign.content.bodyHtml,
+            (sent, total) => console.log(`📧 Прогресс: ${sent}/${total}`)
+        );
+
+        campaign.stats = {
+            sent: results.sent,
+            failed: results.failed
+        };
+        campaign.status = 'completed';
+        campaign.sentAt = new Date();
+        await campaign.save();
+
+        // Сохраняем логи – теперь по каждому пользователю индивидуально
+        for (const detail of results.details) {
+            if (detail.email) {
+                await CampaignLog.updateOne(
+                    { campaignId: campaign._id, userId: detail.userId },
+                    {
+                        $set: {
+                            userEmail: detail.email,
+                            status: detail.success ? 'sent' : 'failed',
+                            error: detail.error || null
+                        }
+                    },
+                    { upsert: true }  // предотвращает дублирование
+                );
+            }
+        }
+
+        console.log(`✅ Кампания "${campaign.name}" завершена. Отправлено: ${results.sent}, ошибок: ${results.failed}`);
+    } catch (err) {
+        console.error(`❌ Ошибка отправки кампании ${campaignId}:`, err);
+        await Campaign.findByIdAndUpdate(campaignId, { status: 'failed' });
+    }
+}
 
 module.exports = router;

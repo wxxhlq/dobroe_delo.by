@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const CampaignLogSchema = new mongoose.Schema({
     campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    userEmail: { type: String },
+    userEmail: { type: String, default: null },
     status: { type: String, enum: ['sent', 'failed'], required: true },
-    error: { type: String }
+    error: { type: String, default: null }
 }, { timestamps: true });
 
-CampaignLogSchema.index({ campaignId: 1, userId: 1 }, { unique: true });
+
 
 module.exports = mongoose.model('CampaignLog', CampaignLogSchema);
