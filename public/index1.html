@@ -6143,7 +6143,11 @@
                     name: data.name,
                     role: data.role || 'USER',
                     email: data.email,
-                    avatar: data.avatarUrl || ''
+                    avatar: data.avatarUrl || '',
+                    city: data.city || '',
+                    phone: data.phone || '',
+                    points: data.points || 0,
+                    achievements: data.achievements || []
                 };
 
                 // 2. ЗАПИСЫВАЕМ В ЛОКАЛ (для виджета)
