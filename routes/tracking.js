@@ -1,54 +1,52 @@
 const express = require('express');
 const router = express.Router();
-const UserEvent = require('../models/UserEvent');
-const analyticsMiddleware = require('../middleware/analytics');
+const { getDB } = require('../db');
 
-router.post('/track', analyticsMiddleware, async (req, res) => {
+router.post('/', async (req, res) => {
     try {
-        // 1. Безопасно достаем данные, даже если req.body пустой
-        const data = req.body || {};
+        const db = getDB();
+        const { eventType, eventData, path, sessionId } = req.body;
 
-        const {
-            sessionId,
-            eventType = 'page_view',
-            eventData = {},
-            userId,
-            timeOnPage = 0,
-            scrollDepth = 0
-        } = data;
+        const newEvent = {
+            eventType: eventType || 'unknown',
+            eventData: eventData || {},
+            path: path || '',
+            sessionId: sessionId || 'guest',
+            createdAt: new Date()
+        };
 
-        // 2. Проверяем наличие sessionId, так как он важен для аналитики
-        if (!sessionId) {
-            // Если сессии нет, не роняем сервер, а просто выходим
-            return res.status(400).json({ error: 'Missing sessionId' });
-        }
+        await db.collection('user_events').insertOne(newEvent);
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error("Ошибка сохранения метрики:", error);
+        res.status(500).json({ success: false });
+    }
+});
 
-        const event = new UserEvent({
-            userId: userId || (req.user ? req.user.id : null),
-            sessionId,
-            eventType,
-            eventData: { ...eventData, timeOnPage, scrollDepth },
-            // Берем данные из middleware, если они там есть (используем опциональную цепочку ?.)
-            sourceData: req.analytics?.sourceData || {},
-            deviceData: req.analytics?.deviceData || {}
-        });
+router.post('/events', async (req, res) => {
+    try {
+        const db = getDB();
+        const { eventType, sessionId, sourceData, deviceData } = req.body;
+        
+        const newEvent = {
+            eventType: eventType || 'page_view',
+            sessionId: sessionId || 'unknown',
+            sourceData: {
+                utm_source: sourceData?.utm_source || 'direct',
+                utm_medium: sourceData?.utm_medium || 'none'
+            },
+            deviceData: {
+                os: deviceData?.os || 'unknown',
+                type: deviceData?.type || 'desktop'
+            },
+            createdAt: new Date()
+        };
 
-        await event.save();
-
-        // 3. Отправляем успешный ответ и выходим из функции
-        return res.status(201).json({ status: 'success' });
-
-    } catch (err) {
-        // Выводим ошибку в консоль WebStorm для отладки
-        console.error('!!! ОШИБКА СОХРАНЕНИЯ В БАЗУ:', err.message);
-
-        // 4. Проверяем, не был ли ответ уже отправлен (защита от ERR_HTTP_HEADERS_SENT)
-        if (!res.headersSent) {
-            return res.status(500).json({
-                error: 'Tracking failed',
-                details: err.message
-            });
-        }
+        await db.collection('user_events').insertOne(newEvent);
+        res.status(201).json({ success: true });
+    } catch (error) {
+        console.error("Ошибка при сохранении события:", error);
+        res.status(500).json({ success: false });
     }
 });
 

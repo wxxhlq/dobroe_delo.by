@@ -18,30 +18,11 @@ async function connectDB() {
             console.log('✓ Подключение к MongoDB успешно');
             console.log('База:', db.databaseName);
 
-            // Создаём индексы (только если их нет)
+            // Создаем уникальные индексы
             try {
-                const indexes = await db.collection('users').indexes();
-                const hasEmailIndex = indexes.some(idx => idx.key.email);
-                const hasUsernameIndex = indexes.some(idx => idx.key.username);
-
-                if (!hasEmailIndex) {
-                    await db.collection('users').createIndex({ email: 1 }, { unique: true });
-                    console.log('  ✓ Индекс на email создан');
-                }
-
-                if (!hasUsernameIndex) {
-                    await db.collection('users').createIndex({ username: 1 }, { unique: true });
-                    console.log('  ✓ Индекс на username создан');
-                }
-
-                const hasPointsIndex = indexes.some(idx => idx.key.points);
-                if (!hasPointsIndex) {
-                    await db.collection('users').createIndex({ points: -1 });
-                    console.log('  ✓ Индекс на points создан');
-                }
-            } catch (indexErr) {
-                // Индексы уже существуют - это нормально
-                console.log('  → Индексы уже существуют');
+                await db.collection('users').createIndex({ email: 1 }, { unique: true });
+            } catch (err) {
+                // Игнорируем ошибки при создании индексов, если они уже существуют
             }
 
             return db;
@@ -56,7 +37,7 @@ async function connectDB() {
 
 function getDB() {
     if (!db) {
-        throw new Error('База данных ещё не подключена. Убедитесь, что connectDB() был вызван и завершён.');
+        throw new Error('База данных ещё не подключена. Убедитесь, что connectDB() был вызван.');
     }
     return db;
 }

@@ -1,0 +1,98 @@
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const userRepository = require('../repositories/UserRepository');
+const GamificationService = require('./GamificationService');
+
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'supersecret_refresh_key_123';
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+class AuthService {
+    async register(userData) {
+        const { username, password, email, role, name, city, phone } = userData;
+        if (!email || !password || !name) throw new Error('Email, пароль и имя обязательны');
+        
+        const existing = await userRepository.findByEmail(email);
+        if (existing) throw new Error('Пользователь с таким email уже существует');
+
+        const password_hash = await bcrypt.hash(password, 10);
+        const newUser = {
+            username: username || email.split('@')[0],
+            email: email.toLowerCase(),
+            password_hash: password_hash,
+            name: name || '',
+            role: role || 'VOLUNTEER',
+            city: city || '',
+            phone: phone || '',
+            points: 0,
+            avatarUrl: '',
+            privacy: 'public',
+            achievements: [],
+            created_at: new Date()
+        };
+
+        const user = await userRepository.createUser(newUser);
+        await GamificationService.checkAchievements(user._id.toString());
+
+        const token = this.generateAccessToken(user);
+        const refreshToken = this.generateRefreshToken(user);
+
+        return {
+            userId: user._id,
+            token,
+            refreshToken,
+            user: this.mapUser(user)
+        };
+    }
+
+    async login(email, password) {
+        const user = await userRepository.findByEmail(email);
+        if (!user) throw new Error('Неверный email или пароль');
+
+        const isValid = await bcrypt.compare(password, user.password_hash);
+        if (!isValid) throw new Error('Неверный email или пароль');
+
+        await userRepository.updateLastLogin(user._id);
+
+        const token = this.generateAccessToken(user);
+        const refreshToken = this.generateRefreshToken(user);
+
+        return {
+            token,
+            refreshToken,
+            user: this.mapUser(user)
+        };
+    }
+
+    mapUser(user) {
+        return {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            city: user.city,
+            phone: user.phone,
+            avatarUrl: user.avatarUrl || '',
+            points: user.points || 0
+        };
+    }
+
+    generateAccessToken(user) {
+        return jwt.sign(
+            { userId: user._id.toString(), email: user.email, role: user.role },
+            process.env.JWT_SECRET || 'supersecret_jwt_key_123',
+            { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+        );
+    }
+
+    generateRefreshToken(user) {
+        return jwt.sign(
+            { userId: user._id.toString() },
+            REFRESH_TOKEN_SECRET,
+            { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+        );
+    }
+}
+
+module.exports = new AuthService();
