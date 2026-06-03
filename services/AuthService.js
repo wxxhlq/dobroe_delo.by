@@ -64,6 +64,48 @@ class AuthService {
         };
     }
 
+    async socialLogin(profileData) {
+        const { email, name, username, avatarUrl, phone } = profileData;
+        if (!email) throw new Error('Email обязателен для авторизации');
+
+        let user = await userRepository.findByEmail(email);
+        if (!user) {
+            // Создаем нового пользователя через соцсеть
+            // Для пароля генерируем случайный хеш, так как вход будет через OAuth
+            const randomPassword = Math.random().toString(36).slice(-10);
+            const password_hash = await bcrypt.hash(randomPassword, 10);
+            
+            const newUser = {
+                username: username || email.split('@')[0],
+                email: email.toLowerCase(),
+                password_hash: password_hash,
+                name: name || 'Пользователь из соцсети',
+                role: 'VOLUNTEER',
+                city: '',
+                phone: phone || '',
+                points: 0,
+                avatarUrl: avatarUrl || '',
+                privacy: 'public',
+                achievements: [],
+                created_at: new Date()
+            };
+            user = await userRepository.createUser(newUser);
+            await GamificationService.checkAchievements(user._id.toString());
+        } else {
+            // Если пользователь уже существует, обновляем логин
+            await userRepository.updateLastLogin(user._id);
+        }
+
+        const token = this.generateAccessToken(user);
+        const refreshToken = this.generateRefreshToken(user);
+
+        return {
+            token,
+            refreshToken,
+            user: this.mapUser(user)
+        };
+    }
+
     mapUser(user) {
         return {
             id: user._id,

@@ -13,8 +13,8 @@ module.exports = function (req, res, next) {
             return res.status(401).json({ success: false, error: "Токен не найден." });
         }
 
-        // Проверяем токен (используй тот же секрет, что в основной авторизации)
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        // Проверяем токен (используем тот же секрет, что в основной авторизации)
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret_jwt_key_123');
 
         // ГЛАВНАЯ ПРОВЕРКА: Если в токене роль не ADMIN — от ворот поворот
         if (decoded.role !== 'ADMIN') {

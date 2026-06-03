@@ -165,7 +165,7 @@ app.post('/refresh', async (req, res) => {
     }
 });
 
-const FRONTEND_ROUTES = ['/', '/projects', '/community', '/news', '/about', '/contacts', '/cabinet'];
+const FRONTEND_ROUTES = ['/', '/projects', '/community', '/news', '/about', '/contacts', '/cabinet', '/auth'];
 FRONTEND_ROUTES.forEach(route => {
     app.get(route, (req, res) => {
         res.sendFile(path.join(__dirname, 'public', 'index1.html'));

@@ -3006,7 +3006,7 @@
         }
         return null;
     }
-    function requireAuth() { if (!currentUser()) { openAuthModal(); return false; } return true; }
+    function requireAuth() { if (!currentUser()) { navigate("/auth"); return false; } return true; }
 
     /* modal */
     const modal = $("#modal");
@@ -3528,6 +3528,8 @@
     }
 
     function openAuthModal() {
+      navigate("/auth");
+      return;
       openModal("Вход / регистрация", `
 
     <div class="hr"></div>
@@ -3753,6 +3755,8 @@
     }
 
     function openUserMenu() {
+      navigate("/cabinet");
+      return;
       const u = currentUser();
       if (!u) return openAuthModal();
       openModal("Меню", `
@@ -3776,11 +3780,268 @@
       $("#goNews").onclick = () => { closeModal(); navigate("/news"); };
       $("#doLogout").onclick = () => {
         localStorage.removeItem('authToken');
-        state.session.userId = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (typeof authToken !== 'undefined') authToken = null;
+        if (typeof state !== 'undefined' && state.session) state.session.userId = null;
         saveState();
         closeModal();
         toast('ok', 'Выход', 'Вы вышли из системы.');
         renderApp();
+      };
+    }
+
+
+    /* ===== Page Auth ===== */
+    function renderAuth() {
+      if (currentUser()) { navigate("/cabinet"); return; }
+      
+      const html = `
+        <div class="container" style="padding-top:60px; padding-bottom:60px; display:flex; justify-content:center; align-items:center;">
+          <div class="card" style="width:100%; max-width:480px; padding:35px 30px; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,0.06); border:1px solid var(--border); background:var(--surface)">
+            
+            <div style="text-align:center; margin-bottom:30px;">
+              <h2 style="font-size:28px; font-weight:850; margin:0 0 10px 0;">Авторизация</h2>
+              <p style="color:var(--muted); font-size:14px; margin:0;">Платформа добрых дел Dobroe_delo.by</p>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display:flex; border-bottom:2px solid var(--border); margin-bottom:30px; position:relative;">
+              <button id="tab-login-btn" style="flex:1; background:none; border:none; padding:12px; font-size:16px; font-weight:700; color:var(--blue); cursor:pointer; outline:none; transition:0.2s;">Вход</button>
+              <button id="tab-reg-btn" style="flex:1; background:none; border:none; padding:12px; font-size:16px; font-weight:600; color:var(--muted); cursor:pointer; outline:none; transition:0.2s;">Регистрация</button>
+              <div id="tab-indicator" style="position:absolute; bottom:-2px; left:0; width:50%; height:2px; background:var(--blue); transition:0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+            </div>
+
+            <!-- Login Content -->
+            <div id="auth-login-pane">
+              <form id="authPageLoginForm">
+                <div class="field" style="margin-bottom:20px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
+                  <input name="email" type="email" class="inp-modern" placeholder="name@example.com" required style="width:100%">
+                </div>
+                <div class="field" style="margin-bottom:24px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль</label>
+                  <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required style="width:100%">
+                </div>
+                <button class="btn" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Войти в аккаунт</button>
+              </form>
+            </div>
+
+            <!-- Register Content (Hidden by default) -->
+            <div id="auth-reg-pane" style="display:none;">
+              <form id="authPageRegForm">
+                <div class="field" style="margin-bottom:15px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Роль на платформе</label>
+                  <select name="role" class="inp-modern" required style="width:100%">
+                    <option value="VOLUNTEER" selected>Волонтёр (хочу помогать)</option>
+                    <option value="ORGANIZER">Организатор (представитель НКО/фонда)</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-bottom:15px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Полное имя</label>
+                  <input name="name" type="text" class="inp-modern" placeholder="Иван Иванов" required style="width:100%">
+                </div>
+                <div class="field" style="margin-bottom:15px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
+                  <input name="email" type="email" class="inp-modern" placeholder="name@example.com" required style="width:100%">
+                </div>
+                <div class="field" style="margin-bottom:20px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль (мин. 3 символа)</label>
+                  <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required minlength="3" style="width:100%">
+                </div>
+                <div class="field" style="margin-bottom:24px;">
+                  <label class="small" style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" name="consent" required style="width:auto; margin:0;">
+                    Согласен(а) на обработку персональных данных
+                  </label>
+                </div>
+                <button class="btn secondary" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Создать аккаунт</button>
+              </form>
+            </div>
+
+            <!-- Social OAuth Divider -->
+            <div style="display:flex; align-items:center; margin:30px 0 20px 0;">
+              <div style="flex:1; height:1px; background:var(--border);"></div>
+              <span style="padding:0 15px; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Войти через соцсети</span>
+              <div style="flex:1; height:1px; background:var(--border);"></div>
+            </div>
+
+            <!-- Social OAuth Buttons -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <a href="/auth/vk" style="display:flex; align-items:center; justify-content:center; gap:10px; background:#0077ff; color:white; padding:12px; border-radius:12px; text-decoration:none; font-size:14px; font-weight:700; transition:0.2s; box-shadow:0 4px 12px rgba(0,119,255,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+                VK ВКонтакте
+              </a>
+              <a href="/auth/telegram" style="display:flex; align-items:center; justify-content:center; gap:10px; background:#229ed9; color:white; padding:12px; border-radius:12px; text-decoration:none; font-size:14px; font-weight:700; transition:0.2s; box-shadow:0 4px 12px rgba(34,158,217,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+                TG Telegram
+              </a>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      $("#app").innerHTML = html;
+
+      const loginBtn = $("#tab-login-btn");
+      const regBtn = $("#tab-reg-btn");
+      const indicator = $("#tab-indicator");
+      const loginPane = $("#auth-login-pane");
+      const regPane = $("#auth-reg-pane");
+
+      loginBtn.onclick = () => {
+        loginBtn.style.color = "var(--blue)";
+        loginBtn.style.fontWeight = "700";
+        regBtn.style.color = "var(--muted)";
+        regBtn.style.fontWeight = "600";
+        indicator.style.left = "0";
+        loginPane.style.display = "block";
+        regPane.style.display = "none";
+      };
+
+      regBtn.onclick = () => {
+        regBtn.style.color = "var(--blue)";
+        regBtn.style.fontWeight = "700";
+        loginBtn.style.color = "var(--muted)";
+        loginBtn.style.fontWeight = "600";
+        indicator.style.left = "50%";
+        loginPane.style.display = "none";
+        regPane.style.display = "block";
+      };
+
+      $("#authPageLoginForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const email = String(fd.get("email")).trim();
+        const pass = String(fd.get("pass")).trim();
+
+        try {
+          const res = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            toast("danger", "Ошибка входа", data.message || "Неверный email или пароль.");
+            return;
+          }
+
+          authToken = data.token;
+          localStorage.setItem('authToken', authToken);
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          let existingUser = state.users.find(u => u.email === data.user.email);
+          const userData = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            role: data.user.role,
+            city: data.user.city || '',
+            phone: data.user.phone || '',
+            avatar: data.user.avatarUrl || '',
+            pass: pass,
+            points: data.user.points || 0,
+            privacy: 'public',
+            createdAt: data.user.createdAt || new Date().toISOString()
+          };
+
+          if (!existingUser) state.users.push(userData);
+          else Object.assign(existingUser, userData);
+
+          state.session.userId = data.user.id;
+          saveState();
+
+          toast("ok", "Успешный вход", `Привет, ${data.user.name}!`);
+
+          if (data.user.role === 'ADMIN') {
+            setTimeout(() => { window.location.href = '/admin.html'; }, 800);
+          } else {
+            navigate("/cabinet");
+            renderApp();
+          }
+        } catch (err) {
+          toast("danger", "Ошибка", "Не удалось войти в аккаунт.");
+        }
+      };
+
+      $("#authPageRegForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+
+        if (!fd.get("consent")) {
+          toast("warn", "Согласие", "Нужно согласиться на обработку данных.");
+          return;
+        }
+
+        const email = String(fd.get("email")).trim();
+        const role = String(fd.get("role"));
+        const name = String(fd.get("name")).trim();
+        const pass = String(fd.get("pass")).trim();
+
+        try {
+          const res = await fetch(`${API_URL}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              password: pass,
+              name,
+              role,
+              username: email.split('@')[0]
+            })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            toast("warn", "Ошибка регистрации", data.message || "Не удалось зарегистрироваться.");
+            return;
+          }
+
+          authToken = data.token;
+          localStorage.setItem('authToken', authToken);
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          const newUser = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            role: data.user.role,
+            city: data.user.city || '',
+            phone: data.user.phone || '',
+            avatar: data.user.avatarUrl || '',
+            pass: pass,
+            points: data.user.points || 0,
+            privacy: 'public',
+            createdAt: new Date()
+          };
+
+          const existingUser = state.users.find(u => u.email === newUser.email);
+          if (!existingUser) state.users.push(newUser);
+          else Object.assign(existingUser, newUser);
+          state.session.userId = data.user.id;
+
+          if (role === "ORGANIZER") {
+            state.organizations.push({
+              id: `org-${data.user.id}`,
+              ownerUserId: data.user.id,
+              name: `Организация ${data.user.name}`,
+              status: "PENDING",
+              contacts: data.user.email,
+              rating: 0,
+              createdAt: new Date()
+            });
+          }
+
+          saveState();
+          toast("ok", "Регистрация успешна", `С возвращением, ${data.user.name}!`);
+          navigate("/cabinet");
+          renderApp();
+        } catch (err) {
+          toast("danger", "Ошибка", "Проблема соединения с сервером.");
+        }
       };
     }
 
@@ -4812,8 +5073,10 @@
               style="width:100%"
               onclick="
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
                 if (typeof authToken !== 'undefined') authToken = null;
-                state.session.userId = null;
+                if (typeof state !== 'undefined' && state.session) state.session.userId = null;
                 saveState();
                 navigate('/');
                 renderApp();
@@ -5042,7 +5305,8 @@
       "/news": renderNews,
       "/about": renderAbout,
       "/contacts": renderContacts,
-      "/cabinet": renderCabinet // Проверь, чтобы эта строка была
+      "/cabinet": renderCabinet,
+      "/auth": renderAuth
     };
 
 
@@ -5231,9 +5495,10 @@
     if (authBtn) {
         authBtn.onclick = () => {
             if (typeof currentUser === "function" && currentUser()) {
-                if (typeof navigate === "function") navigate("/cabinet");
-            } else if (typeof openAuthModal === "function") {
-                openAuthModal();
+                // Direct redirection to cabinet instead of user menu popup
+                navigate("/cabinet");
+            } else {
+                navigate("/auth");
             }
         };
     }
