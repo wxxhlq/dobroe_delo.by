@@ -28,8 +28,9 @@ class TaskController {
             const db = getDB();
             if (!db) return res.status(503).json({ message: 'База данных недоступна' });
 
+            // Гости и обычные пользователи видят только опубликованные проекты
             const docs = await db.collection('projects')
-                .find({ status: { $ne: 'DELETED' } })
+                .find({ status: 'PUBLISHED' })
                 .sort({ createdAt: -1 })
                 .toArray();
 
@@ -66,7 +67,8 @@ class TaskController {
                 capacity: numericCapacity,
                 ownerUserId: new ObjectId(req.user.userId),
                 imageUrl,
-                status: 'PUBLISHED',
+                // Задачи от организаторов проходят модерацию, от админа — публикуются сразу
+                status: (req.user.role === 'ADMIN') ? 'PUBLISHED' : 'PENDING',
                 responsesCount: 0,
                 createdAt: new Date()
             };
@@ -258,17 +260,82 @@ class TaskController {
             
             const isOwner = project.ownerUserId && project.ownerUserId.toString() === req.user.userId;
             const isAdmin = req.user.role === 'ADMIN';
-            if (!isAdmin && !isOwner) return res.status(403).json({ message: 'Нет прав' });
+            const isModerator = req.user.role === 'MODERATOR';
+            if (!isAdmin && !isModerator && !isOwner) return res.status(403).json({ message: 'Нет прав' });
 
             await db.collection('projects').deleteOne({ _id: project._id });
             await db.collection('project_applications').deleteMany({ projectId: project._id });
 
-            if (!isAdmin && isOwner) {
+            if (!isAdmin && !isModerator && isOwner) {
                 await db.collection('users').updateOne({ _id: new ObjectId(project.ownerUserId) }, { $inc: { points: -25 } });
             }
 
             res.json({ message: 'Проект удалён' });
         } catch (err) { res.status(500).json({ message: 'Ошибка сервера' }); }
+    }
+
+    // Модератор одобряет задачу (PENDING → PUBLISHED)
+    async approveTask(req, res) {
+        try {
+            const db = getDB();
+            const projectId = req.params.id;
+
+            const project = await db.collection('projects').findOne({ _id: new ObjectId(projectId) });
+            if (!project) return res.status(404).json({ message: 'Проект не найден' });
+            if (project.status !== 'PENDING') return res.status(400).json({ message: 'Проект не на модерации' });
+
+            await db.collection('projects').updateOne(
+                { _id: project._id },
+                { $set: { status: 'PUBLISHED', moderatedBy: new ObjectId(req.user.userId), moderatedAt: new Date() } }
+            );
+
+            // Логируем событие
+            try {
+                await db.collection('userevents').insertOne({
+                    userId: new ObjectId(req.user.userId),
+                    eventType: 'task_approved',
+                    eventData: { projectId: project._id, projectTitle: project.title },
+                    createdAt: new Date()
+                });
+            } catch(e) {}
+
+            const updated = await db.collection('projects').findOne({ _id: project._id });
+            res.json({ message: 'Проект одобрен и опубликован', project: mapProjectForClient(updated) });
+        } catch (err) {
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
+    }
+
+    // Модератор отклоняет задачу (PENDING → REJECTED)
+    async rejectTask(req, res) {
+        try {
+            const db = getDB();
+            const projectId = req.params.id;
+            const { reason } = req.body;
+
+            const project = await db.collection('projects').findOne({ _id: new ObjectId(projectId) });
+            if (!project) return res.status(404).json({ message: 'Проект не найден' });
+            if (project.status !== 'PENDING') return res.status(400).json({ message: 'Проект не на модерации' });
+
+            await db.collection('projects').updateOne(
+                { _id: project._id },
+                { $set: { status: 'REJECTED', rejectionReason: reason || '', moderatedBy: new ObjectId(req.user.userId), moderatedAt: new Date() } }
+            );
+
+            // Логируем событие
+            try {
+                await db.collection('userevents').insertOne({
+                    userId: new ObjectId(req.user.userId),
+                    eventType: 'task_rejected',
+                    eventData: { projectId: project._id, projectTitle: project.title, reason: reason || '' },
+                    createdAt: new Date()
+                });
+            } catch(e) {}
+
+            res.json({ message: 'Проект отклонён' });
+        } catch (err) {
+            res.status(500).json({ message: 'Ошибка сервера' });
+        }
     }
 }
 

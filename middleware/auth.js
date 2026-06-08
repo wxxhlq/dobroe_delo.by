@@ -22,8 +22,19 @@ function requireOrganizer(req, res, next) {
         return res.status(401).json({ message: 'Токен не передан или недействителен' });
     }
     const role = String(req.user.role).toUpperCase();
-    if (role !== 'ORGANIZER' && role !== 'ADMIN') {
-        return res.status(403).json({ message: 'Доступ только для организаторов или администраторов' });
+    if (role !== 'ORGANIZER' && role !== 'MODERATOR' && role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Доступ только для организаторов, модераторов или администраторов' });
+    }
+    next();
+}
+
+function requireModerator(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({ message: 'Токен не передан или недействителен' });
+    }
+    const role = String(req.user.role).toUpperCase();
+    if (role !== 'MODERATOR' && role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Доступ только для модераторов или администраторов' });
     }
     next();
 }
@@ -39,4 +50,4 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-module.exports = { authMiddleware, requireOrganizer, requireAdmin };
+module.exports = { authMiddleware, requireOrganizer, requireModerator, requireAdmin };

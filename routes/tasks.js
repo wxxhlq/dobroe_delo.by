@@ -1,6 +1,6 @@
 const express = require('express');
 const taskController = require('../controllers/TaskController');
-const { authMiddleware, requireOrganizer } = require('../middleware/auth');
+const { authMiddleware, requireOrganizer, requireModerator } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -37,5 +37,9 @@ router.put('/:id', authMiddleware, taskController.updateTask.bind(taskController
 router.post('/:id/reopen', authMiddleware, taskController.reopenTask.bind(taskController));
 router.post('/:id/close', authMiddleware, taskController.closeTask.bind(taskController));
 router.post('/:id/delete', authMiddleware, taskController.deleteTask.bind(taskController));
+
+// Модерация задач (только модератор/админ)
+router.post('/:id/approve', authMiddleware, requireModerator, taskController.approveTask.bind(taskController));
+router.post('/:id/reject', authMiddleware, requireModerator, taskController.rejectTask.bind(taskController));
 
 module.exports = router;

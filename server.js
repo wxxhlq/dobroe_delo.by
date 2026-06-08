@@ -102,6 +102,7 @@ const communityRoutes = require('./routes/community');
 const gamificationRoutes = require('./routes/gamification');
 const trackingRoutes = require('./routes/tracking');
 const adminRoutes = require('./routes/admin');
+const moderatorRoutes = require('./routes/moderator');
 
 // Подключение роутов
 app.use('/', authRoutes); // /register, /login
@@ -113,6 +114,7 @@ app.use('/api/community', communityRoutes); // /api/community/posts, /api/commun
 app.use('/api', gamificationRoutes); // /api/achievements/:userId
 app.use('/api/track', trackingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/moderator', moderatorRoutes);
 
 // Совместимость с фронтендом для получения откликов пользователя
 const { authMiddleware } = require('./middleware/auth');
@@ -202,7 +204,42 @@ async function startServer() {
                 { $set: { points: 0 } }
             );
             if (result.modifiedCount > 0) {
-                console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей`);
+                console.log(`🛠️ Миграция: Обновлено ${result.modifiedCount} пользователей (points)`);
+            }
+
+            // Миграция: проставить verificationStatus существующим пользователям
+            const verResult1 = await usersCollection.updateMany(
+                { role: 'ORGANIZER', verificationStatus: { $exists: false } },
+                { $set: { verificationStatus: 'VERIFIED', verifiedAt: new Date() } }
+            );
+            if (verResult1.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: ${verResult1.modifiedCount} организаторов верифицированы`);
+            }
+
+            const verResult2 = await usersCollection.updateMany(
+                { verificationStatus: { $exists: false } },
+                { $set: { verificationStatus: 'NONE' } }
+            );
+            if (verResult2.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: ${verResult2.modifiedCount} пользователей - verificationStatus`);
+            }
+
+            // Миграция: проставить isBlocked = false если поле отсутствует
+            const blockResult = await usersCollection.updateMany(
+                { isBlocked: { $exists: false } },
+                { $set: { isBlocked: false } }
+            );
+            if (blockResult.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: ${blockResult.modifiedCount} пользователей - isBlocked`);
+            }
+
+            // Миграция: Автоматическое разблокирование администраторов и модераторов
+            const unblockResult = await usersCollection.updateMany(
+                { role: { $in: ['ADMIN', 'MODERATOR'] }, isBlocked: true },
+                { $set: { isBlocked: false }, $unset: { blockedAt: '', blockedBy: '', blockedReason: '' } }
+            );
+            if (unblockResult.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: Разблокировано ${unblockResult.modifiedCount} администраторов/модераторов`);
             }
         }
         

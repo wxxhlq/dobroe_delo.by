@@ -9,27 +9,42 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 class AuthService {
     async register(userData) {
-        const { username, password, email, role, name, city, phone } = userData;
+        const { username, password, email, role, name, city, phone, organizationName, organizationType, verificationDocuments } = userData;
         if (!email || !password || !name) throw new Error('Email, пароль и имя обязательны');
         
         const existing = await userRepository.findByEmail(email);
         if (existing) throw new Error('Пользователь с таким email уже существует');
 
         const password_hash = await bcrypt.hash(password, 10);
+        
+        // Определяем роль и статус верификации
+        const userRole = (role && role.toUpperCase() === 'ORGANIZER') ? 'ORGANIZER' : 'VOLUNTEER';
+        
         const newUser = {
             username: username || email.split('@')[0],
             email: email.toLowerCase(),
             password_hash: password_hash,
             name: name || '',
-            role: role || 'VOLUNTEER',
+            role: userRole,
             city: city || '',
             phone: phone || '',
             points: 0,
             avatarUrl: '',
             privacy: 'public',
             achievements: [],
+            isBlocked: false,
             created_at: new Date()
         };
+
+        // Если организатор — добавляем данные верификации
+        if (userRole === 'ORGANIZER') {
+            newUser.verificationStatus = 'PENDING';
+            newUser.organizationName = organizationName || '';
+            newUser.organizationType = organizationType || '';
+            newUser.verificationDocuments = verificationDocuments || '';
+        } else {
+            newUser.verificationStatus = 'NONE';
+        }
 
         const user = await userRepository.createUser(newUser);
         await GamificationService.checkAchievements(user._id.toString());
@@ -48,6 +63,11 @@ class AuthService {
     async login(email, password) {
         const user = await userRepository.findByEmail(email);
         if (!user) throw new Error('Неверный email или пароль');
+
+        // Проверка блокировки
+        if (user.isBlocked) {
+            throw new Error('Ваш аккаунт заблокирован. Обратитесь к администратору.');
+        }
 
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) throw new Error('Неверный email или пароль');
@@ -71,7 +91,6 @@ class AuthService {
         let user = await userRepository.findByEmail(email);
         if (!user) {
             // Создаем нового пользователя через соцсеть
-            // Для пароля генерируем случайный хеш, так как вход будет через OAuth
             const randomPassword = Math.random().toString(36).slice(-10);
             const password_hash = await bcrypt.hash(randomPassword, 10);
             
@@ -81,18 +100,23 @@ class AuthService {
                 password_hash: password_hash,
                 name: name || 'Пользователь из соцсети',
                 role: 'VOLUNTEER',
+                verificationStatus: 'NONE',
                 city: '',
                 phone: phone || '',
                 points: 0,
                 avatarUrl: avatarUrl || '',
                 privacy: 'public',
                 achievements: [],
+                isBlocked: false,
                 created_at: new Date()
             };
             user = await userRepository.createUser(newUser);
             await GamificationService.checkAchievements(user._id.toString());
         } else {
-            // Если пользователь уже существует, обновляем логин
+            // Проверка блокировки
+            if (user.isBlocked) {
+                throw new Error('Ваш аккаунт заблокирован. Обратитесь к администратору.');
+            }
             await userRepository.updateLastLogin(user._id);
         }
 
@@ -116,7 +140,10 @@ class AuthService {
             city: user.city,
             phone: user.phone,
             avatarUrl: user.avatarUrl || '',
-            points: user.points || 0
+            points: user.points || 0,
+            verificationStatus: user.verificationStatus || 'NONE',
+            organizationName: user.organizationName || '',
+            isBlocked: user.isBlocked || false
         };
     }
 

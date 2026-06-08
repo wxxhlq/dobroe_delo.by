@@ -8,7 +8,7 @@ class TaskService {
     }
 
     async createTask(taskData, user) {
-        if (user.role !== 'organizer' && user.role !== 'admin') {
+        if (user.role !== 'ORGANIZER' && user.role !== 'ADMIN') {
             throw new Error('Доступ только для организаторов');
         }
 
@@ -55,7 +55,7 @@ class TaskService {
         await taskRepository.incrementResponses(taskId);
         
         // XP за отклик
-        const xpDelta = user.role === 'organizer' ? 15 : 10;
+        const xpDelta = user.role === 'ORGANIZER' ? 15 : 10;
         await userRepository.updatePoints(user.userId, xpDelta);
 
         return application;

@@ -15,14 +15,19 @@ class UserController {
             res.json({
                 id: user._id, username: user.username, email: user.email, name: user.name, role: user.role,
                 city: user.city, phone: user.phone, avatarUrl: user.avatarUrl || '', points: user.points || 0,
-                created_at: user.created_at
+                created_at: user.created_at,
+                verificationStatus: user.verificationStatus || 'NONE',
+                organizationName: user.organizationName || '',
+                organizationType: user.organizationType || '',
+                verificationDocuments: user.verificationDocuments || '',
+                rejectionReason: user.rejectionReason || ''
             });
         } catch (err) { res.status(500).json({ message: 'Ошибка сервера' }); }
     }
 
     async updateMe(req, res) {
         try {
-            const { name, city, phone, privacy, notifications, email } = req.body;
+            const { name, city, phone, privacy, notifications, email, organizationName, organizationType, verificationDocuments, submitVerification } = req.body;
             const db = getDB();
             const usersCollection = db.collection('users');
             const updateData = {};
@@ -33,6 +38,14 @@ class UserController {
             if (privacy) updateData.privacy = privacy;
             if (notifications !== undefined) updateData.notifications = notifications;
             
+            if (organizationName !== undefined) updateData.organizationName = organizationName;
+            if (organizationType !== undefined) updateData.organizationType = organizationType;
+            if (verificationDocuments !== undefined) updateData.verificationDocuments = verificationDocuments;
+            if (submitVerification) {
+                updateData.verificationStatus = 'PENDING';
+                updateData.rejectionReason = '';
+            }
+
             if (email !== undefined) {
                 const normalizedEmail = String(email).trim().toLowerCase();
                 const existing = await usersCollection.findOne({ email: normalizedEmail }, { projection: { _id: 1 } });
@@ -52,7 +65,12 @@ class UserController {
                 message: 'Профиль обновлён', token, user: {
                     id: updatedUser._id, username: updatedUser.username, email: updatedUser.email, name: updatedUser.name,
                     role: updatedUser.role, city: updatedUser.city, phone: updatedUser.phone, avatarUrl: updatedUser.avatarUrl || '',
-                    privacy: updatedUser.privacy, points: updatedUser.points || 0
+                    privacy: updatedUser.privacy, points: updatedUser.points || 0,
+                    verificationStatus: updatedUser.verificationStatus || 'NONE',
+                    organizationName: updatedUser.organizationName || '',
+                    organizationType: updatedUser.organizationType || '',
+                    verificationDocuments: updatedUser.verificationDocuments || '',
+                    rejectionReason: updatedUser.rejectionReason || ''
                 }
             });
         } catch (err) { res.status(500).json({ message: 'Ошибка сервера' }); }
@@ -77,7 +95,12 @@ class UserController {
             res.json({
                 valid: true, user: {
                     id: user._id, username: user.username, email: user.email, name: user.name, role: user.role,
-                    city: user.city, phone: user.phone, avatarUrl: user.avatarUrl || '', points: user.points || 0
+                    city: user.city, phone: user.phone, avatarUrl: user.avatarUrl || '', points: user.points || 0,
+                    verificationStatus: user.verificationStatus || 'NONE',
+                    organizationName: user.organizationName || '',
+                    organizationType: user.organizationType || '',
+                    verificationDocuments: user.verificationDocuments || '',
+                    rejectionReason: user.rejectionReason || ''
                 }
             });
         } catch (err) { res.status(401).json({ valid: false }); }

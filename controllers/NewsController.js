@@ -61,7 +61,7 @@ class NewsController {
         try {
             const doc = await NewsRepository.findById(req.params.id);
             if (!doc) return res.status(404).json({ message: 'Новость не найдена' });
-            if (req.user.role !== 'ADMIN' && (!doc.authorId || doc.authorId.toString() !== req.user.userId)) {
+            if (req.user.role !== 'ADMIN' && req.user.role !== 'MODERATOR' && (!doc.authorId || doc.authorId.toString() !== req.user.userId)) {
                 return res.status(403).json({ message: 'Нет прав для удаления этой новости' });
             }
             await NewsRepository.delete(req.params.id);

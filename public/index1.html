@@ -1199,6 +1199,16 @@
       color: #ffffff;
     }
 
+    .user-role.role-moderator {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    .user-role.role-moderator {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
     .user-role.role-volunteer {
       background: var(--blueSoft);
       color: var(--blue);
@@ -2347,6 +2357,7 @@
             <span class="chip" data-route="/news">Новости</span>
             <span class="chip" data-route="/about">О нас</span>
             <span class="chip" data-route="/contacts">Контакты</span>
+            <span class="chip" id="admin_trigger_btn" style="display:none; color: #fbbf24; font-weight: bold; border: 1px dashed #fbbf24;" onclick="window.location.href='/admin.html'">Админка 🛡️</span>
             <button class="iconbtn" id="btnOpenAuth">Вход</button>
             <button class="btn" id="btnCtaHelp">Хочу помочь</button>
         </nav>
@@ -2416,12 +2427,13 @@
     function roleLabel(role) {
       if (role === 'VOLUNTEER') return 'Волонтёр';
       if (role === 'ORGANIZER') return 'Организатор';
+      if (role === 'MODERATOR') return 'Модератор';
       if (role === 'ADMIN') return 'Администратор';
       return role || '';
     }
 
     function checkAuth() {
-        const user = localStorage.getItem('currentUser'); // Или как там у тебя называется ключ юзера
+        const user = currentUser();
         const adminPanel = document.getElementById('ddby_admin_dashboard');
         const triggerBtn = document.getElementById('admin_trigger_btn');
         const loginForm = document.getElementById('login_section'); // ID твоей формы входа
@@ -2439,7 +2451,11 @@
         } else {
             // Если юзер есть — показываем интерфейс
             if (loginForm) loginForm.style.display = 'none';
-            if (triggerBtn) triggerBtn.style.display = 'flex';
+            if (user.role === 'ADMIN' || user.role === 'MODERATOR') {
+                if (triggerBtn) triggerBtn.style.display = 'inline-flex';
+            } else {
+                if (triggerBtn) triggerBtn.style.display = 'none';
+            }
         }
     }
 
@@ -3646,7 +3662,7 @@
 
                   // 5. УМНАЯ НАВИГАЦИЯ:
                   // Если зашел админ — кидаем в админку, если нет — в кабинет
-                  if (data.user.role === 'ADMIN') {
+                  if (data.user.role === 'ADMIN' || data.user.role === 'MODERATOR') {
                       console.log('🚀 Переход в панель управления...');
                       setTimeout(() => {
                           window.location.href = '/admin.html';
@@ -3955,7 +3971,7 @@
 
           toast("ok", "Успешный вход", `Привет, ${data.user.name}!`);
 
-          if (data.user.role === 'ADMIN') {
+          if (data.user.role === 'ADMIN' || data.user.role === 'MODERATOR') {
             setTimeout(() => { window.location.href = '/admin.html'; }, 800);
           } else {
             navigate("/cabinet");
@@ -5034,7 +5050,7 @@
               <div class="avatar-overlay">📷</div>
             </div>
             <div class="user-name">${esc(u.name)}</div>
-            <div class="user-role ${u.role === "ADMIN" ? "role-admin" : u.role === "ORGANIZER" ? "role-organizer" : "role-volunteer"}">${u.role === "ADMIN" ? "Администратор" : u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
+            <div class="user-role ${u.role === "ADMIN" ? "role-admin" : u.role === "ORGANIZER" ? "role-organizer" : u.role === "MODERATOR" ? "role-moderator" : "role-volunteer"}">${u.role === "ADMIN" ? "Администратор" : u.role === "MODERATOR" ? "Модератор" : u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
 
             <div class="level-box">
               <div class="stat-row"><span>Уровень: ${lvl.name}</span><span>${u.points || 0} XP</span></div>
@@ -5146,6 +5162,68 @@
         }).join("") : `<div class="muted">У вас пока нет откликов на проекты.</div>`}
             </div>
           </div>
+
+          ${u.role === 'ORGANIZER' ? `
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-title"><h2>🛡️ Верификация организации</h2></div>
+            <div class="card-inner" style="padding:20px">
+              ${(() => {
+                const status = u.verificationStatus || 'NONE';
+                if (status === 'VERIFIED') {
+                  return `
+                    <div style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 16px; border-radius: 12px; font-weight: 600;">
+                      <span>✅ Ваш профиль верифицирован! Вы можете создавать и публиковать проекты.</span>
+                    </div>
+                  `;
+                } else if (status === 'PENDING') {
+                  return `
+                    <div style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 16px; border-radius: 12px; font-weight: 600;">
+                      <span>⏳ Заявка находится на рассмотрении модератором.</span>
+                      <div style="font-size: 13px; margin-top: 8px; color: var(--text); font-weight: normal;">
+                        <strong>Организация:</strong> ${esc(u.organizationName)}<br>
+                        <strong>Тип:</strong> ${esc(u.organizationType)}<br>
+                        <strong>Документы:</strong> ${esc(u.verificationDocuments)}
+                      </div>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    ${status === 'REJECTED' ? `
+                      <div style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 16px; border-radius: 12px; font-weight: 600; margin-bottom: 16px;">
+                        <span>❌ Заявка отклонена модератором.</span>
+                        <div style="font-size: 13px; margin-top: 4px; font-weight: normal; color: var(--text);">
+                          <strong>Причина:</strong> ${esc(u.rejectionReason || 'Не указана')}
+                        </div>
+                      </div>
+                    ` : ''}
+                    <form id="verificationFormCabinet" onsubmit="event.preventDefault(); handleSendVerification(this);">
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                        <div class="inp-group">
+                          <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Название организации</label>
+                          <input type="text" name="orgName" class="inp-modern" placeholder="Например, Благотворительный фонд 'Помощь'" required style="width:100%">
+                        </div>
+                        <div class="inp-group">
+                          <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Тип организации</label>
+                          <select name="orgType" class="inp-modern" required style="width:100%; padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; color: var(--text);">
+                            <option value="НКО">НКО (Некоммерческая организация)</option>
+                            <option value="Учебное заведение">Учебное заведение</option>
+                            <option value="Государственная структура">Государственная структура</option>
+                            <option value="Другое">Другое</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="inp-group" style="margin-bottom: 16px;">
+                        <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Ссылка на документы или подтверждение</label>
+                        <input type="text" name="orgDocs" class="inp-modern" placeholder="Ссылка на устав / ОГРН / подтверждающий документ" required style="width:100%">
+                      </div>
+                      <button type="submit" class="btn" style="width:100%;">Отправить документы на проверку</button>
+                    </form>
+                  `;
+                }
+              })()}
+            </div>
+          </div>
+          ` : ''}
 
           ${(u.role === 'ORGANIZER' || u.role === 'ADMIN') ? `
           <div class="card" style="margin-bottom:24px">
@@ -5271,20 +5349,15 @@
           return;
         }
 
-        // Обновляем ТОЛЬКО в памяти, БЕЗ localStorage
-        Object.assign(u, {
-          name: data.user.name,
-          city: data.user.city,
-          phone: data.user.phone,
-          email: data.user.email
-        });
+        // Обновляем ТОЛЬКО в памяти и в localStorage
+        Object.assign(u, data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
 
         // Если сервер вернул новый access token (например, после смены email) — обновим его
         if (data.token) {
             authToken = data.token;
             localStorage.setItem('authToken', authToken); // Оставляем для старого кода
             localStorage.setItem('token', data.token);     // ДОБАВЛЯЕМ ДЛЯ АДМИНКИ
-            localStorage.setItem('user', JSON.stringify(data.user)); // ДОБАВЛЯЕМ ДЛЯ ПРОВЕРКИ РОЛИ
         }
 
         // НЕ вызываем saveState() - данные только на сервере!
@@ -5294,6 +5367,51 @@
       } catch (err) {
         console.error('❌ Ошибка:', err);
         toast('danger', 'Ошибка', 'Проблема соединения с сервером');
+      }
+    };
+
+    window.handleSendVerification = async function (form) {
+      const u = currentUser();
+      if (!u) return;
+
+      const fd = new FormData(form);
+      const updateData = {
+        organizationName: fd.get('orgName'),
+        organizationType: fd.get('orgType'),
+        verificationDocuments: fd.get('orgDocs'),
+        submitVerification: true
+      };
+
+      console.log('📤 Отправка документов на верификацию:', updateData);
+
+      try {
+        const res = await fetch(`http://localhost:3000/me`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(updateData)
+        });
+
+        const data = await res.json();
+        console.log('📥 Ответ сервера:', data);
+
+        if (!res.ok) {
+          if (!handleAuthResponse(res, data)) return;
+          toast('danger', 'Ошибка', data.message || 'Не удалось отправить на верификацию');
+          return;
+        }
+
+        Object.assign(u, data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        toast('ok', '✓', 'Документы отправлены на проверку');
+        renderCabinet();
+
+      } catch (err) {
+        console.error(err);
+        toast('danger', 'Ошибка', 'Ошибка соединения с сервером');
       }
     };
 
@@ -6604,7 +6722,7 @@
               return false;
           }
 
-          if (checkAdmin()) {
+          if (false) { // Disabled - Admin panel link is now in main navigation
               const btn = document.createElement('div');
               btn.innerHTML = '📈';
               btn.style = "position:fixed; bottom:30px; right:30px; width:66px; height:66px; background:#4F46E5; color:white; border-radius:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:9999; box-shadow:0 10px 25px rgba(79,70,229,0.5); font-size:28px; transition:0.3s;";

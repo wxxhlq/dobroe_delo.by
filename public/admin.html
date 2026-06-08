@@ -140,6 +140,7 @@
         .badge-success { background: #10b981; }
         .badge-warning { background: #f59e0b; }
         .badge-danger { background: #ef4444; }
+        .badge-info { background: #3b82f6; }
         .btn {
             background: #4f46e5;
             border: none;
@@ -398,6 +399,7 @@
     <div class="nav-item active" data-tab="dashboard">📊 Пульс системы</div>
     <div class="nav-item" data-tab="userMetrics">🧑‍🤝‍🧑 Пользователи</div>
     <div class="nav-item" data-tab="projectMetrics">🗂 Проекты</div>
+    <div class="nav-item" data-tab="moderation" id="moderationTab">🛡️ Модерация</div>
     <div class="nav-item" data-tab="participationMetrics">🕒 Участие</div>
     <div class="nav-item" data-tab="activityMetrics">📈 Активность</div>
 
@@ -423,6 +425,29 @@
     let liveFeedInterval = null;
     let regChart = null;
     const API_URL = window.location.origin;
+
+    const storedUserStr = localStorage.getItem('user');
+    let currentUserObj = null;
+    if (storedUserStr) {
+        try {
+            currentUserObj = JSON.parse(storedUserStr);
+        } catch (e) {}
+    }
+    if (!currentUserObj || (currentUserObj.role !== 'ADMIN' && currentUserObj.role !== 'MODERATOR')) {
+        window.location.href = '/';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (currentUserObj && currentUserObj.role === 'MODERATOR') {
+            const adminOnlyTabs = ['participationMetrics', 'activityMetrics', 'analytics', 'segments', 'communications', 'monitoring'];
+            document.querySelectorAll('.nav-item').forEach(el => {
+                const tab = el.dataset.tab;
+                if (adminOnlyTabs.includes(tab)) {
+                    el.style.display = 'none';
+                }
+            });
+        }
+    });
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -510,7 +535,7 @@
                     <div style="text-align: center;">
                         <div style="font-size: 64px; margin-bottom: 16px;">👤</div>
                         <h3>${escapeHtml(u.name || u.email)}</h3>
-                        <p style="color: #9ca3af;">${u.role === 'VOLUNTEER' ? 'Волонтёр' : u.role === 'ORGANIZER' ? 'Организатор' : 'Администратор'}</p>
+                        <p style="color: #9ca3af;">${u.role === 'VOLUNTEER' ? 'Волонтёр' : u.role === 'ORGANIZER' ? 'Организатор' : u.role === 'MODERATOR' ? 'Модератор' : 'Администратор'}</p>
                         <div style="text-align: left; margin-top: 20px;">
                             <p><strong>📧 Email:</strong> ${escapeHtml(u.email || '—')}</p>
                             <p><strong>📍 Город:</strong> ${escapeHtml(u.city || '—')}</p>
@@ -1021,7 +1046,16 @@
             else if ((now - regDate) / 86400000 <= 7) statusIcon = '🌱';
             else if ((now - lastActive) / 86400000 > 30) statusIcon = '💤';
 
-            const roleColor = u.role === 'ADMIN' ? 'badge-danger' : (u.role === 'ORGANIZER' ? 'badge-warning' : 'badge-success');
+            const roleColor = u.role === 'ADMIN' ? 'badge-danger' : (u.role === 'ORGANIZER' ? 'badge-warning' : (u.role === 'MODERATOR' ? 'badge-info' : 'badge-success'));
+
+            let dropdownContent = '';
+            if (currentUserObj && currentUserObj.role === 'ADMIN') {
+                dropdownContent += `<button class="action-btn" onclick="handleAction('bonus', '${u._id}')">🎁 Начислить XP</button>`;
+                dropdownContent += `<button class="action-btn" onclick="handleAction('role', '${u._id}')">🔄 Выбрать роль</button>`;
+            }
+            dropdownContent += u.isBlocked 
+                ? `<button class="action-btn" onclick="handleAction('unblock', '${u._id}')">🔓 Разблокировать</button>` 
+                : `<button class="action-btn" onclick="handleAction('block', '${u._id}')">🚫 Блокировать</button>`;
 
             return `
 <tr style="${u.isBlocked ? 'opacity: 0.6;' : ''}">
@@ -1035,7 +1069,7 @@
             </div>
             <div>
                 <div style="font-weight:600; color:#fff; display:flex; align-items:center; gap:6px;">
-                    ${statusIcon} ${name}
+                     ${statusIcon} ${name}
                     ${u.isBlocked ? '<span title="Заблокирован" style="color:#ef4444; font-size:12px;">🚫</span>' : ''}
                 </div>
                 <div style="font-size:11px; color:#6b7280;">
@@ -1062,9 +1096,7 @@
         <div class="action-dropdown">
             <button class="btn-secondary" style="padding:6px 10px; border-radius:8px;">⚙️</button>
             <div class="action-dropdown-content">
-                <button class="action-btn" onclick="handleAction('bonus', '${u._id}')">🎁 Начислить XP</button>
-                <button class="action-btn" onclick="handleAction('role', '${u._id}')">🔄 Выбрать роль</button>
-
+                ${dropdownContent}
             </div>
         </div>
     </td>
@@ -1627,7 +1659,7 @@
 
         const fieldConfig = {
             city: { label: 'Город', type: 'select', options: availableCities, operators: ['eq', 'neq'] },
-            role: { label: 'Роль', type: 'select', options: ['VOLUNTEER', 'ORGANIZER', 'ADMIN'], operators: ['eq', 'neq'] },
+            role: { label: 'Роль', type: 'select', options: ['VOLUNTEER', 'ORGANIZER', 'MODERATOR', 'ADMIN'], operators: ['eq', 'neq'] },
             minEvents: { label: 'Минимум событий', type: 'number', operators: ['gte', 'lte', 'eq', 'gt', 'lt'] },
             isActive: { label: 'Активен за 30 дней', type: 'boolean', operators: ['eq'] },
             source: { label: 'Источник трафика', type: 'select', options: availableSources, operators: ['eq', 'neq'] },
@@ -2333,6 +2365,160 @@
         `;
     }
 
+    function categoryLabel(catId) {
+        const categories = {
+            elderly: "Помощь пожилым",
+            animals: "Защита животных",
+            eco: "Экология",
+            children: "Дети и семья",
+            events: "События"
+        };
+        return categories[catId] || catId || 'Проект';
+    }
+
+    async function renderModeration() {
+        document.getElementById('pageTitle').innerText = 'Модерация платформы';
+        const content = document.getElementById('content');
+
+        content.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; animation: fadeIn 0.3s ease;">
+            <!-- Левая колонка: Верификация организаторов -->
+            <div class="card">
+                <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">🏢 Верификация организаторов</h3>
+                <div id="verificationsList" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка запросов...</div>
+                </div>
+            </div>
+
+            <!-- Правая колонка: Модерация проектов -->
+            <div class="card">
+                <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">🗂 Модерация проектов</h3>
+                <div id="projectsModerationList" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка проектов...</div>
+                </div>
+            </div>
+        </div>
+        `;
+
+        // Загружаем запросы на верификацию
+        try {
+            const verRes = await apiFetch('/api/moderator/verification-requests');
+            const verList = document.getElementById('verificationsList');
+            if (verRes.success && verRes.requests) {
+                if (verRes.requests.length === 0) {
+                    verList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">Нет ожидающих заявок</div>';
+                } else {
+                    verList.innerHTML = verRes.requests.map(req => `
+                        <div class="card" style="background: #222227; border: 1px solid #2a2a30; padding: 16px; margin: 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                <div>
+                                    <h4 style="color: #fff; margin: 0 0 4px 0;">${escapeHtml(req.name)}</h4>
+                                    <div style="font-size: 12px; color: #9ca3af;">${escapeHtml(req.email)}</div>
+                                </div>
+                                <span class="badge badge-warning">Ожидает</span>
+                            </div>
+                            <div style="font-size: 13px; color: #d1d5db; margin-bottom: 12px; border-left: 2px solid #f59e0b; padding-left: 8px;">
+                                <strong>Организация:</strong> ${escapeHtml(req.organizationName || 'Не указана')}<br>
+                                <strong>Тип:</strong> ${escapeHtml(req.organizationType || 'Не указан')}<br>
+                                <strong>Документ:</strong> ${escapeHtml(req.verificationDocuments || 'Не предоставлен')}
+                            </div>
+                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; background: #ef4444; color: white;" onclick="verifyOrganizer('${req._id}', 'reject')">Отклонить</button>
+                                <button class="btn" style="padding: 6px 12px; font-size: 12px; background: #10b981;" onclick="verifyOrganizer('${req._id}', 'approve')">Одобрить</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                verList.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка загрузки</div>';
+            }
+        } catch(e) {
+            document.getElementById('verificationsList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
+        }
+
+        // Загружаем проекты на модерации
+        try {
+            const taskRes = await apiFetch('/api/moderator/pending-tasks');
+            const projectList = document.getElementById('projectsModerationList');
+            if (taskRes.success && taskRes.tasks) {
+                if (taskRes.tasks.length === 0) {
+                    projectList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">Нет проектов на модерацию</div>';
+                } else {
+                    projectList.innerHTML = taskRes.tasks.map(task => `
+                        <div class="card" style="background: #222227; border: 1px solid #2a2a30; padding: 16px; margin: 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                <div>
+                                    <h4 style="color: #fff; margin: 0 0 4px 0;">${escapeHtml(task.title)}</h4>
+                                    <div style="font-size: 12px; color: #818cf8;">${escapeHtml(categoryLabel(task.category))}</div>
+                                </div>
+                                <span class="badge badge-warning">Черновик</span>
+                            </div>
+                            <p style="font-size: 13px; color: #9ca3af; margin: 0 0 12px 0;">${escapeHtml(task.description || '')}</p>
+                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">
+                                👤 <strong>Создатель:</strong> ${escapeHtml(task.ownerName || task.ownerEmail || 'Неизвестно')}
+                            </div>
+                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; background: #ef4444; color: white;" onclick="moderateProject('${task._id}', 'reject')">Отклонить</button>
+                                <button class="btn" style="padding: 6px 12px; font-size: 12px; background: #10b981;" onclick="moderateProject('${task._id}', 'approve')">Одобрить</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                projectList.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка загрузки</div>';
+            }
+        } catch(e) {
+            document.getElementById('projectsModerationList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
+        }
+    }
+
+    window.verifyOrganizer = async function(userId, action) {
+        let reason = '';
+        if (action === 'reject') {
+            reason = prompt('Укажите причину отклонения заявки:');
+            if (reason === null) return;
+            if (!reason.trim()) {
+                alert('Причина отклонения обязательна!');
+                return;
+            }
+        }
+        const res = await apiFetch(`/api/moderator/verify/${userId}`, {
+            method: 'POST',
+            body: JSON.stringify({ action, reason })
+        });
+        if (res.success) {
+            alert(action === 'approve' ? 'Организатор успешно верифицирован!' : 'Заявка отклонена');
+            renderModeration();
+        } else {
+            alert('Ошибка: ' + res.error);
+        }
+    };
+
+    window.moderateProject = async function(projectId, action) {
+        let url = `/api/moderator/task/${projectId}/approve`;
+        let body = {};
+        if (action === 'reject') {
+            const reason = prompt('Укажите причину отклонения проекта:');
+            if (reason === null) return;
+            if (!reason.trim()) {
+                alert('Причина обязательна!');
+                return;
+            }
+            url = `/api/moderator/task/${projectId}/reject`;
+            body = { reason };
+        }
+        const res = await apiFetch(url, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        if (res.success) {
+            alert(action === 'approve' ? 'Проект одобрен и опубликован!' : 'Проект отклонен');
+            renderModeration();
+        } else {
+            alert('Ошибка: ' + res.error);
+        }
+    };
+
     // ===================== НАВИГАЦИЯ =====================
     const tabs = {
         dashboard: renderDashboard,
@@ -2348,7 +2534,8 @@
         communications: renderCommunications,
         landings: renderLandings,
         abtests: renderABTests,
-        monitoring: renderMonitoring
+        monitoring: renderMonitoring,
+        moderation: renderModeration
     };
 
     function switchTab(tab) {
@@ -2397,6 +2584,7 @@
             <select id="newRole">
                 <option value="VOLUNTEER">Волонтёр</option>
                 <option value="ORGANIZER">Организатор</option>
+                <option value="MODERATOR">Модератор</option>
                 <option value="ADMIN">Администратор</option>
             </select>
         `;
@@ -2405,10 +2593,20 @@
                 await executeAction(`/api/admin/user/${userId}/role`, {role});
             };
         } else if (actionType === 'block') {
-            header.innerText = 'Блокировка доступа';
-            body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите изменить статус блокировки этого пользователя?</p>`;
+            header.innerText = 'Блокировка пользователя';
+            body.innerHTML = `
+            <label>Причина блокировки:</label>
+            <input type="text" id="blockReason" placeholder="Нарушение правил, спам..." style="width: 100%; padding: 8px; margin-top: 8px; background: #2a2a30; border: 1px solid #3f3f46; border-radius: 6px; color: #fff;">
+        `;
             confirmBtn.onclick = async () => {
-                await executeAction(`/api/admin/user/${userId}/toggle-block`, {}, 'POST');
+                const reason = document.getElementById('blockReason').value || 'Нарушение правил сообщества';
+                await executeAction(`/api/moderator/block/${userId}`, { reason });
+            };
+        } else if (actionType === 'unblock') {
+            header.innerText = 'Разблокировка пользователя';
+            body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите разблокировать этого пользователя?</p>`;
+            confirmBtn.onclick = async () => {
+                await executeAction(`/api/moderator/unblock/${userId}`, {}, 'POST');
             };
         }
     };
@@ -2724,6 +2922,7 @@
                         let roleText = '';
                         if (user.role === 'VOLUNTEER') roleText = 'Волонтёр';
                         else if (user.role === 'ORGANIZER') roleText = 'Организатор';
+                        else if (user.role === 'MODERATOR') roleText = 'Модератор';
                         else if (user.role === 'ADMIN') roleText = 'Администратор';
                         else roleText = user.role || '';
                         row[label] = roleText;

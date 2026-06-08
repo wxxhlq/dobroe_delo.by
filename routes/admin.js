@@ -1351,13 +1351,26 @@ router.post('/user/:id/role', adminAuthMiddleware, async (req, res) => {
     try {
         const db = getDB();
         const { role } = req.body;
+        const allowedRoles = ['VOLUNTEER', 'ORGANIZER', 'MODERATOR', 'ADMIN'];
+        if (!allowedRoles.includes(role)) {
+            return res.status(400).json({ success: false, error: `Недопустимая роль. Допустимые: ${allowedRoles.join(', ')}` });
+        }
+        // Только ADMIN может назначать роли (модератор не может)
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ success: false, error: 'Только администратор может менять роли' });
+        }
         const userId = new ObjectId(req.params.id);
-
+        const updateData = { role: role };
+        // Если назначаем ORGANIZER — автоматически верифицируем
+        if (role === 'ORGANIZER') {
+            updateData.verificationStatus = 'VERIFIED';
+            updateData.verifiedAt = new Date();
+            updateData.verifiedBy = new ObjectId(req.user.userId);
+        }
         await db.collection('users').updateOne(
             { _id: userId },
-            { $set: { role: role } }
+            { $set: updateData }
         );
-
         res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
@@ -1894,5 +1907,235 @@ async function processCampaignSend(campaignId) {
         await Campaign.findByIdAndUpdate(campaignId, { status: 'failed' });
     }
 }
+
+// ===================== УПРАВЛЕНИЕ БЕЙДЖАМИ =====================
+
+router.get('/badges', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const badges = await db.collection('badge_types').find().sort({ createdAt: -1 }).toArray();
+        res.json({ success: true, badges });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/badges', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { id, name, icon, desc, xpReward, conditionType, conditionValue } = req.body;
+        if (!id || !name) return res.status(400).json({ success: false, error: 'ID и название обязательны' });
+
+        const existing = await db.collection('badge_types').findOne({ id });
+        if (existing) return res.status(409).json({ success: false, error: 'Бейдж с таким ID уже существует' });
+
+        const badge = {
+            id, name, icon: icon || '🏅', desc: desc || '',
+            xpReward: Number(xpReward) || 0,
+            conditionType: conditionType || 'manual',
+            conditionValue: Number(conditionValue) || 0,
+            isActive: true, createdAt: new Date()
+        };
+        await db.collection('badge_types').insertOne(badge);
+        res.json({ success: true, badge });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.put('/badges/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { name, icon, desc, xpReward, conditionType, conditionValue, isActive } = req.body;
+        const update = {};
+        if (name !== undefined) update.name = name;
+        if (icon !== undefined) update.icon = icon;
+        if (desc !== undefined) update.desc = desc;
+        if (xpReward !== undefined) update.xpReward = Number(xpReward);
+        if (conditionType !== undefined) update.conditionType = conditionType;
+        if (conditionValue !== undefined) update.conditionValue = Number(conditionValue);
+        if (isActive !== undefined) update.isActive = isActive;
+
+        const result = await db.collection('badge_types').updateOne(
+            { id: req.params.id }, { $set: update }
+        );
+        if (result.matchedCount === 0) return res.status(404).json({ success: false, error: 'Бейдж не найден' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.delete('/badges/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        await db.collection('badge_types').deleteOne({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ===================== УПРАВЛЕНИЕ БАННЕРАМИ =====================
+
+router.get('/banners', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const banners = await db.collection('banners').find().sort({ order: 1 }).toArray();
+        res.json({ success: true, banners });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/banners', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { title, subtitle, imageUrl, linkUrl, isActive, order } = req.body;
+        if (!title) return res.status(400).json({ success: false, error: 'Заголовок обязателен' });
+
+        const banner = {
+            title, subtitle: subtitle || '', imageUrl: imageUrl || '',
+            linkUrl: linkUrl || '', isActive: isActive !== false,
+            order: Number(order) || 0, createdAt: new Date()
+        };
+        const result = await db.collection('banners').insertOne(banner);
+        banner._id = result.insertedId;
+        res.json({ success: true, banner });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.put('/banners/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { title, subtitle, imageUrl, linkUrl, isActive, order } = req.body;
+        const update = {};
+        if (title !== undefined) update.title = title;
+        if (subtitle !== undefined) update.subtitle = subtitle;
+        if (imageUrl !== undefined) update.imageUrl = imageUrl;
+        if (linkUrl !== undefined) update.linkUrl = linkUrl;
+        if (isActive !== undefined) update.isActive = isActive;
+        if (order !== undefined) update.order = Number(order);
+
+        const result = await db.collection('banners').updateOne(
+            { _id: new ObjectId(req.params.id) }, { $set: update }
+        );
+        if (result.matchedCount === 0) return res.status(404).json({ success: false, error: 'Баннер не найден' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.delete('/banners/:id', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        await db.collection('banners').deleteOne({ _id: new ObjectId(req.params.id) });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ===================== УРОВНИ РЕЙТИНГА =====================
+
+router.get('/rating-levels', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const levels = await db.collection('rating_levels').find().sort({ minPoints: 1 }).toArray();
+        
+        // Если в БД нет уровней — возвращаем дефолтные
+        if (!levels.length) {
+            return res.json({ success: true, levels: [
+                { level: 1, name: 'Новичок', minPoints: 0, maxPoints: 99, icon: '🌱', color: '#4caf50' },
+                { level: 2, name: 'Помощник', minPoints: 100, maxPoints: 299, icon: '💫', color: '#2196f3' },
+                { level: 3, name: 'Активист', minPoints: 300, maxPoints: 599, icon: '⭐', color: '#ff9800' },
+                { level: 4, name: 'Герой', minPoints: 600, maxPoints: 999, icon: '🏆', color: '#9c27b0' },
+                { level: 5, name: 'Легенда', minPoints: 1000, maxPoints: 99999, icon: '👑', color: '#f44336' }
+            ]});
+        }
+        res.json({ success: true, levels });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.put('/rating-levels', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { levels } = req.body;
+        if (!Array.isArray(levels) || !levels.length) {
+            return res.status(400).json({ success: false, error: 'Массив уровней обязателен' });
+        }
+
+        // Полная замена уровней
+        await db.collection('rating_levels').deleteMany({});
+        await db.collection('rating_levels').insertMany(levels.map((l, i) => ({
+            level: l.level || i + 1,
+            name: l.name || `Уровень ${i + 1}`,
+            minPoints: Number(l.minPoints) || 0,
+            maxPoints: Number(l.maxPoints) || 999,
+            icon: l.icon || '🏅',
+            color: l.color || '#666'
+        })));
+
+        res.json({ success: true, message: 'Уровни рейтинга обновлены' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ===================== СИСТЕМНЫЕ ЛОГИ =====================
+
+router.get('/system-logs', adminAuthMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') return res.status(403).json({ success: false, error: 'Только для администраторов' });
+        const db = getDB();
+        const { type, limit: limitStr, page: pageStr } = req.query;
+        const limit = Math.min(Number(limitStr) || 50, 200);
+        const page = Math.max(Number(pageStr) || 1, 1);
+        const skip = (page - 1) * limit;
+
+        let logs = [];
+        let total = 0;
+
+        if (type === 'error') {
+            // Логи ошибок
+            total = await ErrorLog.countDocuments();
+            const errors = await ErrorLog.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
+            logs = errors.map(e => ({ type: 'error', ...e }));
+        } else if (type === 'event') {
+            // События пользователей
+            total = await db.collection('userevents').countDocuments();
+            const events = await db.collection('userevents').find()
+                .sort({ createdAt: -1 }).skip(skip).limit(limit).toArray();
+            logs = events.map(e => ({ type: 'event', ...e }));
+        } else {
+            // Все логи
+            const [errors, events] = await Promise.all([
+                ErrorLog.find().sort({ createdAt: -1 }).limit(Math.floor(limit / 2)).lean(),
+                db.collection('userevents').find().sort({ createdAt: -1 }).limit(Math.floor(limit / 2)).toArray()
+            ]);
+            logs = [
+                ...errors.map(e => ({ type: 'error', ...e })),
+                ...events.map(e => ({ type: 'event', ...e }))
+            ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            total = logs.length;
+        }
+
+        res.json({ success: true, logs, total, page, limit });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 module.exports = router;

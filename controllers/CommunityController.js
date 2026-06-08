@@ -134,7 +134,7 @@ class CommunityController {
         try {
             const post = await CommunityRepository.findPostById(req.params.id);
             if (!post) return res.status(404).json({ message: 'Пост не найден' });
-            if (req.user.role !== 'ADMIN' && (!post.userId || post.userId.toString() !== req.user.userId)) {
+            if (req.user.role !== 'ADMIN' && req.user.role !== 'MODERATOR' && (!post.userId || post.userId.toString() !== req.user.userId)) {
                 return res.status(403).json({ message: 'Нет прав' });
             }
             await CommunityRepository.deletePost(req.params.id);
