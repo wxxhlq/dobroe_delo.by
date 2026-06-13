@@ -1375,6 +1375,34 @@ router.post('/user/:id/role', adminAuthMiddleware, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
+// 2.5. Изменение права на срочные задачи
+router.post('/user/:id/urgent-right', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const { canCreateUrgentTasks } = req.body;
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ success: false, error: 'Только администратор может управлять правами' });
+        }
+        const userId = new ObjectId(req.params.id);
+        await db.collection('users').updateOne(
+            { _id: userId },
+            { $set: { canCreateUrgentTasks: !!canCreateUrgentTasks } }
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+// 2.6. Получение метрик по срочным задачам
+router.get('/metrics/urgent-tasks', adminAuthMiddleware, async (req, res) => {
+    try {
+        const db = getDB();
+        const campaigns = await db.collection('urgent_notification_campaigns').find().sort({ createdAt: -1 }).toArray();
+        res.json({ success: true, campaigns });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 
 
 // ===================== ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЯ ПО ID =====================

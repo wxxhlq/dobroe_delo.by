@@ -18,7 +18,13 @@ function mapProjectForClient(doc) {
         capacity: doc.capacity || doc.volunteersNeeded || 0,
         approved: doc.responsesCount || 0,
         image: doc.imageUrl || '',
-        status: doc.status || 'PUBLISHED'
+        status: doc.status || 'PUBLISHED',
+        priority: doc.priority || 'normal',
+        isUrgent: !!doc.isUrgent,
+        lat: doc.lat || null,
+        lng: doc.lng || null,
+        coordinates: doc.coordinates || null,
+        publishedAt: doc.publishedAt || null
     };
 }
 
@@ -42,7 +48,7 @@ class TaskController {
     }
 
     async createTask(req, res) {
-        const { title, description, city, region, categoryId, format, capacity, address } = req.body;
+        const { title, description, city, region, categoryId, format, capacity, address, priority, lat, lng } = req.body;
         if (!title || !description || !capacity || !categoryId || !region || !format || !address) {
             return res.status(400).json({ message: 'Заполните все обязательные поля' });
         }
@@ -56,6 +62,36 @@ class TaskController {
             const db = getDB();
             const imageUrl = req.file ? `/uploads/projects/${req.file.filename}` : '';
 
+            // Check permissions for high priority/urgent tasks
+            let isUrgent = false;
+            const userRole = String(req.user.role).toUpperCase();
+            
+            if (priority === 'high') {
+                const currentUser = await db.collection('users').findOne({ _id: new ObjectId(req.user.userId) });
+                if (!currentUser) return res.status(404).json({ message: 'Пользователь не найден' });
+                
+                const isModeratorOrAdmin = userRole === 'MODERATOR' || userRole === 'ADMIN';
+                const hasUrgentRight = currentUser.canCreateUrgentTasks === true || currentUser.canCreateSosTasks === true;
+                
+                if (!isModeratorOrAdmin && !hasUrgentRight) {
+                    return res.status(403).json({ message: 'У вас нет прав для создания срочных задач' });
+                }
+                isUrgent = true;
+            }
+
+            // Determine if immediately published
+            // Urgent tasks created by authorized users (Admin, Moderator, Special Organizers) are published immediately.
+            // Regular tasks by Admin/Moderator are published immediately.
+            let isPublishedImmediately = false;
+            if (userRole === 'ADMIN' || userRole === 'MODERATOR') {
+                isPublishedImmediately = true;
+            } else if (userRole === 'ORGANIZER') {
+                // If they are special organizer creating urgent task, publish it immediately
+                if (isUrgent) {
+                    isPublishedImmediately = true;
+                }
+            }
+
             const doc = {
                 title: String(title).trim(),
                 description: String(description).trim(),
@@ -67,8 +103,13 @@ class TaskController {
                 capacity: numericCapacity,
                 ownerUserId: new ObjectId(req.user.userId),
                 imageUrl,
-                // Задачи от организаторов проходят модерацию, от админа — публикуются сразу
-                status: (req.user.role === 'ADMIN') ? 'PUBLISHED' : 'PENDING',
+                status: isPublishedImmediately ? 'PUBLISHED' : 'PENDING',
+                priority: isUrgent ? 'high' : 'normal',
+                isUrgent: isUrgent,
+                lat: lat ? Number(lat) : null,
+                lng: lng ? Number(lng) : null,
+                coordinates: lat && lng ? { lat: Number(lat), lng: Number(lng) } : null,
+                publishedAt: isPublishedImmediately ? new Date() : null,
                 responsesCount: 0,
                 createdAt: new Date()
             };
@@ -86,8 +127,15 @@ class TaskController {
                 });
             } catch(e) {}
 
+            // Trigger targeted notification if published immediately and priority is high
+            if (created.status === 'PUBLISHED' && created.priority === 'high') {
+                const NotificationService = require('../services/NotificationService');
+                NotificationService.sendUrgentTaskNotifications(created).catch(console.error);
+            }
+
             res.status(201).json({ message: 'Проект создан', project: mapProjectForClient(created) });
         } catch (err) {
+            console.error('❌ Ошибка создания проекта:', err);
             res.status(500).json({ message: 'Ошибка сервера' });
         }
     }
@@ -286,7 +334,7 @@ class TaskController {
 
             await db.collection('projects').updateOne(
                 { _id: project._id },
-                { $set: { status: 'PUBLISHED', moderatedBy: new ObjectId(req.user.userId), moderatedAt: new Date() } }
+                { $set: { status: 'PUBLISHED', moderatedBy: new ObjectId(req.user.userId), moderatedAt: new Date(), publishedAt: new Date() } }
             );
 
             // Логируем событие
@@ -300,6 +348,13 @@ class TaskController {
             } catch(e) {}
 
             const updated = await db.collection('projects').findOne({ _id: project._id });
+
+            // Trigger targeted notification if priority is high
+            if (updated.priority === 'high') {
+                const NotificationService = require('../services/NotificationService');
+                NotificationService.sendUrgentTaskNotifications(updated).catch(console.error);
+            }
+
             res.json({ message: 'Проект одобрен и опубликован', project: mapProjectForClient(updated) });
         } catch (err) {
             res.status(500).json({ message: 'Ошибка сервера' });

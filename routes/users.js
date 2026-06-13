@@ -22,7 +22,11 @@ const avatarUpload = multer({ storage });
 
 router.get('/me', authMiddleware, userController.getMe);
 router.put('/me', authMiddleware, userController.updateMe);
+router.post('/me/verify-phone', authMiddleware, userController.verifyPhoneChange);
 router.post('/me/avatar', authMiddleware, avatarUpload.single('avatar'), userController.uploadAvatar);
+router.get('/me/notifications', authMiddleware, userController.getNotifications.bind(userController));
+router.post('/me/notifications/:id/open', authMiddleware, userController.openNotification.bind(userController));
+router.post('/me/notifications/:id/click', authMiddleware, userController.clickNotification.bind(userController));
 router.get('/check-session', authMiddleware, userController.checkSession);
 router.post('/api/user/ping', authMiddleware, userController.ping);
 router.post('/api/user/update-activity', authMiddleware, userController.ping);

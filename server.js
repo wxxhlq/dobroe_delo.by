@@ -241,6 +241,23 @@ async function startServer() {
             if (unblockResult.modifiedCount > 0) {
                 console.log(`🛠️ Миграция: Разблокировано ${unblockResult.modifiedCount} администраторов/модераторов`);
             }
+
+            // Миграция: Проставление подтверждения почты и телефона существующим пользователям
+            const emailConfirmMigrate = await usersCollection.updateMany(
+                { isEmailConfirmed: { $exists: false } },
+                { $set: { isEmailConfirmed: true } }
+            );
+            if (emailConfirmMigrate.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: ${emailConfirmMigrate.modifiedCount} пользователей подтвердили email`);
+            }
+
+            const phoneConfirmMigrate = await usersCollection.updateMany(
+                { isPhoneConfirmed: { $exists: false } },
+                { $set: { isPhoneConfirmed: true } }
+            );
+            if (phoneConfirmMigrate.modifiedCount > 0) {
+                console.log(`🛠️ Миграция: ${phoneConfirmMigrate.modifiedCount} пользователей подтвердили телефон`);
+            }
         }
         
         app.listen(PORT, () => {

@@ -2385,6 +2385,7 @@
     const API_URL = 'http://localhost:3000';
     let authToken = localStorage.getItem('authToken');
     let tempNewsImagePC = "";
+    var state; // Объявляем заранее для предотвращения Temporal Dead Zone в checkAuth/currentUser
     /* ===== State / storage (из твоего исходника) ===== */
     const LS_KEY = "ddby_flat_v1"; // [file:87]
 
@@ -2999,7 +3000,7 @@
       };
     }
 
-    let state = loadState();
+    state = loadState();
     if (!state) { state = seed(); saveState(); }
 
     // Миграция: вычищаем старые локальные посты сообщества и новости,
@@ -3821,69 +3822,147 @@
               <p style="color:var(--muted); font-size:14px; margin:0;">Платформа добрых дел Dobroe_delo.by</p>
             </div>
 
-            <!-- Tabs -->
-            <div style="display:flex; border-bottom:2px solid var(--border); margin-bottom:30px; position:relative;">
+            <!-- Tabs (hidden on SMS verification screen) -->
+            <div id="auth-tabs-container" style="display:flex; border-bottom:2px solid var(--border); margin-bottom:30px; position:relative;">
               <button id="tab-login-btn" style="flex:1; background:none; border:none; padding:12px; font-size:16px; font-weight:700; color:var(--blue); cursor:pointer; outline:none; transition:0.2s;">Вход</button>
               <button id="tab-reg-btn" style="flex:1; background:none; border:none; padding:12px; font-size:16px; font-weight:600; color:var(--muted); cursor:pointer; outline:none; transition:0.2s;">Регистрация</button>
               <div id="tab-indicator" style="position:absolute; bottom:-2px; left:0; width:50%; height:2px; background:var(--blue); transition:0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
             </div>
 
-            <!-- Login Content -->
+            <!-- Login Pane -->
             <div id="auth-login-pane">
               <form id="authPageLoginForm">
                 <div class="field" style="margin-bottom:20px;">
-                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
-                  <input name="email" type="email" class="inp-modern" placeholder="name@example.com" required style="width:100%">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email или Номер телефона</label>
+                  <input name="emailOrPhone" type="text" class="inp-modern" placeholder="email@example.com или +375XXXXXXXXX" required style="width:100%">
                 </div>
-                <div class="field" style="margin-bottom:24px;">
+                <div class="field" style="margin-bottom:12px;">
                   <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль</label>
                   <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required style="width:100%">
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
+                  <a href="#" id="forgot-password-link" style="font-size:13px; color:var(--blue); text-decoration:none; font-weight:600;">Забыли пароль?</a>
                 </div>
                 <button class="btn" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Войти в аккаунт</button>
               </form>
             </div>
 
-            <!-- Register Content (Hidden by default) -->
-            <div id="auth-reg-pane" style="display:none;">
-              <form id="authPageRegForm">
-                <div class="field" style="margin-bottom:15px;">
-                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Роль на платформе</label>
-                  <select name="role" class="inp-modern" required style="width:100%">
-                    <option value="VOLUNTEER" selected>Волонтёр (хочу помогать)</option>
-                    <option value="ORGANIZER">Организатор (представитель НКО/фонда)</option>
-                  </select>
-                </div>
-                <div class="field" style="margin-bottom:15px;">
-                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Полное имя</label>
-                  <input name="name" type="text" class="inp-modern" placeholder="Иван Иванов" required style="width:100%">
-                </div>
-                <div class="field" style="margin-bottom:15px;">
-                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
-                  <input name="email" type="email" class="inp-modern" placeholder="name@example.com" required style="width:100%">
-                </div>
+            <!-- Forgot Password Pane (Hidden by default) -->
+            <div id="auth-forgot-pane" style="display:none;">
+              <form id="authPageForgotForm">
+                <p style="text-align:left; font-size:13px; margin-bottom:20px;">Введите ваш Email, и мы отправим вам ссылку для восстановления доступа к аккаунту.</p>
                 <div class="field" style="margin-bottom:20px;">
-                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль (мин. 3 символа)</label>
-                  <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required minlength="3" style="width:100%">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
+                  <input name="email" type="email" class="inp-modern" placeholder="email@example.com" required style="width:100%">
                 </div>
-                <div class="field" style="margin-bottom:24px;">
-                  <label class="small" style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" name="consent" required style="width:auto; margin:0;">
-                    Согласен(а) на обработку персональных данных
-                  </label>
+                <button class="btn" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto; margin-bottom:15px;">Восстановить пароль</button>
+                <div style="text-align:center;">
+                  <a href="#" id="back-to-login-link" style="font-size:13px; color:var(--muted); text-decoration:none; font-weight:600;">Вернуться к входу</a>
                 </div>
-                <button class="btn secondary" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Создать аккаунт</button>
+              </form>
+            </div>
+
+            <!-- Register Pane (Hidden by default) -->
+            <div id="auth-reg-pane" style="display:none;">
+              <!-- Registration Type Selector -->
+              <div style="display:flex; gap:10px; margin-bottom:20px; background:var(--surface2); padding:4px; border-radius:12px; border:1px solid var(--border)">
+                <button type="button" id="reg-email-tab-btn" style="flex:1; border:none; padding:8px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; background:var(--blue); color:white; transition:0.2s;">По Email</button>
+                <button type="button" id="reg-phone-tab-btn" style="flex:1; border:none; padding:8px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:transparent; color:var(--muted); transition:0.2s;">По Телефону</button>
+              </div>
+
+              <!-- Register via Email Form -->
+              <div id="reg-email-subpane">
+                <form id="authPageRegForm">
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Роль на платформе</label>
+                    <select name="role" class="inp-modern" required style="width:100%">
+                      <option value="VOLUNTEER" selected>Волонтёр (хочу помогать)</option>
+                      <option value="ORGANIZER">Организатор (представитель НКО/фонда)</option>
+                    </select>
+                  </div>
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Полное имя</label>
+                    <input name="name" type="text" class="inp-modern" placeholder="Иван Иванов" required style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email адрес</label>
+                    <input name="email" type="email" class="inp-modern" placeholder="name@example.com" required style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль (мин. 3 символа)</label>
+                    <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required minlength="3" style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:24px;">
+                    <label class="small" style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">
+                      <input type="checkbox" name="consent" required style="width:auto; margin:0;">
+                      Согласен(а) на обработку персональных данных
+                    </label>
+                  </div>
+                  <button class="btn secondary" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Создать аккаунт</button>
+                </form>
+              </div>
+
+              <!-- Register via Phone Form (Hidden by default) -->
+              <div id="reg-phone-subpane" style="display:none;">
+                <form id="authPageRegPhoneForm">
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Роль на платформе</label>
+                    <select name="role" class="inp-modern" required style="width:100%">
+                      <option value="VOLUNTEER" selected>Волонтёр (хочу помогать)</option>
+                      <option value="ORGANIZER">Организатор (представитель НКО/фонда)</option>
+                    </select>
+                  </div>
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Полное имя</label>
+                    <input name="name" type="text" class="inp-modern" placeholder="Иван Иванов" required style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:15px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Номер телефона</label>
+                    <input name="phone" type="text" class="inp-modern" placeholder="+375291234567" required style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Пароль (мин. 3 символа)</label>
+                    <input name="pass" type="password" class="inp-modern" placeholder="••••••••" required minlength="3" style="width:100%">
+                  </div>
+                  <div class="field" style="margin-bottom:24px;">
+                    <label class="small" style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px;">
+                      <input type="checkbox" name="consent" required style="width:auto; margin:0;">
+                      Согласен(а) на обработку персональных данных
+                    </label>
+                  </div>
+                  <button class="btn secondary" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto;">Запросить код подтверждения</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- SMS verification pane (Hidden by default) -->
+            <div id="auth-sms-pane" style="display:none;">
+              <form id="authPageSmsForm">
+                <input type="hidden" name="phone">
+                <p style="text-align:left; font-size:13px; margin-bottom:20px; line-height:1.5;">
+                  На номер <strong id="sms-phone-display"></strong> отправлен SMS-код подтверждения.<br>
+                  <span style="color:var(--muted); font-size:12px;">(Код эмулируется и выведен в консоль сервера)</span>
+                </p>
+                <div class="field" style="margin-bottom:20px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">4-значный SMS-код</label>
+                  <input name="code" type="text" class="inp-modern" placeholder="Введите код" required maxlength="4" style="width:100%; letter-spacing:8px; text-align:center; font-size:20px; font-weight:800;">
+                </div>
+                <button class="btn" type="submit" style="width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700; height:auto; margin-bottom:15px;">Подтвердить и войти</button>
+                <div style="text-align:center;">
+                  <a href="#" id="sms-back-link" style="font-size:13px; color:var(--muted); text-decoration:none; font-weight:600;">Вернуться назад</a>
+                </div>
               </form>
             </div>
 
             <!-- Social OAuth Divider -->
-            <div style="display:flex; align-items:center; margin:30px 0 20px 0;">
+            <div id="social-oauth-divider" style="display:flex; align-items:center; margin:30px 0 20px 0;">
               <div style="flex:1; height:1px; background:var(--border);"></div>
               <span style="padding:0 15px; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Войти через соцсети</span>
               <div style="flex:1; height:1px; background:var(--border);"></div>
             </div>
 
             <!-- Social OAuth Buttons -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div id="social-oauth-buttons" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <a href="/auth/vk" style="display:flex; align-items:center; justify-content:center; gap:10px; background:#0077ff; color:white; padding:12px; border-radius:12px; text-decoration:none; font-size:14px; font-weight:700; transition:0.2s; box-shadow:0 4px 12px rgba(0,119,255,0.2);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
                 VK ВКонтакте
               </a>
@@ -3898,20 +3977,41 @@
 
       $("#app").innerHTML = html;
 
+      // DOM Elements
       const loginBtn = $("#tab-login-btn");
       const regBtn = $("#tab-reg-btn");
       const indicator = $("#tab-indicator");
+      
       const loginPane = $("#auth-login-pane");
       const regPane = $("#auth-reg-pane");
+      const forgotPane = $("#auth-forgot-pane");
+      const smsPane = $("#auth-sms-pane");
+      
+      const tabsContainer = $("#auth-tabs-container");
+      const socialDivider = $("#social-oauth-divider");
+      const socialButtons = $("#social-oauth-buttons");
 
+      const regEmailTabBtn = $("#reg-email-tab-btn");
+      const regPhoneTabBtn = $("#reg-phone-tab-btn");
+      const regEmailSubpane = $("#reg-email-subpane");
+      const regPhoneSubpane = $("#reg-phone-subpane");
+
+      // Switch Main Tabs
       loginBtn.onclick = () => {
         loginBtn.style.color = "var(--blue)";
         loginBtn.style.fontWeight = "700";
         regBtn.style.color = "var(--muted)";
         regBtn.style.fontWeight = "600";
         indicator.style.left = "0";
+        
         loginPane.style.display = "block";
         regPane.style.display = "none";
+        forgotPane.style.display = "none";
+        smsPane.style.display = "none";
+        
+        tabsContainer.style.display = "flex";
+        socialDivider.style.display = "flex";
+        socialButtons.style.display = "grid";
       };
 
       regBtn.onclick = () => {
@@ -3920,26 +4020,81 @@
         loginBtn.style.color = "var(--muted)";
         loginBtn.style.fontWeight = "600";
         indicator.style.left = "50%";
+        
         loginPane.style.display = "none";
         regPane.style.display = "block";
+        forgotPane.style.display = "none";
+        smsPane.style.display = "none";
+        
+        tabsContainer.style.display = "flex";
+        socialDivider.style.display = "flex";
+        socialButtons.style.display = "grid";
       };
 
+      // Switch Registration Sub-tabs
+      regEmailTabBtn.onclick = () => {
+        regEmailTabBtn.style.background = "var(--blue)";
+        regEmailTabBtn.style.color = "white";
+        regPhoneTabBtn.style.background = "transparent";
+        regPhoneTabBtn.style.color = "var(--muted)";
+        
+        regEmailSubpane.style.display = "block";
+        regPhoneSubpane.style.display = "none";
+      };
+
+      regPhoneTabBtn.onclick = () => {
+        regPhoneTabBtn.style.background = "var(--blue)";
+        regPhoneTabBtn.style.color = "white";
+        regEmailTabBtn.style.background = "transparent";
+        regEmailTabBtn.style.color = "var(--muted)";
+        
+        regEmailSubpane.style.display = "none";
+        regPhoneSubpane.style.display = "block";
+      };
+
+      // Forgot Password Links
+      $("#forgot-password-link").onclick = (e) => {
+        e.preventDefault();
+        loginPane.style.display = "none";
+        forgotPane.style.display = "block";
+        socialDivider.style.display = "none";
+        socialButtons.style.display = "none";
+      };
+
+      $("#back-to-login-link").onclick = (e) => {
+        e.preventDefault();
+        forgotPane.style.display = "none";
+        loginPane.style.display = "block";
+        socialDivider.style.display = "flex";
+        socialButtons.style.display = "grid";
+      };
+
+      $("#sms-back-link").onclick = (e) => {
+        e.preventDefault();
+        smsPane.style.display = "none";
+        tabsContainer.style.display = "flex";
+        regPane.style.display = "block";
+        socialDivider.style.display = "flex";
+        socialButtons.style.display = "grid";
+      };
+
+      // Forms Submissions
       $("#authPageLoginForm").onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
-        const email = String(fd.get("email")).trim();
+        const emailOrPhone = String(fd.get("emailOrPhone")).trim();
         const pass = String(fd.get("pass")).trim();
 
         try {
           const res = await fetch(`${API_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: pass })
+            body: JSON.stringify({ emailOrPhone, password: pass })
           });
 
           const data = await res.json();
           if (!res.ok) {
-            toast("danger", "Ошибка входа", data.message || "Неверный email или пароль.");
+            toast("danger", "Ошибка входа", data.message || "Неверный email, телефон или пароль.");
             return;
           }
 
@@ -4015,46 +4170,134 @@
             return;
           }
 
+          toast("ok", "Регистрация успешна", "Пожалуйста, проверьте почту для подтверждения email.");
+          
+          // Очистим поля и переключим на вкладку логина
+          e.target.reset();
+          loginBtn.click();
+        } catch (err) {
+          toast("danger", "Ошибка", "Проблема соединения с сервером.");
+        }
+      };
+
+      $("#authPageRegPhoneForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+
+        if (!fd.get("consent")) {
+          toast("warn", "Согласие", "Нужно согласиться на обработку данных.");
+          return;
+        }
+
+        const phone = String(fd.get("phone")).trim();
+        const role = String(fd.get("role"));
+        const name = String(fd.get("name")).trim();
+        const pass = String(fd.get("pass")).trim();
+
+        try {
+          const res = await fetch(`${API_URL}/register-phone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, role, name, password: pass })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            toast("warn", "Ошибка", data.message || "Не удалось отправить SMS.");
+            return;
+          }
+
+          // Переключаем на экран ввода кода SMS
+          regPane.style.display = "none";
+          tabsContainer.style.display = "none";
+          socialDivider.style.display = "none";
+          socialButtons.style.display = "none";
+          
+          smsPane.querySelector('input[name="phone"]').value = phone;
+          $("#sms-phone-display").innerText = phone;
+          smsPane.style.display = "block";
+          
+          toast("ok", "SMS отправлено", "SMS-код сгенерирован (см. консоль сервера)");
+        } catch (err) {
+          toast("danger", "Ошибка", "Не удалось зарегистрироваться по телефону.");
+        }
+      };
+
+      $("#authPageSmsForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const phone = String(fd.get("phone")).trim();
+        const code = String(fd.get("code")).trim();
+
+        try {
+          const res = await fetch(`${API_URL}/verify-sms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, code })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            toast("danger", "Ошибка подтверждения", data.message || "Неверный SMS-код.");
+            return;
+          }
+
           authToken = data.token;
           localStorage.setItem('authToken', authToken);
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
 
-          const newUser = {
+          // Добавляем во внутренний стейт пользователей
+          let existingUser = state.users.find(u => u.phone === phone);
+          const userData = {
             id: data.user.id,
             email: data.user.email,
             name: data.user.name,
             role: data.user.role,
-            city: data.user.city || '',
-            phone: data.user.phone || '',
-            avatar: data.user.avatarUrl || '',
-            pass: pass,
-            points: data.user.points || 0,
+            city: '',
+            phone: phone,
+            avatar: '',
+            pass: '',
+            points: 0,
             privacy: 'public',
-            createdAt: new Date()
+            createdAt: new Date().toISOString()
           };
 
-          const existingUser = state.users.find(u => u.email === newUser.email);
-          if (!existingUser) state.users.push(newUser);
-          else Object.assign(existingUser, newUser);
+          if (!existingUser) state.users.push(userData);
+          else Object.assign(existingUser, userData);
+
           state.session.userId = data.user.id;
-
-          if (role === "ORGANIZER") {
-            state.organizations.push({
-              id: `org-${data.user.id}`,
-              ownerUserId: data.user.id,
-              name: `Организация ${data.user.name}`,
-              status: "PENDING",
-              contacts: data.user.email,
-              rating: 0,
-              createdAt: new Date()
-            });
-          }
-
           saveState();
-          toast("ok", "Регистрация успешна", `С возвращением, ${data.user.name}!`);
+
+          toast("ok", "Регистрация завершена", `Добро пожаловать, ${data.user.name}!`);
           navigate("/cabinet");
           renderApp();
+        } catch (err) {
+          toast("danger", "Ошибка", "Проблема соединения с сервером.");
+        }
+      };
+
+      $("#authPageForgotForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const email = String(fd.get("email")).trim();
+
+        try {
+          const res = await fetch(`${API_URL}/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            toast("danger", "Ошибка", data.message || "Не удалось отправить ссылку.");
+            return;
+          }
+
+          toast("ok", "Инструкции отправлены", "Ссылка на сброс пароля отправлена на почту.");
+          e.target.reset();
+          $("#back-to-login-link").click();
         } catch (err) {
           toast("danger", "Ошибка", "Проблема соединения с сервером.");
         }
@@ -4476,6 +4719,26 @@
             <input type="file" name="image" accept="image/*" />
             <div class="hint">Изображение будет загружено на сервер (до 8MB).</div>
           </div>
+          ${(u.role === 'ADMIN' || u.role === 'MODERATOR' || u.canCreateUrgentTasks) ? `
+          <div class="field" style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;">
+            <input type="checkbox" name="priority" value="high" id="chkPriorityHigh" style="width: auto;">
+            <label for="chkPriorityHigh" style="margin:0; cursor:pointer; font-weight: bold; color: #ef4444;">🚨 Срочная задача (SOS-оповещение)</label>
+          </div>
+          ` : ''}
+          <div class="field" style="display:flex; align-items:center; gap:8px; margin-bottom: 12px;">
+            <input type="checkbox" id="chkSpecifyCoordinates" style="width: auto;" onchange="document.getElementById('geoCoordinatesGroup').style.display = this.checked ? 'grid' : 'none'">
+            <label for="chkSpecifyCoordinates" style="margin:0; cursor:pointer; font-size:13px;">Указать географические координаты (гео-таргетинг)</label>
+          </div>
+          <div class="two" id="geoCoordinatesGroup" style="display: none; margin-bottom: 12px; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="field">
+              <label>Широта (Latitude)</label>
+              <input type="number" step="any" name="lat" placeholder="например, 53.9006" />
+            </div>
+            <div class="field">
+              <label>Долгота (Longitude)</label>
+              <input type="number" step="any" name="lng" placeholder="например, 27.5590" />
+            </div>
+          </div>
           <div class="row" style="margin-top: 20px;">
             <button type="submit" class="btn">Создать</button>
             <button type="button" class="btn secondary" onclick="closeModal()">Отмена</button>
@@ -4537,6 +4800,16 @@
       form.onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(form);
+
+        // Format priority and geo-coordinates if specified
+        const isUrgentChecked = form.querySelector('input[name="priority"]')?.checked;
+        fd.set('priority', isUrgentChecked ? 'high' : 'normal');
+
+        const isGeoChecked = document.getElementById('chkSpecifyCoordinates')?.checked;
+        if (!isGeoChecked) {
+          fd.delete('lat');
+          fd.delete('lng');
+        }
 
         try {
           const res = await fetch(`${API_URL}/api/projects`, {
@@ -5049,8 +5322,9 @@
               <img src="${u.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png'}" id="avatarPreview">
               <div class="avatar-overlay">📷</div>
             </div>
-            <div class="user-name">${esc(u.name)}</div>
+            <div class="user-name">${esc(u.name)} ${esc(u.lastName || '')}</div>
             <div class="user-role ${u.role === "ADMIN" ? "role-admin" : u.role === "ORGANIZER" ? "role-organizer" : u.role === "MODERATOR" ? "role-moderator" : "role-volunteer"}">${u.role === "ADMIN" ? "Администратор" : u.role === "MODERATOR" ? "Модератор" : u.role === "VOLUNTEER" ? "Волонтёр" : "Организатор"}</div>
+            ${u.role === 'VOLUNTEER' ? `<div style="font-size: 13px; font-weight: 600; color: #fbbf24; margin-top: 8px;">⭐ Рейтинг: ${u.rating || 0}</div>` : ''}
 
             <div class="level-box">
               <div class="stat-row"><span>Уровень: ${lvl.name}</span><span>${u.points || 0} XP</span></div>
@@ -5115,8 +5389,16 @@
                     <input type="text" name="name" class="inp-modern" value="${esc(u.name)}" required style="width:100%">
                   </div>
                   <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Фамилия</label>
+                    <input type="text" name="lastName" class="inp-modern" value="${esc(u.lastName || '')}" style="width:100%">
+                  </div>
+                  <div class="inp-group">
                     <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Город</label>
                     <input type="text" name="city" class="inp-modern" value="${esc(u.city || '')}" style="width:100%">
+                  </div>
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Дата рождения</label>
+                    <input type="date" name="birthDate" class="inp-modern" value="${u.birthDate ? u.birthDate.split('T')[0] : ''}" style="width:100%">
                   </div>
                   <div class="inp-group">
                     <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Телефон</label>
@@ -5126,7 +5408,76 @@
                     <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Email</label>
                     <input type="email" name="email" class="inp-modern" value="${esc(u.email || '')}" style="width:100%">
                   </div>
+                  <div class="inp-group" style="grid-column: span 2;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Географические координаты (для SOS-оповещений)</label>
+                    <div style="display: flex; gap: 12px;">
+                      <input type="number" step="any" name="lat" class="inp-modern" placeholder="Широта (например, 53.9006)" value="${u.lat || (u.coordinates && u.coordinates.lat) || ''}" style="width:50%">
+                      <input type="number" step="any" name="lng" class="inp-modern" placeholder="Долгота (например, 27.5590)" value="${u.lng || (u.coordinates && u.coordinates.lng) || ''}" style="width:50%">
+                    </div>
+                  </div>
                 </div>
+
+                <div class="inp-group" style="margin-top:20px;">
+                  <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">О себе (биография)</label>
+                  <textarea name="bio" class="inp-modern" style="width:100%; height:80px; resize:vertical;">${esc(u.bio || '')}</textarea>
+                </div>
+
+                <div style="margin-top: 20px;">
+                  <label style="display:block; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--muted)">Настройки уведомлений</label>
+                  <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                      <input type="checkbox" name="notifySos" value="true" ${!u.notifications || u.notifications.sosTasks !== false ? 'checked' : ''}> Получать SOS-оповещения
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                      <input type="checkbox" name="notifyPush" value="true" ${!u.notifications || u.notifications.push !== false ? 'checked' : ''}> Общие Push-уведомления
+                    </label>
+                  </div>
+                </div>
+
+                ${u.role === 'VOLUNTEER' ? `
+                <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                  <div>
+                    <label style="display:block; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--muted)">Интересы</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      ${['экология', 'помощь детям', 'спорт', 'пожилые', 'защита животных'].map(interest => {
+                        const checked = (u.interests || []).includes(interest) ? 'checked' : '';
+                        return `
+                          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                            <input type="checkbox" name="interests" value="${interest}" ${checked}> ${esc(interest.charAt(0).toUpperCase() + interest.slice(1))}
+                          </label>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                  <div>
+                    <label style="display:block; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--muted)">Навыки</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      ${['дизайн', 'юриспруденция', 'IT/Программирование'].map(skill => {
+                        const checked = (u.skills || []).includes(skill) ? 'checked' : '';
+                        return `
+                          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                            <input type="checkbox" name="skills" value="${skill}" ${checked}> ${esc(skill.charAt(0).toUpperCase() + skill.slice(1))}
+                          </label>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                </div>
+                ` : ''}
+
+                ${u.role === 'ORGANIZER' ? `
+                <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">ИНН организации</label>
+                    <input type="text" name="inn" class="inp-modern" value="${esc(u.inn || '')}" style="width:100%">
+                  </div>
+                  <div class="inp-group">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; font-size:13px; color:var(--muted)">Юридический адрес</label>
+                    <input type="text" name="legalAddress" class="inp-modern" value="${esc(u.legalAddress || '')}" style="width:100%">
+                  </div>
+                </div>
+                ` : ''}
+
                 <div style="margin-top:24px; text-align:right">
                   <button type="submit" class="btn">Сохранить данные</button>
                 </div>
@@ -5144,6 +5495,13 @@
               <div class="stat-lbl">
                 ${(u.role === 'ORGANIZER' || u.role === 'ADMIN') ? 'Создано проектов' : 'Проекты'}
               </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:24px" id="notificationsCard">
+            <div class="section-title"><h2>🔔 Уведомления</h2></div>
+            <div class="card-inner" id="notificationsList" style="padding: 20px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+              <div class="muted">Загрузка уведомлений...</div>
             </div>
           </div>
 
@@ -5305,7 +5663,79 @@
         // Сбрасываем флаг после использования
         window._keepSettingsOpen = false;
       }
+
+      // Запуск загрузки уведомлений после отрисовки
+      setTimeout(async () => {
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) return;
+
+        try {
+          const res = await fetch(`${API_URL}/me/notifications`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            notificationsList.innerHTML = `<div class="muted">Не удалось загрузить уведомления</div>`;
+            return;
+          }
+
+          const list = data.notifications || [];
+          if (list.length === 0) {
+            notificationsList.innerHTML = `<div class="muted">У вас пока нет уведомлений.</div>`;
+            return;
+          }
+
+          notificationsList.innerHTML = list.map(n => {
+            const isUrgent = n.type === 'sos_task';
+            const unreadStyle = !n.isOpened ? 'border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.03); padding-left: 12px;' : '';
+            const badge = isUrgent ? '<span style="background:#ef4444; color:#fff; font-size:10px; margin-right:8px; padding:2px 6px; border-radius:4px; font-weight:bold; display:inline-block; vertical-align:middle;">🚨 СРОЧНО</span>' : '🔔';
+            const dateStr = new Date(n.createdAt).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+            return `
+              <div class="notification-item" style="padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; gap: 6px; transition: all 0.2s; ${unreadStyle}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:700; font-size:13px; color:var(--text);">${badge} ${esc(n.title)}</span>
+                  <span style="font-size:11px; color:var(--muted);">${dateStr}</span>
+                </div>
+                <p style="margin:2px 0; font-size:12px; color:var(--muted); line-height:1.4;">${esc(n.message)}</p>
+                ${isUrgent && n.taskData ? `
+                  <div style="margin-top:4px;">
+                    <a href="javascript:void(0)" onclick="handleNotificationClick('${n._id}', '${n.taskData.id}')" style="color:#4f46e5; font-size:11px; font-weight:700; text-decoration:none; display:inline-block;">Перейти к задаче →</a>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+
+          // Mark unread notifications as opened
+          const unreadIds = list.filter(n => !n.isOpened).map(n => n._id);
+          for (const nid of unreadIds) {
+            fetch(`${API_URL}/me/notifications/${nid}/open`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            }).catch(console.error);
+          }
+        } catch (err) {
+          console.error('❌ Ошибка загрузки уведомлений:', err);
+          notificationsList.innerHTML = `<div class="muted">Ошибка загрузки уведомлений</div>`;
+        }
+      }, 50);
     }
+
+    window.handleNotificationClick = async function(notificationId, taskId) {
+      try {
+        await fetch(`${API_URL}/me/notifications/${notificationId}/click`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+
+      if (typeof openProjectModal === 'function') {
+        openProjectModal(taskId);
+      }
+    };
 
     // Глобальная функция сохранения профиля
     window.handleUpdateProfile = async function (form) {
@@ -5322,9 +5752,23 @@
       const fd = new FormData(form);
       const updateData = {
         name: fd.get('name'),
-        city: fd.get('city'),
-        phone: fd.get('phone'),
-        email: fd.get('email')
+        lastName: fd.get('lastName') || '',
+        city: fd.get('city') || '',
+        phone: fd.get('phone') || '',
+        email: fd.get('email') || '',
+        birthDate: fd.get('birthDate') || null,
+        bio: fd.get('bio') || '',
+        interests: Array.from(form.querySelectorAll('input[name="interests"]:checked')).map(el => el.value),
+        skills: Array.from(form.querySelectorAll('input[name="skills"]:checked')).map(el => el.value),
+        inn: fd.get('inn') || '',
+        legalAddress: fd.get('legalAddress') || '',
+        lat: fd.get('lat') ? Number(fd.get('lat')) : null,
+        lng: fd.get('lng') ? Number(fd.get('lng')) : null,
+        coordinates: fd.get('lat') && fd.get('lng') ? { lat: Number(fd.get('lat')), lng: Number(fd.get('lng')) } : null,
+        notifications: {
+          sosTasks: form.querySelector('input[name="notifySos"]')?.checked !== false,
+          push: form.querySelector('input[name="notifyPush"]')?.checked !== false
+        }
       };
 
       console.log('📤 Отправка данных на сервер:', updateData);
@@ -5349,19 +5793,60 @@
           return;
         }
 
-        // Обновляем ТОЛЬКО в памяти и в localStorage
-        Object.assign(u, data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.verificationRequired) {
+          const code = prompt('Введите SMS-код подтверждения, отправленный на ваш новый номер телефона:');
+          if (code === null) {
+            window._keepSettingsOpen = true;
+            renderCabinet();
+            return;
+          }
+          if (!code.trim()) {
+            toast('danger', 'Ошибка', 'Код не может быть пустым');
+            window._keepSettingsOpen = true;
+            renderCabinet();
+            return;
+          }
 
-        // Если сервер вернул новый access token (например, после смены email) — обновим его
-        if (data.token) {
-            authToken = data.token;
-            localStorage.setItem('authToken', authToken); // Оставляем для старого кода
-            localStorage.setItem('token', data.token);     // ДОБАВЛЯЕМ ДЛЯ АДМИНКИ
+          try {
+            const verifyRes = await fetch(`http://localhost:3000/me/verify-phone`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify({ code: code.trim() })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              toast('danger', 'Ошибка', verifyData.message || 'Неверный код');
+              window._keepSettingsOpen = true;
+              renderCabinet();
+              return;
+            }
+            
+            toast('ok', '✓', 'Номер телефона успешно изменен!');
+            Object.assign(u, verifyData.user);
+            localStorage.setItem('user', JSON.stringify(verifyData.user));
+            if (verifyData.token) {
+              authToken = verifyData.token;
+              localStorage.setItem('authToken', authToken);
+              localStorage.setItem('token', authToken);
+            }
+          } catch (verifyErr) {
+            console.error('❌ Ошибка верификации телефона:', verifyErr);
+            toast('danger', 'Ошибка', 'Ошибка соединения при верификации');
+          }
+        } else {
+          Object.assign(u, data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (data.token) {
+              authToken = data.token;
+              localStorage.setItem('authToken', authToken);
+              localStorage.setItem('token', authToken);
+          }
+          toast('ok', '✓', 'Профиль обновлён в БД');
         }
 
-        // НЕ вызываем saveState() - данные только на сервере!
-        toast('ok', '✓', 'Профиль обновлён в БД');
         renderCabinet();
 
       } catch (err) {
@@ -6530,7 +7015,25 @@
                     city: data.city || '',
                     phone: data.phone || '',
                     points: data.points || 0,
-                    achievements: data.achievements || []
+                    achievements: data.achievements || [],
+                    lastName: data.lastName || '',
+                    birthDate: data.birthDate || null,
+                    bio: data.bio || '',
+                    interests: data.interests || [],
+                    skills: data.skills || [],
+                    rating: data.rating || 0,
+                    badges: data.badges || [],
+                    inn: data.inn || '',
+                    legalAddress: data.legalAddress || '',
+                    verificationStatus: data.verificationStatus || 'NONE',
+                    organizationName: data.organizationName || '',
+                    organizationType: data.organizationType || '',
+                    verificationDocuments: data.verificationDocuments || '',
+                    rejectionReason: data.rejectionReason || '',
+                    lat: data.lat || null,
+                    lng: data.lng || null,
+                    coordinates: data.coordinates || null,
+                    notifications: data.notifications || null
                 };
 
                 // 2. ЗАПИСЫВАЕМ В ЛОКАЛ (для виджета)

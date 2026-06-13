@@ -406,6 +406,7 @@
     <div class="nav-item" data-tab="analytics">📈 Аналитика каналов</div>
     <div class="nav-item" data-tab="segments">🎯 Сегментация</div>
     <div class="nav-item" data-tab="communications">✉️ Рассылки</div>
+    <div class="nav-item" data-tab="urgentTasks">🚨 SOS-Задачи</div>
     <div class="nav-item" data-tab="monitoring">🔧 Мониторинг</div>
     <div style="flex:1"></div>
     <div class="nav-item" id="goToMainBtn" style="color:#4f46e5;">🏠 На главную</div>
@@ -1052,6 +1053,10 @@
             if (currentUserObj && currentUserObj.role === 'ADMIN') {
                 dropdownContent += `<button class="action-btn" onclick="handleAction('bonus', '${u._id}')">🎁 Начислить XP</button>`;
                 dropdownContent += `<button class="action-btn" onclick="handleAction('role', '${u._id}')">🔄 Выбрать роль</button>`;
+                if (u.role === 'ORGANIZER') {
+                    const hasRight = u.canCreateUrgentTasks === true;
+                    dropdownContent += `<button class="action-btn" onclick="handleAction('urgent-right', '${u._id}', ${hasRight})">${hasRight ? '🔴 Снять право SOS' : '🟢 Дать право SOS'}</button>`;
+                }
             }
             dropdownContent += u.isBlocked 
                 ? `<button class="action-btn" onclick="handleAction('unblock', '${u._id}')">🔓 Разблокировать</button>` 
@@ -2385,16 +2390,34 @@
             <!-- Левая колонка: Верификация организаторов -->
             <div class="card">
                 <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">🏢 Верификация организаторов</h3>
-                <div id="verificationsList" style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <h4 style="margin-bottom: 12px; color: #fff; font-size: 14px;">Ожидают верификации</h4>
+                <div id="verificationsList" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
                     <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка запросов...</div>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #2a2a30; margin-bottom: 20px;">
+
+                <h4 style="margin-bottom: 12px; color: #fff; font-size: 14px;">Реестр одобренных</h4>
+                <div id="verifiedOrganizersList" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка реестра...</div>
                 </div>
             </div>
 
             <!-- Правая колонка: Модерация проектов -->
             <div class="card">
                 <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">🗂 Модерация проектов</h3>
-                <div id="projectsModerationList" style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <h4 style="margin-bottom: 12px; color: #fff; font-size: 14px;">Ожидают модерации</h4>
+                <div id="projectsModerationList" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
                     <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка проектов...</div>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #2a2a30; margin-bottom: 20px;">
+
+                <h4 style="margin-bottom: 12px; color: #fff; font-size: 14px;">История модерации</h4>
+                <div id="projectsHistoryList" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="text-align: center; padding: 20px; color: #6b7280;">Загрузка истории...</div>
                 </div>
             </div>
         </div>
@@ -2436,6 +2459,51 @@
             document.getElementById('verificationsList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
         }
 
+        // Загружаем реестр верифицированных организаторов
+        try {
+            const orgRes = await apiFetch('/api/moderator/verified-organizers');
+            const orgList = document.getElementById('verifiedOrganizersList');
+            if (orgRes.success && orgRes.organizers) {
+                if (orgRes.organizers.length === 0) {
+                    orgList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">Реестр пуст</div>';
+                } else {
+                    orgList.innerHTML = orgRes.organizers.map(org => {
+                        let verifierInfo = '';
+                        if (org.verifiedAt) {
+                            const dateStr = new Date(org.verifiedAt).toLocaleString('ru-RU');
+                            const nameStr = org.verifierName || org.verifierEmail || 'Администратор';
+                            verifierInfo = `<div style="font-size: 11px; color: #10b981; margin-top: 8px;">
+                                Проверил: ${escapeHtml(nameStr)} (${dateStr})
+                            </div>`;
+                        }
+
+                        return `
+                            <div class="card" style="background: #222227; border: 1px solid #2a2a30; padding: 16px; margin: 0; opacity: 0.85;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                    <div>
+                                        <h4 style="color: #fff; margin: 0 0 4px 0;">${escapeHtml(org.name)}</h4>
+                                        <div style="font-size: 12px; color: #9ca3af;">${escapeHtml(org.email)}</div>
+                                        ${org.phone ? `<div style="font-size: 12px; color: #9ca3af;">${escapeHtml(org.phone)}</div>` : ''}
+                                    </div>
+                                    <span class="badge badge-success">Верифицирован</span>
+                                </div>
+                                <div style="font-size: 13px; color: #d1d5db; margin-bottom: 0px; border-left: 2px solid #10b981; padding-left: 8px;">
+                                    <strong>Организация:</strong> ${escapeHtml(org.organizationName || 'Не указана')}<br>
+                                    <strong>Тип:</strong> ${escapeHtml(org.organizationType || 'Не указан')}<br>
+                                    <strong>Документ:</strong> ${escapeHtml(org.verificationDocuments || 'Не предоставлен')}
+                                </div>
+                                ${verifierInfo}
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } else {
+                orgList.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка загрузки</div>';
+            }
+        } catch(e) {
+            document.getElementById('verifiedOrganizersList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
+        }
+
         // Загружаем проекты на модерации
         try {
             const taskRes = await apiFetch('/api/moderator/pending-tasks');
@@ -2449,9 +2517,9 @@
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                                 <div>
                                     <h4 style="color: #fff; margin: 0 0 4px 0;">${escapeHtml(task.title)}</h4>
-                                    <div style="font-size: 12px; color: #818cf8;">${escapeHtml(categoryLabel(task.category))}</div>
+                                    <div style="font-size: 12px; color: #818cf8;">${escapeHtml(categoryLabel(task.categoryId || task.category))}</div>
                                 </div>
-                                <span class="badge badge-warning">Черновик</span>
+                                <span class="badge badge-warning">Ожидает</span>
                             </div>
                             <p style="font-size: 13px; color: #9ca3af; margin: 0 0 12px 0;">${escapeHtml(task.description || '')}</p>
                             <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">
@@ -2469,6 +2537,55 @@
             }
         } catch(e) {
             document.getElementById('projectsModerationList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
+        }
+
+        // Загружаем историю модерации проектов
+        try {
+            const historyRes = await apiFetch('/api/moderator/moderated-tasks');
+            const historyList = document.getElementById('projectsHistoryList');
+            if (historyRes.success && historyRes.tasks) {
+                if (historyRes.tasks.length === 0) {
+                    historyList.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">История пуста</div>';
+                } else {
+                    historyList.innerHTML = historyRes.tasks.map(task => {
+                        const statusBadge = task.status === 'PUBLISHED' 
+                            ? '<span class="badge badge-success">Одобрен</span>' 
+                            : '<span class="badge badge-danger">Отклонен</span>';
+                        
+                        let extraInfo = '';
+                        if (task.status === 'REJECTED') {
+                            extraInfo = `<div style="font-size: 12px; color: #ef4444; margin-top: 8px; border-left: 2px solid #ef4444; padding-left: 8px;">
+                                <strong>Причина отклонения:</strong> ${escapeHtml(task.rejectionReason || 'Без указания причины')}
+                            </div>`;
+                        } else if (task.moderatedAt) {
+                            extraInfo = `<div style="font-size: 11px; color: #10b981; margin-top: 8px;">
+                                Одобрено: ${new Date(task.moderatedAt).toLocaleString('ru-RU')}
+                            </div>`;
+                        }
+                        
+                        return `
+                        <div class="card" style="background: #222227; border: 1px solid #2a2a30; padding: 16px; margin: 0; opacity: 0.85;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                <div>
+                                    <h4 style="color: #fff; margin: 0 0 4px 0;">${escapeHtml(task.title)}</h4>
+                                    <div style="font-size: 12px; color: #818cf8;">${escapeHtml(categoryLabel(task.categoryId || task.category))}</div>
+                                </div>
+                                ${statusBadge}
+                            </div>
+                            <p style="font-size: 13px; color: #9ca3af; margin: 0 0 12px 0;">${escapeHtml(task.description || '')}</p>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                👤 <strong>Создатель:</strong> ${escapeHtml(task.ownerName || task.ownerEmail || 'Неизвестно')}
+                            </div>
+                            ${extraInfo}
+                        </div>
+                        `;
+                    }).join('');
+                }
+            } else {
+                historyList.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка загрузки</div>';
+            }
+        } catch(e) {
+            document.getElementById('projectsHistoryList').innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Ошибка соединения</div>';
         }
     }
 
@@ -2519,6 +2636,79 @@
         }
     };
 
+    async function renderUrgentTasks() {
+        document.getElementById('pageTitle').innerText = 'Срочные SOS-Задачи';
+        const content = document.getElementById('content');
+        content.innerHTML = '<div style="color:#9ca3af; text-align:center; padding:50px;">Загрузка аналитики...</div>';
+        
+        try {
+            const res = await apiFetch('/api/admin/metrics/urgent-tasks');
+            if (!res.success) {
+                content.innerHTML = `<div style="color:#ef4444; padding:20px;">Не удалось загрузить данные: ${res.error}</div>`;
+                return;
+            }
+            
+            const campaigns = res.campaigns || [];
+            if (campaigns.length === 0) {
+                content.innerHTML = `
+                    <div style="text-align:center; padding:60px; background:#1a1a1f; border-radius:12px; border:1px solid #2a2a30;">
+                        <span style="font-size:48px; display:block; margin-bottom:16px;">🚨</span>
+                        <h3 style="color:#fff; margin-bottom:8px;">Срочных задач пока не создано</h3>
+                        <p style="color:#9ca3af;">Все SOS-задачи с высоким приоритетом и их статистика рассылки будут отображаться здесь.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const tbody = campaigns.map(c => {
+                const ctr = c.sentCount ? ((c.clickedCount / c.sentCount) * 100).toFixed(1) : '0.0';
+                const openRate = c.sentCount ? ((c.openedCount / c.sentCount) * 100).toFixed(1) : '0.0';
+                const date = new Date(c.createdAt).toLocaleString('ru-RU');
+                
+                return `
+                    <tr style="border-bottom:1px solid #2a2a30;">
+                        <td style="padding:12px 8px;">
+                            <div style="font-weight:600; color:#fff;">${escapeHtml(c.taskTitle)}</div>
+                            <div style="font-size:11px; color:#4f46e5;">ID: ${c.taskId}</div>
+                        </td>
+                        <td style="padding:12px 8px; color:#e1e4e8;">${date}</td>
+                        <td style="padding:12px 8px; font-weight:600; color:#818cf8; text-align:center;">${c.sentCount}</td>
+                        <td style="padding:12px 8px; color:#fbbf24; text-align:center;">${c.pushSentCount}</td>
+                        <td style="padding:12px 8px; color:#34d399; text-align:center;">${c.openedCount} <span style="font-size:10px; color:#9ca3af;">(${openRate}%)</span></td>
+                        <td style="padding:12px 8px; color:#60a5fa; text-align:center;">${c.clickedCount} <span style="font-size:10px; color:#9ca3af;">(${ctr}%)</span></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            content.innerHTML = `
+                <div class="card" style="padding:24px; background:#1a1a1f; border-radius:12px; border:1px solid #2a2a30; margin-bottom:24px;">
+                    <h3 style="color:#fff; margin-top:0; margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+                        <span>🚨</span> Статистика уведомлений о срочных (SOS) задачах
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; color:#e1e4e8; font-size:13px;">
+                            <thead>
+                                <tr style="border-bottom:2px solid #2a2a30; text-align:left; color:#9ca3af;">
+                                    <th style="padding:12px 8px;">Задача</th>
+                                    <th style="padding:12px 8px;">Дата создания</th>
+                                    <th style="padding:12px 8px; text-align:center;">Охвачено волонтеров</th>
+                                    <th style="padding:12px 8px; text-align:center;">Отправлено Push</th>
+                                    <th style="padding:12px 8px; text-align:center;">Открытий приложения</th>
+                                    <th style="padding:12px 8px; text-align:center;">Кликов по задаче (CTR)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tbody}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            content.innerHTML = `<div style="color:#ef4444; padding:20px;">Ошибка при загрузке данных: ${err.message}</div>`;
+        }
+    }
+
     // ===================== НАВИГАЦИЯ =====================
     const tabs = {
         dashboard: renderDashboard,
@@ -2532,6 +2722,7 @@
         analytics: renderAnalytics,
         segments: renderSegments,
         communications: renderCommunications,
+        urgentTasks: renderUrgentTasks,
         landings: renderLandings,
         abtests: renderABTests,
         monitoring: renderMonitoring,
@@ -2607,6 +2798,13 @@
             body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите разблокировать этого пользователя?</p>`;
             confirmBtn.onclick = async () => {
                 await executeAction(`/api/moderator/unblock/${userId}`, {}, 'POST');
+            };
+        } else if (actionType === 'urgent-right') {
+            const hasRight = arguments[2];
+            header.innerText = hasRight ? 'Снять право SOS' : 'Предоставить право SOS';
+            body.innerHTML = `<p style="color: #9ca3af;">Вы действительно хотите ${hasRight ? 'снять право' : 'предоставить право'} на создание срочных задач для этого организатора?</p>`;
+            confirmBtn.onclick = async () => {
+                await executeAction(`/api/admin/user/${userId}/urgent-right`, { canCreateUrgentTasks: !hasRight });
             };
         }
     };

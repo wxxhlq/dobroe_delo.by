@@ -43,6 +43,59 @@ router.get('/verification-requests', async (req, res) => {
 });
 
 /**
+ * @route GET /api/moderator/verified-organizers
+ * @desc  Список верифицированных организаторов (verificationStatus: VERIFIED)
+ */
+router.get('/verified-organizers', async (req, res) => {
+    try {
+        const db = getDB();
+        const organizers = await db.collection('users').aggregate([
+            {
+                $match: {
+                    role: 'ORGANIZER',
+                    verificationStatus: 'VERIFIED'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'verifiedBy',
+                    foreignField: '_id',
+                    as: 'verifier'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$verifier',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $sort: { verifiedAt: -1, created_at: -1 }
+            },
+            {
+                $project: {
+                    name: 1,
+                    email: 1,
+                    phone: 1,
+                    city: 1,
+                    organizationName: 1,
+                    organizationType: 1,
+                    verificationDocuments: 1,
+                    verifiedAt: 1,
+                    verifierName: '$verifier.name',
+                    verifierEmail: '$verifier.email'
+                }
+            }
+        ]).toArray();
+
+        res.json({ success: true, organizers });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
  * @route POST /api/moderator/verify/:userId
  * @desc  Одобрить или отклонить заявку организатора
  * @body  { action: 'approve' | 'reject', reason: '...' }
@@ -118,6 +171,34 @@ router.get('/pending-tasks', async (req, res) => {
                 title: 1, description: 1, city: 1, region: 1, address: 1,
                 categoryId: 1, format: 1, capacity: 1, imageUrl: 1,
                 status: 1, createdAt: 1,
+                ownerName: '$owner.name',
+                ownerEmail: '$owner.email',
+                ownerOrganization: '$owner.organizationName'
+            }}
+        ]).toArray();
+
+        res.json({ success: true, tasks });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route GET /api/moderator/moderated-tasks
+ * @desc  Список модерированных задач (status: PUBLISHED или REJECTED)
+ */
+router.get('/moderated-tasks', async (req, res) => {
+    try {
+        const db = getDB();
+        const tasks = await db.collection('projects').aggregate([
+            { $match: { status: { $in: ['PUBLISHED', 'REJECTED'] } } },
+            { $lookup: { from: 'users', localField: 'ownerUserId', foreignField: '_id', as: 'owner' } },
+            { $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+            { $sort: { moderatedAt: -1, createdAt: -1 } },
+            { $project: {
+                title: 1, description: 1, city: 1, region: 1, address: 1,
+                categoryId: 1, format: 1, capacity: 1, imageUrl: 1,
+                status: 1, createdAt: 1, moderatedAt: 1, rejectionReason: 1,
                 ownerName: '$owner.name',
                 ownerEmail: '$owner.email',
                 ownerOrganization: '$owner.organizationName'
