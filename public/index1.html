@@ -3809,6 +3809,32 @@
     }
 
 
+    const FOOTER_HTML = `
+    <footer style="background: var(--text); color: #fff; padding: 80px 0 40px;">
+      <div class="container">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 60px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 60px;">
+          <div>
+            <div style="font-size: 26px; font-weight: 850; margin-bottom: 20px;">Доброе_дело.by</div>
+            <p style="opacity: 0.6; line-height: 1.6; max-width: 400px;">Единая платформа волонтерства и социальной взаимопомощи. Сделаем наш город добрее вместе.</p>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Навигация</h4>
+            <div style="display: grid; gap: 12px; opacity: 0.8; font-size: 15px;">
+              <span class="link" onclick="navigate('#/projects')">Проекты</span>
+              <span class="link" onclick="navigate('#/news')">Новости</span>
+              <span class="link" onclick="navigate('#/about')">О нас</span>
+            </div>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 20px;">Контакты</h4>
+            <p style="opacity: 0.8; font-size: 15px;">info@ddby.by</p>
+            <p style="opacity: 0.8; font-size: 15px;">+375 (29) 000-00-00</p>
+          </div>
+        </div>
+        <div style="margin-top: 40px; text-align: center; opacity: 0.4; font-size: 13px;">© 2026 Доброе_дело.by. Все права защищены.</div>
+      </div>
+    </footer>`;
+
     /* ===== Page Auth ===== */
     function renderAuth() {
       if (currentUser()) { navigate("/cabinet"); return; }
@@ -4509,30 +4535,7 @@
       </section>
     </div>
 
-    <footer style="background: var(--text); color: #fff; padding: 80px 0 40px;">
-      <div class="container">
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 60px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 60px;">
-          <div>
-            <div style="font-size: 26px; font-weight: 850; margin-bottom: 20px;">Доброе_дело.by</div>
-            <p style="opacity: 0.6; line-height: 1.6; max-width: 400px;">Единая платформа волонтерства и социальной взаимопомощи. Сделаем наш город добрее вместе.</p>
-          </div>
-          <div>
-            <h4 style="margin-bottom: 20px;">Навигация</h4>
-            <div style="display: grid; gap: 12px; opacity: 0.8; font-size: 15px;">
-              <span class="link" onclick="navigate('#/projects')">Проекты</span>
-              <span class="link" onclick="navigate('#/news')">Новости</span>
-              <span class="link" onclick="navigate('#/about')">О нас</span>
-            </div>
-          </div>
-          <div>
-            <h4 style="margin-bottom: 20px;">Контакты</h4>
-            <p style="opacity: 0.8; font-size: 15px;">info@ddby.by</p>
-            <p style="opacity: 0.8; font-size: 15px;">+375 (29) 000-00-00</p>
-          </div>
-        </div>
-        <div style="margin-top: 40px; text-align: center; opacity: 0.4; font-size: 13px;">© 2026 Доброе_дело.by. Все права защищены.</div>
-      </div>
-    </footer>
+    ${FOOTER_HTML}
 
     <style>
       @keyframes fadeInUp {
@@ -4627,6 +4630,7 @@
         </div>
       </section>
     </div>
+    ${FOOTER_HTML}
   `;
 
       $("#openHelpFromCatalog").onclick = openHelpModal;
@@ -5017,6 +5021,7 @@
         <button class="btn secondary" onclick="navigate('/projects')">Посмотреть проекты</button>
       </div>
     </div>
+    ${FOOTER_HTML}
   `;
 
       $("#contactForm").onsubmit = (e) => {
@@ -5608,6 +5613,7 @@
         </main>
       </div>
     </div>
+    ${FOOTER_HTML}
   `;
 
       // Обработка загрузки аватара
@@ -6688,7 +6694,8 @@
                 </div>
             </aside>
         </div>
-    </div>`;
+    </div>
+    ${FOOTER_HTML}`;
     }
 
     window.openFullImage = function (src) {
@@ -6773,7 +6780,8 @@
                 </div>
             `}
         </div>
-    </div>`;
+    </div>
+    ${FOOTER_HTML}`;
     }
 
     // ОТКРЫТИЕ МОДАЛЬНОГО ОКНА (ИСПРАВЛЕНО)
@@ -6989,6 +6997,7 @@
         </div>
 
     </div>
+    ${FOOTER_HTML}
     `;
     }
 
