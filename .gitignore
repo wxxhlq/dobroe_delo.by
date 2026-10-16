@@ -12,4 +12,18 @@ npm-debug.log*
 *.exe
 *.iss
 
-public/uploads/
+# Загруженные пользователями файлы не храним в репозитории.
+# Демонстрационные фото проектов — исключение, они нужны на сайте.
+public/uploads/*
+!public/uploads/projects/
+public/uploads/projects/*
+!public/uploads/projects/elderly-care.webp
+!public/uploads/projects/animal-shelter.webp
+!public/uploads/projects/eco-recycle.webp
+
+# Локальные бэкапы базы
+backup_*.bson
+
+# Одноразовые скрипты миграции
+list-projects.js
+refresh-projects.js
