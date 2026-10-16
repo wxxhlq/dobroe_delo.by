@@ -21,22 +21,23 @@ async function getTransporter() {
         return transporter;
     }
 
+    const smtpPort = parseInt(process.env.SMTP_PORT) || 465;
+
     const config = {
         host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT) || 465,
-        secure: process.env.SMTP_PORT === '465', // true для 465 порта
+        port: smtpPort,
+        secure: smtpPort === 465, // прямое TLS на 465, STARTTLS на 587/25
         auth: {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS
         }
     };
 
-    // Для Яндекса дополнительные настройки не нужны, но оставляем стандартную конфигурацию
     transporter = nodemailer.createTransport(config);
 
     try {
         await transporter.verify();
-        console.log('✅ SMTP соединение с Яндекс.Почтой установлено');
+        console.log(`✅ SMTP соединение установлено: ${config.host}:${smtpPort}`);
     } catch (err) {
         console.error('❌ Ошибка подключения к SMTP:', err.message);
     }
