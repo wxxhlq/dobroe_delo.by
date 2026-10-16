@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
     <script defer src="https://cloud.umami.is/script.js" data-website-id="f9ad662f-3488-47c5-af79-9b2da5aaeb0f"></script>
   <title>Доброе_дело.by</title>
-  <!--марк сучка соснула ручку бем-->
   <style>
     :root {
       --bg: #f6f8fc;
@@ -2382,7 +2381,7 @@
 
   <script>
     /* ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ API ===== */
-    const API_URL = 'http://localhost:3000';
+    const API_URL = window.location.origin;
     let authToken = localStorage.getItem('authToken');
     let tempNewsImagePC = "";
     var state; // Объявляем заранее для предотвращения Temporal Dead Zone в checkAuth/currentUser
@@ -5780,7 +5779,7 @@
       console.log('📤 Отправка данных на сервер:', updateData);
 
       try {
-        const res = await fetch(`http://localhost:3000/me`, {
+        const res = await fetch(`${API_URL}/me`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -5814,7 +5813,7 @@
           }
 
           try {
-            const verifyRes = await fetch(`http://localhost:3000/me/verify-phone`, {
+            const verifyRes = await fetch(`${API_URL}/me/verify-phone`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -5876,7 +5875,7 @@
       console.log('📤 Отправка документов на верификацию:', updateData);
 
       try {
-        const res = await fetch(`http://localhost:3000/me`, {
+        const res = await fetch(`${API_URL}/me`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

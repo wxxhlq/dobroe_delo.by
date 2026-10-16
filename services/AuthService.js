@@ -6,7 +6,7 @@ const GamificationService = require('./GamificationService');
 const emailService = require('./emailService');
 
 const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'supersecret_refresh_key_123';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 class AuthService {
@@ -424,7 +424,7 @@ class AuthService {
     generateAccessToken(user) {
         return jwt.sign(
             { userId: user._id.toString(), email: user.email, role: user.role },
-            process.env.JWT_SECRET || 'supersecret_jwt_key_123',
+            process.env.JWT_SECRET,
             { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
         );
     }

@@ -119,7 +119,7 @@ class UserController {
             await GamificationService.checkAchievements(req.user.userId);
             
             const updatedUser = await usersCollection.findOne({ _id: new ObjectId(req.user.userId) });
-            const token = jwt.sign({ userId: updatedUser._id.toString(), role: updatedUser.role, email: updatedUser.email }, process.env.JWT_SECRET || 'supersecret_jwt_key_123', { expiresIn: '15m' });
+            const token = jwt.sign({ userId: updatedUser._id.toString(), role: updatedUser.role, email: updatedUser.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
             
             if (verificationRequired) {
                 return res.json({
@@ -209,7 +209,7 @@ class UserController {
             );
 
             const updatedUser = await usersCollection.findOne({ _id: user._id });
-            const token = jwt.sign({ userId: updatedUser._id.toString(), role: updatedUser.role, email: updatedUser.email }, process.env.JWT_SECRET || 'supersecret_jwt_key_123', { expiresIn: '15m' });
+            const token = jwt.sign({ userId: updatedUser._id.toString(), role: updatedUser.role, email: updatedUser.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
             res.json({
                 message: 'Номер телефона успешно изменен',

@@ -8,12 +8,30 @@ const { connectDB, getDB } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+for (const key of ['MONGODB_URI', 'JWT_SECRET', 'REFRESH_TOKEN_SECRET']) {
+    if (!process.env[key]) {
+        console.error(`❌ Отсутствует обязательная переменная окружения ${key}`);
+        process.exit(1);
+    }
+}
+
 // Мидлвары
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+app.get('/healthz', (req, res) => {
+    let mongo = 'disconnected';
+    try {
+        getDB().command({ ping: 1 });
+        mongo = 'ok';
+    } catch (e) {
+        mongo = 'error';
+    }
+    res.status(mongo === 'ok' ? 200 : 503).json({ status: mongo === 'ok' ? 'ok' : 'degraded', mongo, uptime: process.uptime() });
+});
 
 // ЖЕЛЕЗОБЕТОННЫЙ ЛОГГЕР ПЕРЕХОДОВ (Для автоматического трекинга)
 app.use(async (req, res, next) => {
@@ -128,7 +146,7 @@ app.post('/refresh', async (req, res) => {
     if (!refreshToken) return res.status(400).json({ message: 'Refresh token обязателен' });
 
     try {
-        const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET || 'supersecret_refresh_key_123');
+        const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
         const db = getDB();
         if (!db) return res.status(503).json({ message: 'База данных недоступна' });
 
@@ -143,12 +161,12 @@ app.post('/refresh', async (req, res) => {
         // Для MVP этого достаточно
         const newAccessToken = jwt.sign(
             { userId: user._id.toString(), role: user.role, email: user.email },
-            process.env.JWT_SECRET || 'supersecret_jwt_key_123',
+            process.env.JWT_SECRET,
             { expiresIn: '15m' }
         );
         const newRefreshToken = jwt.sign(
             { userId: user._id.toString() },
-            process.env.REFRESH_TOKEN_SECRET || 'supersecret_refresh_key_123',
+            process.env.REFRESH_TOKEN_SECRET,
             { expiresIn: '7d' }
         );
 

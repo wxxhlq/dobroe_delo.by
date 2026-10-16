@@ -8,7 +8,7 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ message: 'Токен не передан' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'supersecret_jwt_key_123', (err, payload) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
         if (err) {
             return res.status(403).json({ message: 'Неверный или истекший токен' });
         }
