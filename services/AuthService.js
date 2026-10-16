@@ -5,12 +5,22 @@ const userRepository = require('../repositories/UserRepository');
 const GamificationService = require('./GamificationService');
 const emailService = require('./emailService');
 
+// Базовый URL для ссылок в письмах. На хостинге берётся из APP_URL,
+// локально (NODE_ENV != production) — с хоста и порта текущего запроса.
+function baseUrl(req) {
+    if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+    if (!req) return 'http://localhost:3000';
+    const host = req.get ? req.get('host') : req.headers.host;
+    const proto = (req.get && req.get('x-forwarded-proto')) || req.protocol || 'http';
+    return `${proto}://${host}`;
+}
+
 const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 class AuthService {
-    async register(userData) {
+    async register(userData, req) {
         const { username, password, email, role, name, city, phone, organizationName, organizationType, verificationDocuments } = userData;
         if (!email || !password || !name) throw new Error('Email, пароль и имя обязательны');
         
@@ -59,7 +69,7 @@ class AuthService {
         await GamificationService.checkAchievements(user._id.toString());
 
         // Отправка письма подтверждения
-        const confirmUrl = `http://localhost:3000/confirm-email?token=${emailConfirmationToken}`;
+        const confirmUrl = `${baseUrl(req)}/confirm-email?token=${emailConfirmationToken}`;
         await emailService.sendEmail({
             to: user.email,
             subject: 'Подтверждение регистрации на Доброе_дело.by',
@@ -230,7 +240,7 @@ class AuthService {
         };
     }
 
-    async forgotPassword(email) {
+    async forgotPassword(email, req) {
         if (!email) throw new Error('Email обязателен');
         const user = await userRepository.findByEmail(email.trim());
         if (!user) {
@@ -252,7 +262,7 @@ class AuthService {
             }
         );
 
-        const resetUrl = `http://localhost:3000/reset-password?token=${token}`;
+        const resetUrl = `${baseUrl(req)}/reset-password?token=${token}`;
         await emailService.sendEmail({
             to: user.email,
             subject: 'Восстановление пароля на Доброе_дело.by',
@@ -299,7 +309,7 @@ class AuthService {
         return { success: true, message: 'Пароль успешно обновлен' };
     }
 
-    async resendConfirmation(email) {
+    async resendConfirmation(email, req) {
         if (!email) throw new Error('Email обязателен');
         const user = await userRepository.findByEmail(email.trim());
         if (!user) throw new Error('Пользователь не найден');
@@ -322,7 +332,7 @@ class AuthService {
             }
         );
 
-        const confirmUrl = `http://localhost:3000/confirm-email?token=${token}`;
+        const confirmUrl = `${baseUrl(req)}/confirm-email?token=${token}`;
         await emailService.sendEmail({
             to: user.email,
             subject: 'Повторное подтверждение регистрации на Доброе_дело.by',

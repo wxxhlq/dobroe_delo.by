@@ -3,7 +3,7 @@ const authService = require('../services/AuthService');
 class AuthController {
     async register(req, res) {
         try {
-            const result = await authService.register(req.body);
+            const result = await authService.register(req.body, req);
             res.status(201).json({
                 message: 'Пользователь зарегистрирован. Пожалуйста, подтвердите email по ссылке, отправленной на вашу почту.',
                 ...result
@@ -56,7 +56,7 @@ class AuthController {
     async forgotPassword(req, res) {
         try {
             const { email } = req.body;
-            const result = await authService.forgotPassword(email);
+            const result = await authService.forgotPassword(email, req);
             res.json(result);
         } catch (err) {
             console.error('❌ Ошибка сброса пароля:', err);
@@ -78,7 +78,7 @@ class AuthController {
     async resendConfirmation(req, res) {
         try {
             const { email } = req.body;
-            const result = await authService.resendConfirmation(email);
+            const result = await authService.resendConfirmation(email, req);
             res.json(result);
         } catch (err) {
             console.error('❌ Ошибка повторной отправки подтверждения:', err);
