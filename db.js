@@ -1,7 +1,11 @@
 const { MongoClient } = require('mongodb');
 
 const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/auth_system';
-const client = new MongoClient(uri);
+
+// Пользователи Atlas живут в базе admin, а не в базе из URI.
+// Без явного authSource драйвер берёт имя базы из пути и получает "bad auth".
+const authSource = process.env.MONGODB_AUTH_SOURCE || (/mongodb\+srv:\/\//.test(uri) ? 'admin' : undefined);
+const client = new MongoClient(uri, authSource ? { authSource } : {});
 
 let db;
 let dbConnectionPromise = null;
