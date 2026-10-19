@@ -194,6 +194,8 @@ FRONTEND_ROUTES.forEach(route => {
 
 const ErrorLog = require('./models/ErrorLog');
 app.use(async (err, req, res, next) => {
+    console.error(`❌ ${req.method} ${req.originalUrl} — ${err.name}: ${err.message}`);
+    if (err.stack) console.error(err.stack);
     try {
         await ErrorLog.create({
             message: err.message, stack: err.stack, url: req.originalUrl,
